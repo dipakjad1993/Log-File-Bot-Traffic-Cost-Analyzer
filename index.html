@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log File &amp; Bot Traffic cost Analyzer</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">LOG &amp; BOT TRAFFIC COST ANALYZER</div>
+  <div class="sidebar-sub">Enterprise Traffic Intelligence</div>
+  <div class="sidebar-nav">
+    <button class="sb-btn active" data-section="dashboard">Dashboard</button>
+    <button class="sb-btn" data-section="about">About</button>
+    <button class="sb-btn" data-section="howto">How To Use</button>
+  </div>
+  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser.</div>
+</nav>
+
+<div class="main-wrap">
+
+<!-- ============ UPLOAD SCREEN ============ -->
+<section id="sec-dashboard" class="page active-page">
+  <div class="upload-panel" id="upload-panel">
+    <div class="upload-header">
+      <div class="upload-brand-icon"></div>
+      <h1>Log File &amp; Bot Traffic cost Analyzer</h1>
+      <p class="tool-tagline">A free, client-side alternative to Botify, Loggly, and other $4k-$8k/mo enterprise log analysis platforms. Upload your server logs and get instant, in-depth insights into bot traffic, crawl budget waste, infrastructure costs, AI scraper impact, and security threats &mdash; all processed entirely in your browser.</p>
+    </div>
+    <div class="upload-drop" id="upload-drop">
+      <div class="drop-icon"></div>
+      <div class="drop-title">Drop your log file here</div>
+      <div class="drop-sub">or</div>
+      <button class="btn-primary" id="browse-btn">Browse Files</button>
+      <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log" hidden>
+      <div class="drop-formats">Accepted: JSON array, JSONL (one JSON per line), NDJSON</div>
+    </div>
+    <div class="upload-extras">
+      <span class="divider-text">no log file?</span>
+      <button class="btn-outline" id="download-sample-btn">Download Sample Log</button>
+    </div>
+  </div>
+
+  <!-- File info bar -->
+  <div class="info-bar hidden" id="info-bar">
+    <div class="ib-item"><span class="ib-label">File</span><span class="ib-val" id="ib-file">--</span></div>
+    <div class="ib-item"><span class="ib-label">Size</span><span class="ib-val" id="ib-size">--</span></div>
+    <div class="ib-item"><span class="ib-label">Records</span><span class="ib-val" id="ib-records">--</span></div>
+    <div class="ib-item"><span class="ib-label">Fields</span><span class="ib-val" id="ib-fields">--</span></div>
+    <button class="btn-sm" id="clear-btn">Clear</button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap hidden" id="progress-wrap">
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-label" id="progress-label">Analyzing...</div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="results hidden">
+
+    <!-- KPIs -->
+    <div class="kpi-strip" id="kpi-strip"></div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar" id="tab-bar">
+      <button class="tb active" data-tab="tab1">1. Bot Classification</button>
+      <button class="tb" data-tab="tab2">2. Bot Verification</button>
+      <button class="tb" data-tab="tab3">3. Crawl Budget</button>
+      <button class="tb" data-tab="tab4">4. Cost Analysis</button>
+      <button class="tb" data-tab="tab5">5. AI Scraper Matrix</button>
+      <button class="tb" data-tab="tab6">6. Edge Rules</button>
+      <button class="tb" data-tab="tab7">7. Performance</button>
+      <button class="tb" data-tab="tab8">8. Traffic Patterns</button>
+      <button class="tb" data-tab="tab9">9. Security</button>
+      <button class="tb" data-tab="tab10">10. CFO / FinOps</button>
+    </div>
+
+    <!-- Tab content -->
+    <div class="tab-content">
+      <div class="tp active-tp" id="tab1"></div>
+      <div class="tp" id="tab2"></div>
+      <div class="tp" id="tab3"></div>
+      <div class="tp" id="tab4"></div>
+      <div class="tp" id="tab5"></div>
+      <div class="tp" id="tab6"></div>
+      <div class="tp" id="tab7"></div>
+      <div class="tp" id="tab8"></div>
+      <div class="tp" id="tab9"></div>
+      <div class="tp" id="tab10"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ABOUT SCREEN ============ -->
+<section id="sec-about" class="page">
+  <div class="content-page" id="about-content"></div>
+</section>
+
+<!-- ============ HOWTO SCREEN ============ -->
+<section id="sec-howto" class="page">
+  <div class="content-page" id="howto-content"></div>
+</section>
+
+</div>
+
+<script src="js/analyzer.js"></script>
+</body>
+</html>

@@ -1,0 +1,848 @@
+/* ============================================================
+   Log File & Bot Traffic Cost Analyzer — Engine v4.0
+   Complete rewrite: bug-free, deep analysis, light theme
+   ============================================================ */
+(function(){
+'use strict';
+
+/* ==== A: BOT SIGNATURE DB (2026) ==== */
+const BOTS=[
+  {p:'googlebot',n:'Googlebot',cat:'search_engine',tier:'search_engine',v:10,note:'Primary organic search crawler. Critical for SEO visibility and organic traffic.'},
+  {p:'adsbot-google',n:'AdsBot-Google',cat:'search_engine',tier:'search_engine',v:8,note:'Google Ads landing page quality crawler.'},
+  {p:'mediapartners-google',n:'Mediapartners-Google',cat:'search_engine',tier:'search_engine',v:7,note:'Google AdSense crawler for content matching.'},
+  {p:'google-InspectionTool',n:'Google InspectionTool',cat:'search_engine',tier:'search_engine',v:9,note:'Google Rich Results testing tool.'},
+  {p:'feedfetcher-google',n:'FeedFetcher-Google',cat:'search_engine',tier:'search_engine',v:6,note:'Google feed fetcher.'},
+  {p:'bingbot',n:'Bingbot',cat:'search_engine',tier:'search_engine',v:9,note:'Microsoft Bing crawler. Drives organic traffic from Bing.'},
+  {p:'msnbot',n:'MSNbot',cat:'search_engine',tier:'search_engine',v:7,note:'Legacy Bing crawler.'},
+  {p:'bingpreview',n:'BingPreview',cat:'search_engine',tier:'search_engine',v:5,note:'Bing snapshot crawler.'},
+  {p:'yandexbot',n:'YandexBot',cat:'search_engine',tier:'search_engine',v:7,note:'Yandex search crawler for Russian market.'},
+  {p:'baiduspider',n:'BaiduSpider',cat:'search_engine',tier:'search_engine',v:6,note:'Baidu search crawler for Chinese market.'},
+  {p:'duckduckbot',n:'DuckDuckBot',cat:'search_engine',tier:'search_engine',v:7,note:'DuckDuckGo search crawler.'},
+  {p:'applebot',n:'Applebot',cat:'search_engine',tier:'search_engine',v:7,note:'Apple/Siri web index crawler.'},
+  {p:'yahoo! slurp',n:'Yahoo Slurp',cat:'search_engine',tier:'search_engine',v:5,note:'Yahoo search crawler.'},
+  {p:'facebot',n:'Facebookbot',cat:'social',tier:'social',v:5,note:'Facebook/Meta link preview crawler.'},
+  {p:'facebookexternalhit',n:'facebookexternalhit',cat:'social',tier:'social',v:5,note:'Facebook link sharing crawler.'},
+  {p:'twitterbot',n:'Twitterbot',cat:'social',tier:'social',v:5,note:'Twitter/X card preview crawler.'},
+  {p:'linkedinbot',n:'LinkedInBot',cat:'social',tier:'social',v:4,note:'LinkedIn link preview crawler.'},
+  {p:'slackbot',n:'Slackbot',cat:'social',tier:'social',v:3,note:'Slack link unfurling.'},
+  {p:'discordbot',n:'Discordbot',cat:'social',tier:'social',v:3,note:'Discord link embed.'},
+  {p:'pinterestbot',n:'Pinterestbot',cat:'social',tier:'social',v:4,note:'Pinterest pin crawler.'},
+  {p:'perplexitybot',n:'PerplexityBot',cat:'ai_search',tier:'ai_citation',v:7,note:'Perplexity AI search. Drives referral traffic and citations.'},
+  {p:'claudebot',n:'ClaudeBot',cat:'ai_search',tier:'ai_citation',v:6,note:'Anthropic Claude. Can drive citations via Claude.ai.'},
+  {p:'oai-searchbot',n:'OAI-SearchBot',cat:'ai_search',tier:'ai_citation',v:6,note:'OpenAI ChatGPT Search. Drives referral traffic.'},
+  {p:'chatgpt-user',n:'ChatGPT-User',cat:'ai_search',tier:'ai_citation',v:6,note:'ChatGPT browsing agent.'},
+  {p:'gptbot',n:'GPTBot',cat:'ai_search',tier:'ai_citation',v:4,note:'OpenAI GPTBot. Context-dependent: search vs training.'},
+  {p:'youbot',n:'YouBot',cat:'ai_search',tier:'ai_citation',v:5,note:'You.com AI search crawler.'},
+  {p:'bravebot',n:'BraveBot',cat:'ai_search',tier:'ai_citation',v:5,note:'Brave Search AI crawler.'},
+  {p:'amazonbot',n:'Amazonbot',cat:'ai_search',tier:'ai_citation',v:3,note:'Amazon/Alexa crawler.'},
+  {p:'ccbot',n:'CCBot',cat:'ai_training',tier:'ai_training',v:0,note:'Common Crawl. Feeds AI training pipelines. Zero direct ROI.'},
+  {p:'bytespider',n:'Bytespider',cat:'ai_training',tier:'ai_training',v:0,note:'ByteDance AI training scraper. Extremely aggressive.'},
+  {p:'meta-externalagent',n:'Meta-ExternalAgent',cat:'ai_training',tier:'ai_training',v:0,note:'Meta AI training crawler.'},
+  {p:'applebot-extended',n:'Applebot-Extended',cat:'ai_training',tier:'ai_training',v:1,note:'Apple extended crawler for AI training.'},
+  {p:'scrapy',n:'Scrapy',cat:'ai_training',tier:'ai_training',v:0,note:'Python Scrapy framework scraper.'},
+  {p:'python-requests',n:'Python-requests',cat:'ai_training',tier:'ai_training',v:-1,note:'Python HTTP client. Generic scraper.'},
+  {p:'python-urllib',n:'Python-urllib',cat:'ai_training',tier:'ai_training',v:-1,note:'Python urllib. Generic scraper.'},
+  {p:'go-http-client',n:'Go-http-client',cat:'ai_training',tier:'ai_training',v:-1,note:'Go HTTP client. Often automated.'},
+  {p:'java/',n:'Java/HTTP',cat:'ai_training',tier:'ai_training',v:-1,note:'Java HTTP client.'},
+  {p:'curl/',n:'cURL',cat:'ai_training',tier:'ai_training',v:-2,note:'cURL command. Automated downloading.'},
+  {p:'wget/',n:'Wget',cat:'ai_training',tier:'ai_training',v:-2,note:'Wget. Automated downloading.'},
+  {p:'headlesschrome',n:'HeadlessChrome',cat:'ai_training',tier:'ai_training',v:-3,note:'Headless Chrome. Automated browser.'},
+  {p:'phantomjs',n:'PhantomJS',cat:'ai_training',tier:'ai_training',v:-3,note:'PhantomJS headless browser.'},
+  {p:'puppeteer',n:'Puppeteer',cat:'ai_training',tier:'ai_training',v:-3,note:'Puppeteer headless browser.'},
+  {p:'playwright',n:'Playwright',cat:'ai_training',tier:'ai_training',v:-3,note:'Playwright test automation.'},
+  {p:'ahrefsbot',n:'AhrefsBot',cat:'seo_tool',tier:'seo_tool',v:2,note:'Ahrefs SEO crawler. Provides backlink data.'},
+  {p:'semrushbot',n:'SEMrushBot',cat:'seo_tool',tier:'seo_tool',v:1,note:'SEMrush SEO crawler.'},
+  {p:'dotbot',n:'DotBot (Moz)',cat:'seo_tool',tier:'seo_tool',v:1,note:'Moz/DotBot SEO crawler.'},
+  {p:'mj12bot',n:'MJ12bot',cat:'seo_tool',tier:'seo_tool',v:1,note:'Majestic SEO crawler.'},
+  {p:'screaming frog',n:'Screaming Frog',cat:'seo_tool',tier:'seo_tool',v:0,note:'Screaming Frog SEO Spider tool.'},
+  {p:'pingdom',n:'Pingdom',cat:'monitoring',tier:'monitoring',v:0,note:'Pingdom uptime monitor.'},
+  {p:'uptimerobot',n:'UptimeRobot',cat:'monitoring',tier:'monitoring',v:0,note:'UptimeRobot monitor.'},
+  {p:'gtmetrix',n:'GTmetrix',cat:'monitoring',tier:'monitoring',v:0,note:'GTmetrix performance monitor.'},
+  {p:'newrelic',n:'New Relic',cat:'monitoring',tier:'monitoring',v:0,note:'New Relic monitoring agent.'},
+  {p:'datadog',n:'Datadog',cat:'monitoring',tier:'monitoring',v:0,note:'Datadog monitoring agent.'},
+];
+
+const REAL_BROWSERS=[
+  {p:'windows nt 10.0',n:'Chrome on Windows'},
+  {p:'windows nt 6.1',n:'Chrome on Windows 7'},
+  {p:'windows nt 6.3',n:'Chrome on Windows 8.1'},
+  {p:'macintosh; intel mac os x',n:'Safari on macOS'},
+  {p:'x11; linux',n:'Chrome on Linux'},
+  {p:'android',min:60,n:'Mobile Chrome'},
+  {p:'iphone; cpu iphone os',n:'Safari on iPhone'},
+  {p:'ipad; cpu os',n:'Safari on iPad'},
+  {p:'edge/',n:'Microsoft Edge'},
+  {p:'edg/',n:'Microsoft Edge (Chromium)'},
+  {p:'firefox/',n:'Firefox'},
+  {p:'chrome/',n:'Chrome'},
+  {p:'version/',min:60,n:'Safari'},
+  {p:'applewebkit/',min:60,n:'WebKit browser'},
+  {p:'opr/',n:'Opera'},
+  {p:'samsungbrowser',n:'Samsung Browser'},
+  {p:'ucbrowser',n:'UC Browser'},
+  {p:'yabrowser',n:'Yandex Browser'},
+];
+
+const ENGINE_IPS={
+  Google:['66.249.','64.233.','72.14.','216.239.','74.125.','172.217.','142.250.','209.85.','108.177.','35.190.','35.191.','34.'],
+  Bing:['13.107.','204.79.','199.232.'],
+  Baidu:['180.76.','123.125.','220.181.'],
+  Yandex:['77.88.','93.158.','5.45.','95.108.'],
+};
+
+const CLOUD_IPS={
+  AWS:['3.','18.','52.','54.','34.','184.72.','204.236.'],
+  'Google Cloud':['34.','35.','130.211.','35.186.','35.190.','35.191.'],
+  Azure:['13.64.','13.65.','13.66.','40.76.','40.77.','52.96.','52.97.'],
+  Cloudflare:['104.16.','104.17.','104.18.','104.19.','172.64.','172.65.'],
+  Hetzner:['5.9.','5.45.','37.120.','138.201.'],
+  DigitalOcean:['159.65.','104.131.','167.71.'],
+  OVH:['51.38.','149.202.','91.121.','147.189.'],
+  Fastly:['151.101.','199.232.'],
+};
+
+const TRAPS=[
+  {name:'Faceted Navigation / Filters',regex:/[?&](color|size|brand|category|type|style|material|price|rating|condition|filter|f_[a-z]+)=/i,sev:'high'},
+  {name:'Pagination Loops',regex:/[?&](page|p|offset|start|from|cursor|after)=\d+/i,sev:'medium'},
+  {name:'Sort Parameter Variants',regex:/[?&](sort|order|direction|sort_by|sort_order)=/i,sev:'medium'},
+  {name:'Session/Tracking IDs',regex:/[?&](session|sid|sess|token|phpsessid|jsessionid)=/i,sev:'high'},
+  {name:'Infinite Calendar/Date Loops',regex:/\/(calendar|archive|date|day|month|year)\/\d{4}/i,sev:'high'},
+  {name:'Internal Search Results',regex:/\/(search|query|find|results?)\/|[\?&](q|query|search|keyword|term)=/i,sev:'medium'},
+  {name:'Tag/Category Pagination',regex:/\/(tag|tags|author|category|label)\/[^\/]+\/page\/\d+/i,sev:'low'},
+  {name:'API/AJAX Endpoints',regex:/\/api\/|\/ajax\/|\/graphql|\/v\d+\/|\.json$|\.xml$/i,sev:'medium'},
+  {name:'Complex Query Strings (3+ params)',regex:/\?[^?]+&[^?]+&[^?]+&/,sev:'high'},
+  {name:'UTM Parameter Spam',regex:/[?&]utm_[a-z]+=/i,sev:'low'},
+];
+
+const THREATS=[
+  {name:'Path Traversal Attempt',regex:/\.\.\/|\.\.\\|%2e%2e|%252e%252e/i,sev:'critical'},
+  {name:'Sensitive File Probe',regex:/\.(env|git|svn|htpasswd|htaccess|config|bak|sql|dump|key|pem)$/i,sev:'critical'},
+  {name:'WordPress Admin Probe',regex:/\/wp-(admin|login|xmlrpc)/i,sev:'high'},
+  {name:'Admin Panel Probe',regex:/\/(phpmyadmin|adminer|admin\.php|login\.php|xmlrpc\.php|manager\/)/i,sev:'high'},
+  {name:'Shell/CGI Probe',regex:/\/(shell|cmd|exec|cgi-bin|bin\/sh|bin\/bash)/i,sev:'critical'},
+  {name:'Backup File Access',regex:/\.(bak|old|backup|sql|dump|tar\.gz|zip|rar)$/i,sev:'high'},
+  {name:'Log File Access',regex:/\/(server-status|server-info|error\.log|access\.log|debug|trace)/i,sev:'medium'},
+];
+
+/* ==== B: UTILITIES ==== */
+function fmtB(b){if(!b||isNaN(b))return'0 B';const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(Math.abs(b))/Math.log(k));return parseFloat((b/Math.pow(k,i)).toFixed(2))+' '+s[i]}
+function fmtN(n){if(n==null||isNaN(n))return'0';return n.toLocaleString('en-US')}
+function fmtC(n){if(n==null||isNaN(n))return'$0.00';return'$'+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+function fmtP(n){if(n==null||isNaN(n))return'0.0%';return n.toFixed(1)+'%'}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function avg(a){return a.length?a.reduce((s,v)=>s+v,0)/a.length:0}
+function pctl(a,p){if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);return s[Math.min(Math.floor(s.length*p/100),s.length-1)]}
+function grpBy(arr,fn){const m={};for(const i of arr){const k=typeof fn==='function'?fn(i):i[fn];if(!m[k])m[k]=[];m[k].push(i)}return m}
+
+/* ==== C: NORMALIZE ==== */
+function pick(o,...keys){
+  for(const k of keys){
+    if(o[k]!==undefined&&o[k]!==null&&o[k]!=='')return String(o[k]);
+    const lk=k.toLowerCase();
+    for(const ok of Object.keys(o)){if(ok.toLowerCase()===lk)return String(o[ok])}
+  }
+  return null;
+}
+function norm(rec){
+  const raw_ip=pick(rec,'remote_addr','client_ip','clientIP','ClientIP','clientip','real_ip','ip','source_ip','x_forwarded_for');
+  let ip=raw_ip;if(ip&&ip.includes(','))ip=ip.split(',')[0].trim();if(ip&&ip.startsWith('['))ip=ip.slice(1,-1);
+  const ts=pick(rec,'timestamp','time','time_local','date','datetime','created','@timestamp','ts','Timestamp','Time','Date','log_time');
+  let tstamp=null;if(ts){tstamp=new Date(ts);if(isNaN(tstamp.getTime()))tstamp=null}
+  const method=(pick(rec,'method','request_method','requestMethod','RequestMethod','http_method')||'GET').toUpperCase();
+  const uri=pick(rec,'uri','request_uri','requestURI','RequestURI','url','path','request','request_path')||'/';
+  const statusStr=pick(rec,'status','status_code','statusCode','HttpStatus','http_status');
+  const status=statusStr?parseInt(statusStr,10):0;
+  const ua=pick(rec,'user_agent','useragent','userAgent','UserAgent','User-Agent','ua','http_user_agent')||'';
+  const bytesStr=pick(rec,'bytes','bytes_sent','bytesSent','body_bytes_sent','bodyBytesSent','response_bytes','size','content_length');
+  const bytes=bytesStr?parseInt(bytesStr,10):0;
+  const rtStr=pick(rec,'request_time','requestTime','RequestTime','response_time','upstream_response_time','duration','latency','ttfb');
+  const rt=rtStr?parseFloat(rtStr):null;
+  const referer=pick(rec,'referer','referrer','http_referer','httpReferer','request_referer')||'';
+  const tls=pick(rec,'tls_protocol','ssl_protocol','sslProtocol','TLSProtocol')||'';
+  const cache=pick(rec,'cache_status','cacheStatus','CacheStatus','cf_cache_status','x_cache','X-Cache')||'';
+  return {raw:rec,ip,tstamp,method,uri,status,ua,bytes:isNaN(bytes)?0:bytes,rt:isNaN(rt)?null:rt,referer,tls,cache};
+}
+
+/* ==== D: CLASSIFY ==== */
+function classifyBot(ua){
+  if(!ua)return{name:'Unknown (No User-Agent)',cat:'unknown',tier:'unknown',v:-1};
+  const ual=ua.toLowerCase();
+  let isBrowser=false,browserName='';
+  for(const bp of REAL_BROWSERS){
+    if(ual.includes(bp.p.toLowerCase())){
+      if(bp.min&&ua.length<bp.min)continue;
+      isBrowser=true;browserName=bp.n;break;
+    }
+  }
+  for(const sig of BOTS){
+    if(ual.includes(sig.p.toLowerCase())){
+      if(isBrowser&&sig.cat==='ai_training'&&['python-requests','python-urllib','go-http-client','java/','curl/','wget/'].includes(sig.p))continue;
+      return{name:sig.n,cat:sig.cat,tier:sig.tier,v:sig.v,note:sig.note};
+    }
+  }
+  if(isBrowser)return{name:'Human Browser ('+browserName+')',cat:'human',tier:'human',v:10,note:'Genuine human browser traffic'};
+  const hints=['bot','spider','crawler','fetch','scrape','archive','collector','monitor','checker','validator'];
+  for(const h of hints){if(ual.includes(h))return{name:'Unknown Bot ('+h+')',cat:'unknown_bot',tier:'unknown_bot',v:-1,note:ua.substring(0,80)}}
+  if(ua.length<10)return{name:'Minimal/Empty UA',cat:'suspicious',tier:'suspicious',v:-2,note:ua};
+  if(ua.length>30&&(ual.includes('mozilla')||ual.includes('webkit')||ual.includes('chrome')||ual.includes('safari')))return{name:'Likely Human',cat:'human',tier:'human',v:8};
+  return{name:'Unclassified',cat:'unclassified',tier:'unclassified',v:0,note:ua.substring(0,80)};
+}
+
+/* ==== E: VERIFY ==== */
+function verifyBot(rec,b){
+  const c={dns:{s:'skip',d:''},tls:{s:'skip',d:''},asn:{s:'skip',d:''},beh:{s:'skip',d:''}};
+  if(b.tier==='search_engine'){
+    const e=b.name.includes('Google')?'Google':b.name.includes('Bing')?'Bing':b.name.includes('Yandex')?'Yandex':b.name.includes('Baidu')?'Baidu':'';
+    const ranges=e?ENGINE_IPS[e]:null;
+    if(ranges&&rec.ip){const m=ranges.find(r=>rec.ip.startsWith(r));c.dns={s:m?'verified':'suspicious',d:m?`IP ${rec.ip} matches known ${e} range ${m}*`:`IP ${rec.ip} NOT in known ${e} ranges -- possible spoofing`}}
+  }
+  if(rec.tls){
+    if(b.name.includes('Googlebot'))c.tls={s:rec.tls==='TLSv1.3'?'consistent':'suspicious',d:`TLS ${rec.tls} -- ${rec.tls==='TLSv1.3'?'matches':'does not match'} expected Googlebot fingerprint`};
+    else if(b.tier==='human')c.tls={s:['TLSv1.3','TLSv1.2'].includes(rec.tls)?'consistent':'unusual',d:`TLS ${rec.tls}`};
+    else c.tls={s:'info',d:`TLS ${rec.tls}`};
+  }
+  if(rec.ip){
+    let cloud='';for(const[prov,pfxs] of Object.entries(CLOUD_IPS)){if(pfxs.some(p=>rec.ip.startsWith(p))){cloud=prov;break}}
+    if(cloud)c.asn={s:b.tier==='human'?'suspicious':'expected',d:b.tier==='human'?`IP from ${cloud} -- possible headless`:`Bot on ${cloud} -- expected`};
+    else c.asn={s:'residential',d:'IP appears residential/ISP'};
+  }
+  const hasTrap=TRAPS.some(t=>t.regex.test(rec.uri));
+  const isAggressive=rec.uri.includes('?')&&rec.uri.split('&').length>3;
+  c.beh={s:hasTrap||isAggressive?'aggressive':'normal',d:hasTrap||isAggressive?'Aggressive crawl pattern detected':'Normal pattern'};
+  return c;
+}
+
+/* ==== F: TRAP DETECTION ==== */
+function detectTraps(records){
+  const t={};
+  for(const r of records){
+    for(const tp of TRAPS){
+      if(tp.regex.test(r.uri)){
+        if(!t[tp.name])t[tp.name]={name:tp.name,sev:tp.sev,count:0,paths:new Set(),bytes:0,statusCodes:{}};
+        t[tp.name].count++;t[tp.name].paths.add(r.uri.split('?')[0]);t[tp.name].bytes+=r.bytes;
+        t[tp.name].statusCodes[r.status]=(t[tp.name].statusCodes[r.status]||0)+1;
+      }
+    }
+  }
+  for(const k in t){t[k].uniqueCount=t[k].paths.size;delete t[k].paths}
+  return t;
+}
+
+/* ==== G: COSTS ==== */
+const COSTS={cdnEgress:0.09,request10K:0.0075,ssr1K:0.005,saas:6000};
+function calcCosts(botData,cfg){
+  const c={...COSTS,...cfg};
+  const r={byBot:{},total:{egress:0,request:0,ssr:0,all:0},savings:{botBlocking:0,saas:c.saas,total:0}};
+  for(const[name,bd] of Object.entries(botData)){
+    const egGB=bd.totalBytes/(1024*1024*1024);
+    const eg=egGB*c.cdnEgress;
+    const rq=(bd.count/10000)*c.request10K;
+    const ss=((bd.s2xx||0)/1000)*c.ssr1K;
+    const tot=eg+rq+ss;
+    r.byBot[name]={count:bd.count,totalBytes:bd.totalBytes,eg,rq,ss,total:tot};
+    r.total.egress+=eg;r.total.request+=rq;r.total.ssr+=ss;r.total.all+=tot;
+    if(bd.tier==='ai_training'||bd.tier==='suspicious'||bd.tier==='unknown_bot'||bd.tier==='unclassified'||bd.v<0)r.savings.botBlocking+=tot;
+  }
+  r.savings.total=r.savings.botBlocking+c.saas;
+  return r;
+}
+
+/* ==== H: CRAWL BUDGET ==== */
+function crawlBudget(records,cls){
+  const eng={};
+  for(let i=0;i<records.length;i++){
+    const r=records[i],c=cls[i];
+    if(c.tier!=='search_engine'&&c.tier!=='ai_citation')continue;
+    const k=c.name;
+    if(!eng[k])eng[k]={name:k,tier:c.tier,total:0,unique:new Set(),s2xx:0,s3xx:0,s4xx:0,s5xx:0,cacheHit:0,cacheMiss:0,paramUrls:0,totalBytes:0,rts:[]};
+    const e=eng[k];e.total++;e.unique.add(r.uri.split('?')[0]);e.totalBytes+=r.bytes;
+    if(r.status>=200&&r.status<300)e.s2xx++;else if(r.status>=300&&r.status<400)e.s3xx++;else if(r.status>=400&&r.status<500)e.s4xx++;else if(r.status>=500)e.s5xx++;
+    const cl=(r.cache||'').toLowerCase();if(cl.includes('hit'))e.cacheHit++;else if(cl.includes('miss'))e.cacheMiss++;
+    if(r.uri.includes('?'))e.paramUrls++;if(r.rt!==null)e.rts.push(r.rt);
+  }
+  for(const k in eng){
+    const e=eng[k];e.uniqueCount=e.unique.size;delete e.unique;
+    e.avgMs=e.rts.length?avg(e.rts)*1000:null;e.p95Ms=e.rts.length?pctl(e.rts,95)*1000:null;
+    delete e.rts;e.efficiency=e.total?(e.s2xx/e.total*100):0;e.paramRatio=e.total?(e.paramUrls/e.total*100):0;
+    e.cacheRatio=(e.cacheHit+e.cacheMiss)?(e.cacheHit/(e.cacheHit+e.cacheMiss)*100):0;
+  }
+  return eng;
+}
+
+/* ==== I: TRAFFIC PATTERNS ==== */
+function trafficP(records){
+  const hourly=new Array(24).fill(0),daily=new Array(7).fill(0);
+  const methods={},statuses={},topIPs={},topURLs={},topRef={},topUA={};
+  for(const r of records){
+    if(r.tstamp){hourly[r.tstamp.getUTCHours()]++;daily[r.tstamp.getUTCDay()]++}
+    methods[r.method]=(methods[r.method]||0)+1;
+    const sg=Math.floor(r.status/100)+'xx';statuses[sg]=(statuses[sg]||0)+1;
+    if(r.ip)topIPs[r.ip]=(topIPs[r.ip]||0)+1;
+    const up=r.uri.split('?')[0];topURLs[up]=(topURLs[up]||0)+1;
+    if(r.referer){try{const h=new URL(r.referer).hostname;topRef[h]=(topRef[h]||0)+1}catch(e){}}
+    const sUA=(r.ua||'').substring(0,80);topUA[sUA]=(topUA[sUA]||0)+1;
+  }
+  const hAvg=avg(hourly);const hStd=Math.sqrt(hourly.reduce((s,v)=>s+Math.pow(v-hAvg,2),0)/24);
+  const spikes={};hourly.forEach((v,h)=>{if(v>hAvg+2*hStd&&v>10)spikes[h]={count:v,ratio:(v/hAvg).toFixed(1)}});
+  return{hourly,daily,methods,statuses,topIPs:Object.entries(topIPs).sort((a,b)=>b[1]-a[1]).slice(0,25),topURLs:Object.entries(topURLs).sort((a,b)=>b[1]-a[1]).slice(0,40),topRef:Object.entries(topRef).sort((a,b)=>b[1]-a[1]).slice(0,20),topUA:Object.entries(topUA).sort((a,b)=>b[1]-a[1]).slice(0,20),spikes,hAvg};
+}
+
+/* ==== J: SECURITY ==== */
+function security(records){
+  const ipD={},threats=[],largeP=[];
+  for(const r of records){
+    if(!r.ip)continue;
+    if(!ipD[r.ip])ipD[r.ip]={count:0,bytes:0,s4xx:0,urls:new Set(),uas:new Set(),first:r.tstamp,last:r.tstamp};
+    const d=ipD[r.ip];d.count++;d.bytes+=r.bytes;if(r.status>=400&&r.status<500)d.s4xx++;
+    d.urls.add(r.uri.split('?')[0]);if(r.ua)d.uas.add(r.ua.substring(0,60));
+    if(r.tstamp){if(!d.first||r.tstamp<d.first)d.first=r.tstamp;if(!d.last||r.tstamp>d.last)d.last=r.tstamp}
+    for(const t of THREATS){if(t.regex.test(r.uri))threats.push({type:t.name,sev:t.sev,ip:r.ip,uri:r.uri,ua:r.ua})}
+    if(r.bytes>10*1024*1024)largeP.push({ip:r.ip,uri:r.uri,bytes:r.bytes,ua:r.ua});
+  }
+  const ipA=[];for(const[ip,d] of Object.entries(ipD)){
+    const dur=d.first&&d.last?(d.last-d.first)/1000:0;const rps=dur>0?d.count/dur:0;
+    ipA.push({ip,count:d.count,bytes:d.bytes,s4xx:d.s4xx,uniqueUrls:d.urls.size,rps,uas:[...d.uas]});
+  }
+  ipA.sort((a,b)=>b.count-a.count);
+  const rpsV=ipA.filter(i=>i.rps>0).map(i=>i.rps);const rA=avg(rpsV);const rS=Math.sqrt(rpsV.reduce((s,v)=>s+Math.pow(v-rA,2),0)/(rpsV.length||1));
+  const hvIPs=ipA.filter(i=>i.rps>Math.max(rA+2*rS,3)&&i.count>50);
+  return{totalIPs:ipA.length,topIPs:ipA.slice(0,30),threats,hvIPs,largeP:largeP.slice(0,20)};
+}
+
+/* ==== K: EDGE RULES ==== */
+function genEdgeRules(botData,sec){
+  const r={cloudflare:[],fastly:[],aws:[]};
+  for(const[name,bd] of Object.entries(botData)){
+    if((bd.tier==='ai_training'||bd.tier==='suspicious')&&bd.count>50){
+      const u=bd.topUAList?.[0]?.[0]||name;
+      r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${fmtN(bd.count)} requests, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${u.substring(0,40)}") { action: "block"; }`});
+      r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${u.substring(0,40)}") { error 403 "Blocked"; }`});
+      r.aws.push({name:`Block ${name}`,act:'BLOCK',rule:`{ "Statement": { "ByteMatchStatement": { "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } }, "PositionalConstraint": "CONTAINS", "SearchString": "${u.substring(0,40)}" } }, "Action": { "Block": {} } }`});
+    }
+    if(bd.tier==='ai_citation'&&bd.count>30){
+      const u=bd.topUAList?.[0]?.[0]||name;
+      r.cloudflare.push({name:`Rate-limit ${name}`,act:'RATE-LIMIT',desc:`Limit to 10 req/min`,rule:`(http.user-agent contains "${u.substring(0,40)}") { rate_limit { rps = 10; duration = 60; } }`});
+    }
+  }
+  if(sec.hvIPs.length>0)r.cloudflare.push({name:'Block High-Velocity IPs',act:'BLOCK',desc:`${sec.hvIPs.length} IPs exceeding safe velocity`,rule:`ip.src in { ${sec.hvIPs.slice(0,10).map(i=>i.ip).join(' ')} } { action: "block"; }`});
+  return r;
+}
+
+/* ==== L: MAIN ANALYZE ==== */
+function analyze(records,cfg,onProgress){
+  const total=records.length;let step=0;const S=14;
+  const adv=m=>{step++;onProgress&&onProgress(Math.round(step/S*100),m)};
+
+  adv('Normalizing log records...');
+  const normed=records.map(norm);
+  adv('Classifying all user-agents...');
+  const cls=normed.map(r=>classifyBot(r.ua));
+  adv('Aggregating traffic by bot category...');
+  const botData={};
+  for(let i=0;i<normed.length;i++){
+    const r=normed[i],c=cls[i],k=c.name;
+    if(!botData[k])botData[k]={name:c.name,cat:c.cat,tier:c.tier,v:c.v,note:c.note,count:0,totalBytes:0,s2xx:0,s3xx:0,s4xx:0,s5xx:0,rts:[],uniqueIPs:new Set(),uniqueUrls:new Set(),cacheHit:0,cacheMiss:0,topUA:{}};
+    const b=botData[k];b.count++;b.totalBytes+=r.bytes;
+    if(r.status>=200&&r.status<300)b.s2xx++;else if(r.status>=300&&r.status<400)b.s3xx++;else if(r.status>=400&&r.status<500)b.s4xx++;else if(r.status>=500)b.s5xx++;
+    if(r.rt!==null)b.rts.push(r.rt);if(r.ip)b.uniqueIPs.add(r.ip);b.uniqueUrls.add(r.uri.split('?')[0]);
+    const cl=(r.cache||'').toLowerCase();if(cl.includes('hit'))b.cacheHit++;else if(cl.includes('miss'))b.cacheMiss++;
+    if(r.ua){const s=r.ua.substring(0,100);b.topUA[s]=(b.topUA[s]||0)+1}
+  }
+  for(const k in botData){
+    const b=botData[k];b.uniqueIPCount=b.uniqueIPs.size;b.uniqueUrlCount=b.uniqueUrls.size;
+    b.avgMs=b.rts.length?avg(b.rts)*1000:null;b.p95Ms=b.rts.length?pctl(b.rts,95)*1000:null;
+    b.topUAList=Object.entries(b.topUA).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    delete b.uniqueIPs;delete b.uniqueUrls;delete b.rts;delete b.topUA;
+  }
+
+  adv('Performing multi-layer bot verification...');
+  let vV=0,vS=0,vK=0;const sZ=Math.min(normed.length,10000);
+  for(let i=0;i<sZ;i++){const v=verifyBot(normed[i],cls[i]);for(const c of Object.values(v)){if(c.s==='verified'||c.s==='consistent'||c.s==='expected'||c.s==='residential')vV++;else if(c.s==='suspicious'||c.s==='inconsistent')vS++;else vK++}}
+
+  adv('Analyzing crawl budget efficiency...');
+  const crawlBud=crawlBudget(normed,cls);
+  adv('Detecting URL patterns and crawl traps...');
+  const traps=detectTraps(normed);
+  adv('Calculating infrastructure costs...');
+  const costs=calcCosts(botData,cfg);
+
+  adv('Analyzing AI scraper citation ROI...');
+  const aiMatrix={};
+  for(const[k,b] of Object.entries(botData)){
+    if(b.tier==='ai_citation'||b.tier==='ai_training'){
+      const egGB=b.totalBytes/(1024*1024*1024);
+      aiMatrix[k]={...b,egGB,bandCost:egGB*(cfg?.cdnEgress||COSTS.cdnEgress),rec:b.tier==='ai_citation'?'RATE-LIMIT':'BLOCK',roi:b.tier==='ai_citation'?'Conditional':'Negative'};
+    }
+  }
+  adv('Analyzing traffic patterns and velocity...');
+  const tp=trafficP(normed);
+  adv('Running security analysis...');
+  const sec=security(normed);
+  adv('Generating edge blocking rules...');
+  const edgeRules=genEdgeRules(botData,sec);
+  adv('Computing executive summary...');
+
+  const allRT=normed.filter(r=>r.rt!==null).map(r=>r.rt);
+  const totalBytes=normed.reduce((s,r)=>s+r.bytes,0);
+  const humanCount=Object.values(botData).filter(b=>b.tier==='human').reduce((s,b)=>s+b.count,0);
+  const tierData={};
+  for(const[k,b] of Object.entries(botData)){
+    if(!tierData[b.tier])tierData[b.tier]={count:0,totalBytes:0,bots:[]};
+    tierData[b.tier].count+=b.count;tierData[b.tier].totalBytes+=b.totalBytes;tierData[b.tier].bots.push(b.name);
+  }
+
+  return{
+    summary:{totalRecords:total,totalBytes,totalBytesFmt:fmtB(totalBytes),uniqueIPs:new Set(normed.filter(r=>r.ip).map(r=>r.ip)).size,uniqueURLs:new Set(normed.map(r=>r.uri.split('?')[0])).size,
+      dateRange:{start:normed.filter(r=>r.tstamp).sort((a,b)=>a.tstamp-b.tstamp)[0]?.tstamp,end:normed.filter(r=>r.tstamp).sort((a,b)=>b.tstamp-a.tstamp)[0]?.tstamp},
+      avgMs:allRT.length?avg(allRT)*1000:null,p95Ms:allRT.length?pctl(allRT,95)*1000:null,p99Ms:allRT.length?pctl(allRT,99)*1000:null,
+      botsDetected:Object.keys(botData).length,humanPct:total?humanCount/total*100:0,botPct:total?(total-humanCount)/total*100:0},
+    botData,tierData,vs:{verified:vV,suspicious:vS,skipped:vK},crawlBud,traps,costs,aiMatrix,tp,sec,edgeRules,_records:records};
+}
+
+/* ==== M: RENDER HELPERS ==== */
+const TL={search_engine:'Search Engine',ai_citation:'AI Search / Citation',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'};
+const TC={search_engine:'b-green',ai_citation:'b-cyan',ai_training:'b-red',seo_tool:'b-purple',monitoring:'b-blue',human:'b-green',social:'b-amber',unknown_bot:'b-amber',suspicious:'b-red',unclassified:'b-gray',unknown:'b-gray'};
+
+function mkTable(headers,rows){let h='<div class="tbl-wrap"><table class="dt"><thead><tr>';for(const th of headers)h+=th;h+='</tr></thead><tbody>';for(const row of rows)h+=row;h+='</tbody></table></div>';return h}
+function th(t,cls=''){return `<th${cls?' class="'+cls+'"':''}>${t}</th>`}
+function td(t,cls=''){return `<td${cls?' class="'+cls+'"':''}>${t}</td>`}
+
+/* ==== N: RENDERERS ==== */
+function renderKPIs(s,c){
+  document.getElementById('kpi-strip').innerHTML=`
+    <div class="kpi c-blue"><div class="kpi-label">Records Analyzed</div><div class="kpi-val">${fmtN(s.totalRecords)}</div><div class="kpi-sub">${s.totalBytesFmt} total volume</div></div>
+    <div class="kpi c-cyan"><div class="kpi-label">Unique IPs / URLs</div><div class="kpi-val">${fmtN(s.uniqueIPs)} / ${fmtN(s.uniqueURLs)}</div><div class="kpi-sub">distinct sources and paths</div></div>
+    <div class="kpi c-purple"><div class="kpi-label">Traffic Categories</div><div class="kpi-val">${s.botsDetected}</div><div class="kpi-sub">distinct classifications found</div></div>
+    <div class="kpi c-green"><div class="kpi-label">Human Traffic</div><div class="kpi-val">${fmtP(s.humanPct)}</div><div class="kpi-sub">genuine browser visitors</div></div>
+    <div class="kpi c-amber"><div class="kpi-label">Total Infrastructure Cost</div><div class="kpi-val">${fmtC(c.total.all)}</div><div class="kpi-sub">egress + requests + compute</div></div>
+    <div class="kpi c-red"><div class="kpi-label">Potential Monthly Savings</div><div class="kpi-val">${fmtC(c.savings.total)}</div><div class="kpi-sub">bot blocking + SaaS offset</div></div>
+    <div class="kpi c-pink"><div class="kpi-label">Avg / P95 Response Time</div><div class="kpi-val">${s.avgMs?Math.round(s.avgMs)+'ms':'N/A'}</div><div class="kpi-sub">P95: ${s.p95Ms?Math.round(s.p95Ms)+'ms':'N/A'}</div></div>`;
+}
+
+function renderTab1(A){
+  const el=document.getElementById('tab1');let h='';const s=A.summary,bd=A.botData;
+  const sorted=Object.values(bd).sort((a,b)=>b.count-a.count);
+
+  h+=`<div class="card"><h3>Bot Classification Overview</h3>
+  <p>Every request has been classified against a database of 50+ known bot signatures and 18 real browser fingerprint patterns. Each entity is assigned a value tier from -5 (harmful) to +10 (critical for SEO). This classification drives all downstream cost, blocking, and crawl budget decisions.</p>
+  <div class="infobox"><strong>How classification works:</strong> The engine first checks if the User-Agent matches a real browser fingerprint (checking for AppleWebKit, Gecko, Blink rendering engines with OS/hardware indicators). If a real browser is found AND no bot signature matches, it is classified as human. If a known bot signature matches first, it is classified as that bot regardless of browser patterns (preventing spoofed Googlebot claims from real browser UAs).</div></div>`;
+
+  // Tier distribution
+  const tiers={};sorted.forEach(b=>{if(!tiers[b.tier])tiers[b.tier]={count:0,bytes:0,bots:[]};tiers[b.tier].count+=b.count;tiers[b.tier].bytes+=b.totalBytes;tiers[b.tier].bots.push(b.name)});
+  h+=`<div class="card"><h3>Traffic Distribution by Value Tier</h3><p>This breakdown determines where your infrastructure budget is going. High-value search engine traffic is expected. Zero-ROI AI training traffic represents pure waste that should be blocked at the edge.</p><div class="bars">`;
+  const mT=Math.max(...Object.values(tiers).map(t=>t.count),1);
+  for(const[tier,td] of Object.entries(tiers).sort((a,b)=>b[1].count-a[1].count)){
+    const pct=td.count/s.totalRecords*100;const cc=tier==='search_engine'||tier==='human'?'green':tier==='ai_citation'?'cyan':tier==='ai_training'?'red':tier==='social'?'amber':'blue';
+    h+=`<div class="bar-r"><div class="bar-l">${TL[tier]||tier}</div><div class="bar-t"><div class="bar-f ${cc}" style="width:${td.count/mT*100}%"></div></div><div class="bar-v">${fmtN(td.count)} (${fmtP(pct)})</div></div>`;
+  }
+  h+=`</div></div>`;
+
+  // Full bot table
+  h+=`<div class="card"><h3>Complete Bot Classification Table</h3><p>Every distinct traffic category sorted by volume. Rows highlighted in red are zero-ROI bots that consume infrastructure resources without generating search visibility, referral traffic, or revenue.</p>`;
+  h+=mkTable([th('Bot / Category'),th('Value Tier'),th('Score'),th('Requests','n'),th('% Total','n'),th('Bandwidth','n'),th('Unique IPs','n'),th('Unique URLs','n'),th('Avg TTFB','n'),th('P95 TTFB','n'),th('2xx','n'),th('4xx','n'),th('5xx','n'),th('Cache Hit','n')],
+    sorted.map(b=>{
+      const pct=s.totalRecords?(b.count/s.totalRecords*100):0;
+      return `<tr class="${b.tier==='ai_training'||b.v<0?'hl':''}"><td><strong>${esc(b.name)}</strong></td><td><span class="badge ${TC[b.tier]||'b-gray'}">${TL[b.tier]||b.tier}</span></td><td><span class="badge ${b.v>=5?'b-green':b.v>0?'b-cyan':b.v===0?'b-amber':'b-red'}">${b.v>0?'+'+b.v:b.v}</span></td>${td(fmtN(b.count),'n')}${td(fmtP(pct),'n')}${td(fmtB(b.totalBytes),'n')}${td(fmtN(b.uniqueIPCount),'n')}${td(fmtN(b.uniqueUrlCount),'n')}${td(b.avgMs?Math.round(b.avgMs)+'ms':'--','n')}${td(b.p95Ms?Math.round(b.p95Ms)+'ms':'--','n')}${td(fmtN(b.s2xx),'n')}${td(fmtN(b.s4xx),'n','style="color:var(--amber)"')}${td(fmtN(b.s5xx),'n','style="color:var(--red)"')}${td((b.cacheHit+b.cacheMiss)>0?fmtP(b.cacheHit/(b.cacheHit+b.cacheMiss)*100):'--','n')}</tr>`;
+    }));
+
+  // Top UAs
+  h+=`<h4>Top 20 User-Agent Strings</h4>`;
+  h+=mkTable([th('User-Agent'),th('Count','n'),th('%','n'),th('Classification')],
+    A.tp.topUA.map(([ua,cnt])=>{const c=classifyBot(ua);return `<tr><td style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(ua)}</td>${td(fmtN(cnt),'n')}${td(fmtP(cnt/s.totalRecords*100),'n')}<td><span class="badge ${TC[c.tier]||'b-gray'}">${TL[c.tier]||c.tier}</span></td></tr>`}));
+
+  el.innerHTML=h;
+}
+
+function renderTab2(A){
+  const el=document.getElementById('tab2');let h='';const vs=A.vs;
+  h+=`<div class="card"><h3>Multi-Layer Bot Verification</h3>
+  <p>Each request is validated through four independent verification layers. This process separates genuine Googlebot/Bingbot from spoofed scrapers that fake their User-Agent string. The analysis below covers up to 10,000 sampled records for detailed verification.</p>
+  <div class="infobox"><strong>Why 4 layers?</strong> User-Agent spoofing is trivial -- any scraper can claim to be Googlebot. But faking a Google IP address, TLS fingerprint, and hosting on Google's ASN simultaneously is extremely difficult. The combination of all 4 layers provides high-confidence verification.</div></div>`;
+
+  h+=`<div class="card"><h3>Verification Summary</h3><div class="cols2"><div>
+    <div class="sr"><span class="sr-l">Verified Checks (passed all layers)</span><span class="sr-v" style="color:var(--green)">${fmtN(vs.verified)}</span></div>
+    <div class="sr"><span class="sr-l">Suspicious Checks (failed one or more layers)</span><span class="sr-v" style="color:var(--amber)">${fmtN(vs.suspicious)}</span></div>
+    <div class="sr"><span class="sr-l">Unverified / Informational</span><span class="sr-v" style="color:var(--text-3)">${fmtN(vs.skipped)}</span></div>
+    <div class="sr"><span class="sr-l">Verification Confidence Rate</span><span class="sr-v">${fmtP(vs.verified/(vs.verified+vs.suspicious+vs.skipped)*100)}</span></div>
+  </div><div>
+    <div class="sr"><span class="sr-l">Layer 1: Reverse DNS / IP Range</span><span class="sr-v">Validates IP against published search engine ranges</span></div>
+    <div class="sr"><span class="sr-l">Layer 2: TLS Fingerprint</span><span class="sr-v">Checks TLS version matches claimed identity</span></div>
+    <div class="sr"><span class="sr-l">Layer 3: ASN Intelligence</span><span class="sr-v">Detects cloud-hosted vs residential IPs</span></div>
+    <div class="sr"><span class="sr-l">Layer 4: Behavioral Analysis</span><span class="sr-v">Identifies aggressive crawl patterns</span></div>
+  </div></div></div>`;
+
+  h+=`<div class="card"><h3>Search Engine IP Range Reference</h3><p>Each major search engine publishes its IP ranges. Use this table to manually verify suspicious requests against official sources.</p>`;
+  h+=mkTable([th('Search Engine'),th('Known IP Prefixes'),th('Official DNS Suffix'),th('Verification')],
+    Object.entries(ENGINE_IPS).map(([eng,pfxs])=>`<tr><td><strong>${esc(eng)}</strong></td><td style="font-size:10px">${pfxs.slice(0,4).join(', ')}...</td><td>${eng==='Google'?'.googlebot.com':eng==='Bing'?'.search.msn.com':eng==='Yandex'?'.yandex.ru':'.baidu.com'}</td><td><span class="badge b-green">Published</span></td></tr>`));
+
+  if(vs.suspicious>0)h+=`<div class="rec red"><h5>Suspicious Verifications Detected</h5><p>${fmtN(vs.suspicious)} checks flagged suspicious behavior. This means a bot claims to be a search engine but fails IP range or TLS validation. These are likely spoofed bots. Consider implementing the generated edge rules to block these IPs at the CDN level before they consume origin resources.</p></div>`;
+
+  el.innerHTML=h;
+}
+
+function renderTab3(A){
+  const el=document.getElementById('tab3');let h='';
+  h+=`<div class="card"><h3>Crawl Budget & Waste Heat Index</h3>
+  <p>Crawl budget is the number of pages a search engine will crawl on your site within a given timeframe. When bots waste this budget on parameterized URLs, faceted navigation traps, or low-value pages, your high-quality content gets crawled less frequently, directly impacting search rankings and indexation speed.</p>
+  <div class="infobox"><strong>Why this matters:</strong> If Googlebot visits /shop/filter?color=blue&size=xl&page=47 50,000 times/month but that URL generates $0 in revenue and has 0 indexation value, you are paying server costs to serve a bot that provides no return. Reclaiming this budget for high-value product pages can improve organic traffic by 15-30%.</div></div>`;
+
+  const entries=Object.entries(A.crawlBud);
+  if(entries.length>0){
+    h+=`<div class="card"><h3>Search Engine Crawl Efficiency</h3>`;
+    h+=mkTable([th('Crawler'),th('Total','n'),th('Unique URLs','n'),th('2xx','n'),th('3xx','n'),th('4xx','n'),th('5xx','n'),th('Parameterized','n'),th('Efficiency','n'),th('Cache Hit','n'),th('Avg TTFB','n'),th('P95 TTFB','n')],
+      entries.map(([name,e])=>{
+        const pCol=e.paramRatio>30?'var(--red)':'var(--text-1)';
+        const effCls=e.efficiency>=90?'b-green':e.efficiency>=70?'b-amber':'b-red';
+        return `<tr><td><strong>${esc(name)}</strong></td>${td(fmtN(e.total),'n')}${td(fmtN(e.uniqueCount),'n')}${td(fmtN(e.s2xx),'n')}${td(fmtN(e.s3xx),'n')}${td(fmtN(e.s4xx),'n','style="color:var(--amber)"')}${td(fmtN(e.s5xx),'n','style="color:var(--red)"')}${td(fmtN(e.paramUrls)+' ('+fmtP(e.paramRatio)+')','n','style="color:'+pCol+'"')}${td(fmtP(e.efficiency),'n','<span class="badge '+effCls+'">'+fmtP(e.efficiency)+'</span>')}${td(fmtP(e.cacheRatio),'n')}${td(e.avgMs?Math.round(e.avgMs)+'ms':'--','n')}${td(e.p95Ms?Math.round(e.p95Ms)+'ms':'--','n')}</tr>`}));
+    for(const[name,e] of entries){
+      if(e.paramRatio>30)h+=`<div class="rec red"><h5>High Parameterized URL Ratio: ${esc(name)}</h5><p>${fmtP(e.paramRatio)} of crawl requests hit URLs with query strings (filters, sorts, pagination). These pages typically have low indexation value. Implement: robots.txt Disallow for faceted URLs, rel="canonical" to clean URLs, HTTP 410 for deprecated patterns, and edge rate-limiting for bots exclusively crawling parameterized URLs.</p></div>`;
+      if(e.cacheRatio<40)h+=`<div class="rec amber"><h5>Low Cache Hit Rate: ${esc(name)}</h5><p>Only ${fmtP(e.cacheRatio)} of requests served from cache. Most requests hit origin, consuming compute resources.</p></div>`;
+    }
+    h+=`</div>`;
+  }else{
+    h+=`<div class="card"><p>No search engine or AI citation bots detected in this log data. Crawl budget analysis requires search engine crawler traffic.</p></div>`;
+  }
+
+  // Traps
+  h+=`<div class="card"><h3>Crawl Trap Detection</h3><p>URL patterns that function as crawl traps -- infinite loops, parameter combinations, and low-value pages that waste bot attention.</p>`;
+  const trapE=Object.entries(A.traps).sort((a,b)=>b[1].count-a[1].count);
+  if(trapE.length){
+    h+=mkTable([th('Trap Pattern'),th('Severity'),th('Requests','n'),th('Unique Paths','n'),th('Bandwidth','n'),th('Status Codes')],
+      trapE.map(([name,t])=>`<tr><td><strong>${esc(name)}</strong></td><td><span class="badge ${t.sev==='high'?'b-red':t.sev==='medium'?'b-amber':'b-gray'}">${t.sev.toUpperCase()}</span></td>${td(fmtN(t.count),'n')}${td(fmtN(t.uniqueCount),'n')}${td(fmtB(t.bytes),'n')}<td style="font-size:10px">${Object.entries(t.statusCodes).map(([s,c])=>`${s}:${fmtN(c)}`).join(' | ')}</td></tr>`));
+  }else h+=`<p>No significant crawl trap patterns detected in this log data.</p>`;
+  h+=`</div>`;
+
+  // Top URLs
+  h+=`<div class="card"><h3>Top 40 Most Requested URL Paths</h3><div class="bars">`;
+  const mU=A.tp.topURLs[0]?.[1]||1;
+  for(const[url,cnt] of A.tp.topURLs)h+=`<div class="bar-r"><div class="bar-l" title="${esc(url)}">${esc(url.length>42?'...'+url.slice(-40):url)}</div><div class="bar-t"><div class="bar-f blue" style="width:${cnt/mU*100}%"></div></div><div class="bar-v">${fmtN(cnt)}</div></div>`;
+  h+=`</div></div>`;
+  el.innerHTML=h;
+}
+
+function renderTab4(A){
+  const el=document.getElementById('tab4');let h='';const c=A.costs;
+  h+=`<div class="card"><h3>Infrastructure Cost Analysis</h3><p>Calculates the actual USD cost of serving each bot category. Costs include CDN egress ($0.09/GB), per-request charges ($0.0075/10K), and estimated SSR compute ($0.005/1K requests) based on AWS CloudFront 2026 pricing.</p></div>`;
+
+  const sorted=Object.entries(c.byBot).sort((a,b)=>b[1].total-a[1].total);
+  h+=`<div class="card"><h3>Cost Breakdown by Bot Category</h3>`;
+  h+=mkTable([th('Bot'),th('Tier'),th('Requests','n'),th('Bandwidth','n'),th('Egress Cost','n'),th('Request Cost','n'),th('SSR Cost','n'),th('Total Cost','n')],
+    sorted.map(([name,bc])=>{const bd=A.botData[name];return `<tr class="${bd?.tier==='ai_training'||bd?.v<0?'hl':''}"><td><strong>${esc(name)}</strong></td><td><span class="badge ${TC[bd?.tier]||'b-gray'}">${TL[bd?.tier]||'--'}</span></td>${td(fmtN(bc.count),'n')}${td(fmtB(bc.totalBytes),'n')}${td(fmtC(bc.eg),'n')}${td(fmtC(bc.rq),'n')}${td(fmtC(bc.ss),'n')}${td(fmtC(bc.total),'n','style="font-weight:700;color:var(--amber)"')}</tr>`}));
+  const totStyle='style="font-size:14px;color:var(--amber)"';
+  h+=`<tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="3">TOTAL</td>${td(fmtB(sorted.reduce((s,[,b])=>s+b.totalBytes,0)),'n')}${td(fmtC(c.total.egress),'n')}${td(fmtC(c.total.request),'n')}${td(fmtC(c.total.ssr),'n')}${td(fmtC(c.total.all),'n',totStyle)}</tr>`;
+  h+=`</div>`;
+
+  // Savings
+  h+=`<div class="card"><h3>Savings Opportunity</h3><div class="cols2">
+    <div class="card" style="margin:0"><h4>Bot Traffic Cost Reduction</h4><div style="font-size:26px;font-weight:800;color:var(--green);font-family:var(--mono)">${fmtC(c.savings.botBlocking)}/mo</div><p>By blocking zero-ROI bots at the edge (Cloudflare/Fastly/AWS WAF rules)</p></div>
+    <div class="card" style="margin:0"><h4>SaaS Tool Replacement</h4><div style="font-size:26px;font-weight:800;color:var(--green);font-family:var(--mono)">${fmtC(c.savings.saas)}/mo</div><p>Eliminating Botify/Loggly or equivalent enterprise license</p></div></div>
+  <div class="rec green"><h5>Combined Annual Savings</h5><p>Implementing the recommended edge rules and replacing your SaaS tool could save your enterprise <strong>${fmtC(c.savings.total*12)}/year</strong>. This is a conservative estimate based on the traffic patterns found in your log data.</p></div></div>`;
+  el.innerHTML=h;
+}
+
+function renderTab5(A){
+  const el=document.getElementById('tab5');let h='';
+  h+=`<div class="card"><h3>AI Scraper Citation ROI Matrix</h3>
+  <p>Not all AI bots should be blocked. Some drive referral traffic and search citations (Perplexity, ChatGPT Search). Others only train models that compete with you (Bytespider, CCBot). This matrix scores each AI bot to help you make data-driven blocking decisions.</p>
+  <div class="infobox"><strong>How to read:</strong> Bots marked BLOCK provide zero return on infrastructure cost -- implement edge rules immediately. Bots marked RATE-LIMIT have conditional value -- allow limited access while controlling costs. Check your analytics for referral traffic from these platforms to complete the ROI picture.</div></div>`;
+
+  const entries=Object.entries(A.aiMatrix).sort((a,b)=>b[1].bandCost-a[1].bandCost);
+  if(entries.length){
+    h+=`<div class="card"><h3>AI Bot ROI Scorecard</h3>`;
+    h+=mkTable([th('AI Bot'),th('Category'),th('Requests','n'),th('Bandwidth','n'),th('Egress Cost','n'),th('ROI'),th('Action')],
+      entries.map(([name,b])=>`<tr><td><strong>${esc(name)}</strong></td><td><span class="badge ${b.tier==='ai_citation'?'b-cyan':'b-red'}">${TL[b.tier]}</span></td>${td(fmtN(b.count),'n')}${td(fmtB(b.totalBytes),'n')}${td(fmtC(b.bandCost),'n')}<td><span class="badge ${b.tier==='ai_citation'?'b-cyan':'b-red'}">${b.roi}</span></td><td><span class="badge ${b.rec==='BLOCK'?'b-red':'b-amber'}">${b.rec}</span></td></tr>`));
+    h+=`</div>`;
+
+    h+=`<div class="card"><h3>How to Calculate Full AI Scraper ROI</h3>
+    <p>This tool provides the cost side of the equation. To calculate full ROI, cross-reference with your analytics:</p>
+    <div class="rec green"><h5>Steps to Complete the ROI Calculation</h5>
+    <ul><li><strong>Step 1:</strong> Check Google Analytics for referral traffic from AI platform domains (perplexity.ai, chatgpt.com, anthropic.com)</li>
+    <li><strong>Step 2:</strong> Calculate conversion rate of AI-referred visitors vs. organic search visitors</li>
+    <li><strong>Step 3:</strong> Multiply conversions by average order value to get revenue attributed to AI referrals</li>
+    <li><strong>Step 4:</strong> Compare AI referral revenue against the bandwidth cost shown above</li>
+    <li><strong>Step 5:</strong> If revenue > cost, RATE-LIMIT. If cost > revenue, BLOCK at the edge.</li></ul></div></div>`;
+  }else h+=`<div class="card"><p>No AI scraper bots detected in this log data.</p></div>`;
+  el.innerHTML=h;
+}
+
+function renderTab6(A){
+  const el=document.getElementById('tab6');let h='';const rules=A.edgeRules;
+  h+=`<div class="card"><h3>Automated Edge Rule Generation</h3><p>Ready-to-deploy rules generated from the analysis above. Copy these directly into your CDN/WAF dashboard to block or rate-limit bots at the edge before they reach your origin servers.</p></div>`;
+
+  for(const[provider,ruleset] of Object.entries(rules)){
+    if(!ruleset.length)continue;
+    const label=provider==='cloudflare'?'Cloudflare WAF Rules':provider==='fastly'?'Fastly VCL Snippets':'AWS WAF Rules';
+    h+=`<div class="card"><h3>${label}</h3><p>${provider==='cloudflare'?'Cloudflare Dashboard > Security > WAF > Custom Rules':provider==='fastly'?'Fastly Service > VCL Snippets':'AWS WAF Console'}</p>`;
+    for(const rule of ruleset)h+=`<div class="code"><h5>${esc(rule.name)} <span class="badge ${rule.act==='BLOCK'?'b-red':'b-amber'}" style="margin-left:6px">${rule.act}</span></h5><p>${esc(rule.desc)}</p><code>${esc(rule.rule)}</code></div>`;
+    h+=`</div>`;
+  }
+  if(!rules.cloudflare.length&&!rules.fastly.length&&!rules.aws.length)h+=`<div class="card"><p>No edge rules generated. No bots exceeded the 50-request minimum threshold for rule generation.</p></div>`;
+
+  h+=`<div class="card"><h3>Advanced Defense: Honeypot & Tarpitting</h3><div class="cols2">
+    <div><h4>Honeypot / Poison Pill</h4><p>Serve convincing fabricated content to confirmed scrapers. This wastes their compute and corrupts their training data. Create hidden routes returning fake product data to known bad bots.</p></div>
+    <div><h4>Tarpitting (Slow Response)</h4><p>Serve valid responses extremely slowly (1 byte/second) to aggressive scrapers. Burns their connection pool. Implement with NGINX limit_rate or Apache mod_ratelimit.</p></div></div></div>`;
+  el.innerHTML=h;
+}
+
+function renderTab7(A){
+  const el=document.getElementById('tab7');let h='';
+  const sorted=Object.values(A.botData).filter(b=>b.avgMs!==null).sort((a,b)=>b.avgMs-a.avgMs);
+  if(sorted.length){
+    h+=`<div class="card"><h3>Response Time by Bot Type</h3><p>Average Time To First Byte (TTFB) broken down by traffic category. High TTFB for bots indicates origin compute pressure. High TTFB for humans indicates infrastructure problems requiring immediate attention.</p>`;
+    const mT=Math.max(...sorted.map(b=>b.avgMs));
+    h+=mkTable([th('Bot'),th('Tier'),th('Requests','n'),th('Avg TTFB','n'),th('P95 TTFB','n'),th('Visual')],
+      sorted.map(b=>`<tr><td><strong>${esc(b.name)}</strong></td><td><span class="badge ${TC[b.tier]||'b-gray'}">${TL[b.tier]||b.tier}</span></td>${td(fmtN(b.count),'n')}${td(Math.round(b.avgMs)+'ms','n')}${td(b.p95Ms?Math.round(b.p95Ms)+'ms':'--','n')}<td style="width:180px"><div style="width:100%;height:6px;background:var(--bg-2);border-radius:3px"><div style="width:${b.avgMs/mT*100}%;height:100%;background:${b.tier==='human'?'var(--green)':b.tier==='ai_training'?'var(--red)':'var(--accent)'};border-radius:3px"></div></div></td></tr>`));
+    h+=`</div>`;
+  }
+
+  h+=`<div class="card"><h3>Status Code Distribution</h3><div class="bars">`;
+  const mS=Math.max(...Object.values(A.tp.statuses),1);const sC={'2xx':'green','3xx':'blue','4xx':'amber','5xx':'red'};
+  for(const[st,cnt] of Object.entries(A.tp.statuses).sort())h+=`<div class="bar-r"><div class="bar-l">${st}</div><div class="bar-t"><div class="bar-f ${sC[st]||'blue'}" style="width:${cnt/mS*100}%"></div></div><div class="bar-v">${fmtN(cnt)}</div></div>`;
+  h+=`</div></div>`;
+
+  h+=`<div class="card"><h3>HTTP Method Distribution</h3>`;
+  const tM=Object.values(A.tp.methods).reduce((s,v)=>s+v,0);
+  h+=mkTable([th('Method'),th('Count','n'),th('%','n'),th('Interpretation')],
+    Object.entries(A.tp.methods).sort((a,b)=>b[1]-a[1]).map(([m,cnt])=>`<tr><td><strong>${esc(m)}</strong></td>${td(fmtN(cnt),'n')}${td(fmtP(cnt/tM*100),'n')}<td>${m==='GET'?'Standard page/resource requests':m==='POST'?'Form submissions or API calls':m==='HEAD'?'Health checks or monitoring':m+' request'}</td></tr>`));
+  h+=`</div>`;
+  el.innerHTML=h;
+}
+
+function renderTab8(A){
+  const el=document.getElementById('tab8');let h='';const tp=A.tp;
+  h+=`<div class="card"><h3>Hourly Request Distribution</h3><p>Request volume by hour (UTC). Spikes outside normal human browsing hours (typically 2AM-6AM local) indicate automated scraping activity. Red bars mark statistically significant spikes (2+ standard deviations above mean).</p><div class="bars">`;
+  const mH=Math.max(...tp.hourly,1);
+  tp.hourly.forEach((cnt,hr)=>{const sp=tp.spikes[hr];h+=`<div class="bar-r"><div class="bar-l">${String(hr).padStart(2,'0')}:00${sp?' *':''}</div><div class="bar-t"><div class="bar-f ${sp?'red':'blue'}" style="width:${cnt/mH*100}%"></div></div><div class="bar-v">${fmtN(cnt)}</div></div>`});
+  h+=`</div>`;
+  if(Object.keys(tp.spikes).length)h+=`<div class="rec red"><h5>Velocity Spikes Detected</h5><p>Hours marked with * exceed 2 standard deviations above the hourly average (${Math.round(tp.hAvg)} avg/hr). These spikes strongly indicate automated scraping rather than human browsing patterns. Consider implementing time-based rate limiting during off-peak hours.</p></div>`;
+  h+=`</div>`;
+
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  h+=`<div class="card"><h3>Day-of-Week Distribution</h3><div class="bars">`;
+  const mD=Math.max(...tp.daily,1);
+  tp.daily.forEach((cnt,d)=>h+=`<div class="bar-r"><div class="bar-l">${days[d]}</div><div class="bar-t"><div class="bar-f purple" style="width:${cnt/mD*100}%"></div></div><div class="bar-v">${fmtN(cnt)}</div></div>`);
+  h+=`</div></div>`;
+
+  h+=`<div class="card"><h3>Top 25 IPs by Request Volume</h3>`;
+  h+=mkTable([th('IP Address'),th('Requests','n'),th('% of Total','n')],
+    tp.topIPs.map(([ip,cnt])=>`<tr><td style="font-family:var(--mono)">${esc(ip)}</td>${td(fmtN(cnt),'n')}${td(fmtP(cnt/A.summary.totalRecords*100),'n')}</tr>`));
+  h+=`</div>`;
+
+  if(tp.topRef.length){
+    h+=`<div class="card"><h3>Top Referrers</h3><div class="bars">`;
+    const mR=tp.topRef[0][1]||1;
+    for(const[ref,cnt] of tp.topRef)h+=`<div class="bar-r"><div class="bar-l" title="${esc(ref)}">${esc(ref.length>32?ref.substring(0,30)+'...':ref)}</div><div class="bar-t"><div class="bar-f cyan" style="width:${cnt/mR*100}%"></div></div><div class="bar-v">${fmtN(cnt)}</div></div>`;
+    h+=`</div></div>`;
+  }
+  el.innerHTML=h;
+}
+
+function renderTab9(A){
+  const el=document.getElementById('tab9');let h='';const sec=A.sec;
+  h+=`<div class="card"><h3>Security Threat Analysis</h3><p>Automated detection of suspicious request patterns including path traversal attempts, admin panel probes, and high-velocity IPs that may indicate DDoS or aggressive scraping.</p>
+  <div class="cols2"><div>
+    <div class="sr"><span class="sr-l">Total Unique IPs</span><span class="sr-v">${fmtN(sec.totalIPs)}</span></div>
+    <div class="sr"><span class="sr-l">Suspicious Patterns</span><span class="sr-v" style="color:var(--red)">${fmtN(sec.threats.length)}</span></div></div><div>
+    <div class="sr"><span class="sr-l">High-Velocity IPs</span><span class="sr-v" style="color:var(--amber)">${fmtN(sec.hvIPs.length)}</span></div>
+    <div class="sr"><span class="sr-l">Large Payload Requests</span><span class="sr-v">${fmtN(sec.largeP.length)}</span></div></div></div></div>`;
+
+  if(sec.threats.length){
+    const grouped=grpBy(sec.threats,'type');
+    h+=`<div class="card"><h3>Suspicious Request Patterns</h3>`;
+    h+=mkTable([th('Threat'),th('Severity'),th('Count','n'),th('Sample IP'),th('Sample URI'),th('User-Agent')],
+      Object.entries(grouped).map(([threat,items])=>`<tr class="hl"><td><strong>${esc(threat)}</strong></td><td><span class="badge ${items[0].sev==='critical'?'b-red':items[0].sev==='high'?'b-amber':'b-blue'}">${items[0].sev.toUpperCase()}</span></td>${td(fmtN(items.length),'n')}<td style="font-family:var(--mono);font-size:11px">${esc(items[0].ip)}</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(items[0].uri)}</td><td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc((items[0].ua||'').substring(0,50))}</td></tr>`));
+    h+=`<div class="rec red"><h5>Security Action Required</h5><p>Detected ${fmtN(sec.threats.length)} suspicious patterns across ${Object.keys(grouped).length} categories. Block offending IPs at the edge, enable WAF rules for common attack patterns, and audit logs for successful exploitation.</p></div></div>`;
+  }
+
+  if(sec.hvIPs.length){
+    h+=`<div class="card"><h3>High-Velocity IPs (Potential DDoS / Scraping)</h3>`;
+    h+=mkTable([th('IP'),th('Requests','n'),th('Req/Sec','n'),th('URLs','n'),th('4xx','n'),th('Top UA')],
+      sec.hvIPs.slice(0,15).map(ip=>`<tr class="hl"><td style="font-family:var(--mono)">${esc(ip.ip)}</td>${td(fmtN(ip.count),'n')}${td(ip.rps.toFixed(1),'n','style="color:var(--red)"')}${td(fmtN(ip.uniqueUrls),'n')}${td(fmtN(ip.s4xx),'n')}<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc((ip.uas[0]||'').substring(0,55))}</td></tr>`));
+    h+=`</div>`;
+  }
+
+  if(sec.largeP.length){
+    h+=`<div class="card"><h3>Large Payload Requests (>10MB)</h3>`;
+    h+=mkTable([th('IP'),th('URI'),th('Size','n'),th('User-Agent')],
+      sec.largeP.map(p=>`<tr><td style="font-family:var(--mono)">${esc(p.ip)}</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.uri)}</td>${td(fmtB(p.bytes),'n','style="color:var(--amber)"')}<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc((p.ua||'').substring(0,55))}</td></tr>`));
+    h+=`</div>`;
+  }
+  el.innerHTML=h;
+}
+
+function renderTab10(A){
+  const el=document.getElementById('tab10');let h='';const c=A.costs,s=A.summary;
+  const iH=8,iR=150,iC=iH*iR,pM=c.savings.total>0?iC/c.savings.total:0;
+
+  h+=`<div class="card"><h3>Executive Summary - CFO / FinOps Report</h3>
+  <p>Financial summary of bot traffic infrastructure costs and recommended savings. All figures based on actual log data analysis and AWS CloudFront 2026 pricing. This report is suitable for executive review and budget planning.</p>
+  <div class="kpi-strip" style="margin-top:14px">
+    <div class="kpi c-amber"><div class="kpi-label">Monthly Total Spend</div><div class="kpi-val">${fmtC(c.total.all+c.savings.saas)}</div><div class="kpi-sub">infrastructure + SaaS license</div></div>
+    <div class="kpi c-red"><div class="kpi-label">Monthly Waste (Zero-ROI Bots)</div><div class="kpi-val">${fmtC(c.savings.botBlocking)}</div><div class="kpi-sub">cost with zero return</div></div>
+    <div class="kpi c-green"><div class="kpi-label">Monthly Savings Available</div><div class="kpi-val">${fmtC(c.savings.total)}</div><div class="kpi-sub">bot blocking + SaaS offset</div></div>
+    <div class="kpi c-blue"><div class="kpi-label">Annual Savings Projection</div><div class="kpi-val">${fmtC(c.savings.total*12)}</div><div class="kpi-sub">after implementing recommendations</div></div></div></div>`;
+
+  h+=`<div class="card"><h3>Monthly Cost Breakdown</h3>`;
+  h+=mkTable([th('Cost Category'),th('Monthly','n'),th('Annual','n'),th('Description')],
+    [[`CDN Egress (All Traffic)`,c.total.egress,c.total.egress*12,'Bandwidth consumed across all traffic'],
+     [`Request Processing`,c.total.request,c.total.request*12,'Per-request charges at CDN edge'],
+     [`SSR Compute`,c.total.ssr,c.total.ssr*12,'Server-side rendering for bot requests'],
+     [`SaaS Tool License`,c.savings.saas,c.savings.saas*12,'Botify / Loggly / equivalent'],
+    ].map(([cat,mo,yr,desc])=>`<tr><td>${cat}</td>${td(fmtC(mo),'n')}${td(fmtC(yr),'n')}<td style="font-size:11px">${desc}</td></tr>`)
+    .concat([[`<strong>Total Current Spend</strong>`,c.total.all+c.savings.saas,(c.total.all+c.savings.saas)*12,'']]))
+  h+=`</div>`;
+
+  h+=`<div class="card"><h3>Savings Opportunity</h3>`;
+  h+=mkTable([th('Savings Category'),th('Monthly','n'),th('Annual','n'),th('Implementation')],
+    [[`Block Zero-ROI Bots`,c.savings.botBlocking,c.savings.botBlocking*12,'Cloudflare / Fastly / AWS WAF edge rules'],
+     [`SaaS Tool Replacement`,c.savings.saas,c.savings.saas*12,'Use this tool instead'],
+     [`<strong>Total Savings</strong>`,c.savings.total,c.savings.total*12,''],
+    ].map(([cat,mo,yr,impl])=>`<tr><td>${cat}</td>${td(fmtC(mo),'n','style="color:var(--green)"')}${td(fmtC(yr),'n','style="color:var(--green)"')}<td style="font-size:11px">${impl}</td></tr>`));
+  h+=`</div>`;
+
+  h+=`<div class="card"><h3>Return on Investment</h3><div class="cols2">
+    <div class="card" style="margin:0"><h4>Implementation Cost</h4><div style="font-size:22px;font-weight:800;font-family:var(--mono)">${fmtC(iC)}</div><p>Estimated ${iH} hours at ${fmtC(iR)}/hour</p></div>
+    <div class="card" style="margin:0"><h4>Payback Period</h4><div style="font-size:22px;font-weight:800;font-family:var(--mono)">${pM.toFixed(1)} months</div><p>Time to recover from monthly savings</p></div></div>
+  <div class="rec green"><h5>Executive Recommendation</h5><p>Implementation cost: <strong>${fmtC(iC)}</strong>. Monthly savings: <strong>${fmtC(c.savings.total)}</strong>. Payback: <strong>${pM.toFixed(1)} months</strong>. Year-one net savings: <strong>${fmtC(c.savings.total*12-iC)}</strong>. Annual ROI: <strong>${((c.savings.total*12/iC)*100).toFixed(0)}%</strong>. This investment pays for itself within ${Math.ceil(pM)} months and generates ongoing savings thereafter.</p></div></div>`;
+
+  h+=`<div class="card"><h3>Analysis Metadata</h3>
+  <div class="sr"><span class="sr-l">Total Log Records</span><span class="sr-v">${fmtN(s.totalRecords)}</span></div>
+  <div class="sr"><span class="sr-l">Data Volume</span><span class="sr-v">${s.totalBytesFmt}</span></div>
+  <div class="sr"><span class="sr-l">Unique IPs / URLs</span><span class="sr-v">${fmtN(s.uniqueIPs)} / ${fmtN(s.uniqueURLs)}</span></div>
+  <div class="sr"><span class="sr-l">Date Range</span><span class="sr-v">${s.dateRange.start?s.dateRange.start.toISOString().split('T')[0]:'--'} to ${s.dateRange.end?s.dateRange.end.toISOString().split('T')[0]:'--'}</span></div>
+  <div class="sr"><span class="sr-l">Human / Bot Split</span><span class="sr-v">${fmtP(s.humanPct)} human / ${fmtP(s.botPct)} bot</span></div>
+  <div class="sr"><span class="sr-l">Pricing Model</span><span class="sr-v">AWS CloudFront 2026 Standard</span></div></div>`;
+  el.innerHTML=h;
+}
+
+function renderAll(A){
+  renderKPIs(A.summary,A.costs);
+  renderTab1(A);renderTab2(A);renderTab3(A);renderTab4(A);renderTab5(A);
+  renderTab6(A);renderTab7(A);renderTab8(A);renderTab9(A);renderTab10(A);
+}
+
+/* ==== O: SAMPLE DATA ==== */
+function genSample(){
+  const gIP=['66.249.66.1','66.249.66.2','72.14.200.1'];
+  const bIP=['13.107.42.14','204.79.197.200'];
+  const hIP=['98.45.123.1','76.89.201.45','102.89.55.12','185.67.12.89','45.132.99.200','88.201.44.55','194.168.5.23','62.110.45.12','78.90.34.56','112.45.78.90'];
+  const aIP=['40.88.0.1','40.88.0.2','52.96.123.45','34.102.136.180'];
+  const uas={
+    googlebot:['Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'],
+    bingbot:['Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)'],
+    gptbot:['GPTBot/1.0 (+https://openai.com/gptbot)'],
+    bytespider:['Mozilla/5.0 (Linux; Android 10) Chrome/122.0.0.0 Mobile Safari/537.36 Bytespider/5.0'],
+    perplexity:['PerplexityBot/1.0 (+https://docs.perplexity.ai)'],
+    claudebot:['ClaudeBot/1.0 (+https://anthropic.com/claudebot)'],
+    oai:['OAI-SearchBot/1.0 (+https://openai.com/searchbot)'],
+    ccbot:['CCBot/2.0 (+https://commoncrawl.org/faq/)'],
+    human:['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15','Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'],
+  };
+  const pMain=['/','/about','/contact','/pricing','/products','/blog','/features','/customers','/docs','/support','/login','/signup','/demo'];
+  const pProd=['/products/widget-pro','/products/analytics-suite','/products/bot-shield','/products/crawl-monitor'];
+  const pBlog=['/blog/seo-guide-2026','/blog/ai-scraping-impact','/blog/crawl-budget','/blog/bot-detection','/blog/edge-computing'];
+  const pDocs=['/docs/getting-started','/docs/api-reference','/docs/authentication','/docs/webhooks'];
+  const pParam=['/shop/filter?color=blue&size=xl&sort=price','/shop/filter?color=red&size=lg&brand=nike&sort=date&category=shoes&page=12','/products?category=all&price_min=50&price_max=200&sort=rating&page=3','/api/products?limit=50&offset=500&sort=created_at'];
+  const pTrap=['/calendar/2026/01','/calendar/2026/02','/tag/seo','/tag/bot-detection','/author/john-smith'];
+  const pSec=['/.env','/.git/config','/wp-admin','/wp-login.php','/phpmyadmin'];
+
+  const w=[{c:'human',w:.58},{c:'googlebot',w:.15},{c:'bingbot',w:.04},{c:'gptbot',w:.06},{c:'perplexity',w:.03},{c:'claudebot',w:.02},{c:'oai',w:.015},{c:'bytespider',w:.04},{c:'ccbot',w:.025}];
+  const now=new Date('2026-07-26T12:00:00Z');const recs=[];
+  for(let i=0;i<5000;i++){
+    let r=Math.random(),cum=0,cat='human';for(const x of w){cum+=x.w;if(r<=cum){cat=x.c;break}}
+    const ua=(uas[cat]||uas.human)[Math.floor(Math.random()*(uas[cat]||uas.human).length)];
+    let ip;if(cat==='googlebot')ip=gIP[Math.floor(Math.random()*gIP.length)];else if(cat==='bingbot')ip=bIP[Math.floor(Math.random()*bIP.length)];else if(cat==='human')ip=hIP[Math.floor(Math.random()*hIP.length)];else ip=aIP[Math.floor(Math.random()*aIP.length)];
+    const pr=Math.random();let path;
+    if(cat==='human')path=pr<.5?pMain[~~(Math.random()*pMain.length)]:pr<.75?pProd[~~(Math.random()*pProd.length)]:pr<.9?pBlog[~~(Math.random()*pBlog.length)]:pDocs[~~(Math.random()*pDocs.length)];
+    else if(cat==='googlebot'||cat==='bingbot')path=pr<.3?pMain[~~(Math.random()*pMain.length)]:pr<.5?pProd[~~(Math.random()*pProd.length)]:pr<.7?pBlog[~~(Math.random()*pBlog.length)]:pParam[~~(Math.random()*pParam.length)];
+    else path=pr<.15?pMain[~~(Math.random()*pMain.length)]:pr<.3?pProd[~~(Math.random()*pProd.length)]:pr<.45?pBlog[~~(Math.random()*pBlog.length)]:pr<.65?pParam[~~(Math.random()*pParam.length)]:pr<.8?pTrap[~~(Math.random()*pTrap.length)]:pSec[~~(Math.random()*pSec.length)];
+    let st;const sr=Math.random();if(path.startsWith('/.'))st=404;else if(sr<.78)st=200;else if(sr<.88)st=301;else if(sr<.93)st=304;else if(sr<.96)st=404;else if(sr<.98)st=429;else st=500;
+    let bytes=st===304?0:st===301?200:~~(Math.random()*120000)+800;
+    let rt=cat==='human'?.04+Math.random()*.25:cat==='googlebot'||cat==='bingbot'?.08+Math.random()*.4:.15+Math.random()*1.5;
+    const ts=new Date(now.getTime()-Math.random()*24*3600*1000);
+    recs.push({ClientIP:ip,Timestamp:ts.toISOString(),RequestURI:path,RequestMethod:'GET',HttpStatus:st,Bytes:bytes,UserAgent:ua,Referer:cat==='human'?'https://www.google.com/':'',RequestTime:+rt.toFixed(3),CacheStatus:st===200&&Math.random()<.6?'HIT':st===200?'MISS':'EXPIRED',TLSProtocol:(cat==='human'||cat==='googlebot')?'TLSv1.3':'TLSv1.2',TLSCipher:'TLS_AES_256_GCM_SHA384'});
+  }
+  return JSON.stringify(recs,null,2);
+}
+
+/* ==== P: ABOUT/HOWTO ==== */
+function renderAbout(){
+  document.getElementById('about-content').innerHTML=`
+<h1>About This Tool</h1>
+<p>The Log File & Bot Traffic cost Analyzer processes server access logs to identify, classify, and quantify the financial impact of all traffic hitting your infrastructure, with particular focus on bot traffic, AI scrapers, and crawl budget optimization.</p>
+<h2>Why This Tool Exists</h2>
+<p>In 2026, AI scrapers like GPTBot, ClaudeBot, Bytespider, and PerplexityBot are hitting enterprise servers at unprecedented scale. They rack up cloud compute and CDN egress bills, consume crawl budget away from search engines, and generate zero ROI. Legacy tools like Botify or Loggly cost $4,000-$8,000+/month at enterprise scale.</p>
+<h2>What This Tool Saves</h2>
+<div class="savings-grid">
+  <div class="savings-card"><h4>CDN Egress Waste</h4><p>Breaks down bandwidth costs by bot type, showing exactly where money is wasted.</p><div class="savings-val">$5,000 - $20,000/mo</div></div>
+  <div class="savings-card"><h4>Origin Compute</h4><p>Identifies CPU/memory consumed by rogue bots for targeted edge blocking.</p><div class="savings-val">$3,000 - $15,000/mo</div></div>
+  <div class="savings-card"><h4>SaaS Replacement</h4><p>Replaces Botify, Loggly, and similar enterprise platforms.</p><div class="savings-val">$4,000 - $8,000/mo</div></div>
+  <div class="savings-card"><h4>Crawl Budget</h4><p>Reclaims wasted budget by identifying parameterized URL traps.</p><div class="savings-val">Improved Rankings</div></div></div>
+<h2>Core Capabilities</h2>
+<ul><li>50+ known bot signature database with 2026-era AI scraper coverage</li><li>Multi-layer bot verification (IP range, TLS fingerprint, ASN, behavioral)</li><li>Crawl budget ROI analysis with waste heat indexing</li><li>Infrastructure cost calculation with configurable pricing</li><li>AI scraper citation ROI matrix for smart blocking</li><li>Automated edge rule generation (Cloudflare, Fastly, AWS WAF)</li><li>Security threat detection and high-velocity IP identification</li><li>CFO/FinOps executive reports with ROI calculations</li></ul>`;
+}
+
+function renderHowto(){
+  document.getElementById('howto-content').innerHTML=`
+<h1>How To Use</h1>
+<div class="step"><div class="step-n">1</div><div class="step-body"><h3>Prepare Your Log File</h3><p>JSON format required. Accepted: JSON Array, JSONL (one JSON per line), or NDJSON. Each entry should contain: timestamp, user_agent, remote_addr (IP), request_uri (URL), status (HTTP code), and optionally bytes, request_time, tls_protocol, cache_status. The tool auto-normalizes field names from Cloudflare, Nginx, Apache, AWS ALB, Varnish, and custom formats.</p></div></div>
+<div class="step"><div class="step-n">2</div><div class="step-body"><h3>Upload</h3><p>Click Browse or drag-drop. All analysis runs locally in your browser. No data leaves your machine.</p></div></div>
+<div class="step"><div class="step-n">3</div><div class="step-body"><h3>Review</h3><p>10 analysis tabs cover: Bot Classification, Bot Verification, Crawl Budget, Cost Analysis, AI Scraper Matrix, Edge Rules, Performance, Traffic Patterns, Security, and CFO/FinOps Report.</p></div></div>
+<div class="step"><div class="step-n">4</div><div class="step-body"><h3>Act</h3><p>Deploy generated edge rules. Share CFO report. Prioritize SEO fixes based on crawl budget analysis.</p></div></div>
+<h2>JSON Format Examples</h2>
+<div class="code"><h5>Cloudflare</h5><code>[{"ClientIP":"66.249.66.1","Timestamp":"2026-01-15T10:30:45Z","RequestURI":"/products","HttpStatus":200,"Bytes":24500,"UserAgent":"Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)","RequestTime":0.125,"TLSProtocol":"TLSv1.3"}]</code></div>
+<div class="code"><h5>Nginx JSON</h5><code>{"remote_addr":"66.249.66.1","request_uri":"/blog/seo-guide","status":200,"body_bytes_sent":18700,"http_user_agent":"Mozilla/5.0 (compatible; Googlebot/2.1)","request_time":0.089,"ssl_protocol":"TLSv1.3"}</code></div>`;
+}
+
+/* ==== Q: CONTROLLER ==== */
+let currentAnalysis=null,currentCfg={};
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));document.querySelectorAll('.sb-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+id).classList.add('active-page');document.querySelector(`[data-section="${id}"]`).classList.add('active')}
+function showTab(id){document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active-tp'));document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active-tp');document.querySelector(`[data-tab="${id}"]`).classList.add('active')}
+
+function processFile(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      document.getElementById('progress-wrap').classList.remove('hidden');
+      document.getElementById('upload-panel').classList.add('hidden');
+      const text=e.target.result;let records;
+      const trimmed=text.trim();
+      if(trimmed.startsWith('[')){records=JSON.parse(trimmed);if(!Array.isArray(records))records=[records]}
+      else{records=trimmed.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l.trim())}catch(e){return null}}).filter(Boolean)}
+      if(!records.length)throw new Error('No valid JSON records found in file.');
+      document.getElementById('ib-file').textContent=file.name;
+      document.getElementById('ib-size').textContent=fmtB(file.size);
+      document.getElementById('ib-records').textContent=fmtN(records.length);
+      document.getElementById('ib-fields').textContent=Object.keys(records[0]).length;
+      document.getElementById('info-bar').classList.remove('hidden');
+      setTimeout(()=>{
+        currentAnalysis=analyze(records,currentCfg,(pct,msg)=>{document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg});
+        document.getElementById('progress-wrap').classList.add('hidden');
+        document.getElementById('results').classList.remove('hidden');
+        renderAll(currentAnalysis);
+      },50);
+    }catch(err){
+      document.getElementById('progress-wrap').classList.add('hidden');
+      document.getElementById('upload-panel').classList.remove('hidden');
+      alert('Error: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  renderAbout();renderHowto();
+  document.querySelectorAll('.sb-btn').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.section)));
+  document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+  const fi=document.getElementById('file-input'),drop=document.getElementById('upload-drop');
+  document.getElementById('browse-btn').addEventListener('click',e=>{e.stopPropagation();fi.click()});
+  drop.addEventListener('click',()=>fi.click());
+  fi.addEventListener('change',e=>{if(e.target.files.length)processFile(e.target.files[0])});
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('dragover')});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('dragover'));
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('dragover');if(e.dataTransfer.files.length)processFile(e.dataTransfer.files[0])});
+  document.getElementById('clear-btn').addEventListener('click',()=>{fi.value='';document.getElementById('info-bar').classList.add('hidden');document.getElementById('results').classList.add('hidden');document.getElementById('upload-panel').classList.remove('hidden');currentAnalysis=null});
+  document.getElementById('download-sample-btn').addEventListener('click',e=>{e.stopPropagation();const b=new Blob([genSample()],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='sample-server-logs.json';a.click();URL.revokeObjectURL(u)});
+});
+
+})();
