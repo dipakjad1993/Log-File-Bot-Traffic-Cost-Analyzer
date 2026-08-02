@@ -2,6 +2,10 @@
 
 **A free, open-source, client-side alternative to Botify, Loggly, Screaming Frog Log Analyzer, and other $4,000-$8,000+/month enterprise log analysis platforms.**
 
+### 🚀 Live Demo
+
+Try the deployed version here: **[https://log-file-bot-traffic-cost-analyzer.onrender.com](https://log-file-bot-traffic-cost-analyzer.onrender.com)**
+
 Upload your server access logs and get instant, in-depth insights into bot traffic, crawl budget waste, infrastructure costs, AI scraper impact, and security threats — all processed entirely in your browser. No data ever leaves your machine. No server uploads. No subscriptions. No tracking.
 
 ---
