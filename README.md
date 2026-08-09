@@ -252,7 +252,7 @@ Convert your server logs to JSON format. Each entry should contain at minimum:
 ### Step 2: Upload
 
 - Click **Browse Files** or drag-and-drop your JSON log file
-- Or click **Download Sample Log** to generate a 5,000-record sample dataset for testing
+- Or click **Download Sample Log** to generate a unique sample dataset (selectable size: 1 MB — 1 GB)
 
 ### Step 3: Review Analysis
 
@@ -278,21 +278,47 @@ The tool generates 10 detailed analysis tabs:
 
 ---
 
-## Sample Data
+## Sample Data Generator
 
-The tool includes a built-in sample data generator that creates realistic 5,000-record datasets with:
+The tool includes a built-in sample data generator that creates unique, realistic log datasets **every time** you download. Each generation produces different data with randomized IPs, timestamps, and request patterns.
 
-- **58% Human traffic** — Real browser UAs (Chrome, Firefox, Safari, Edge) with realistic IPs
-- **15% Googlebot** — From verified Google IP ranges with proper User-Agent
-- **4% Bingbot** — From verified Microsoft IP ranges
-- **6% GPTBot** — OpenAI's web crawler
-- **3% PerplexityBot** — Perplexity AI search crawler
-- **2% ClaudeBot** — Anthropic's Claude crawler
-- **1.5% OAI-SearchBot** — ChatGPT Search
-- **4% Bytespider** — ByteDance AI training scraper
-- **2.5% CCBot** — Common Crawl AI training
+### Configurable File Sizes
 
-The sample data includes realistic URL distributions (main pages, products, blog posts, documentation, parameterized URLs, trap URLs, and security probe URLs), status codes, cache statuses, TLS versions, and response times.
+Select your desired file size before downloading:
+
+| Option | Approximate Records | Use Case |
+|--------|-------------------|----------|
+| 1 MB | ~3,700 | Quick testing |
+| 5 MB | ~18,500 | Standard analysis |
+| 10 MB | ~37,000 | Deeper analysis |
+| 50 MB | ~185,000 | Production simulation |
+| 100 MB | ~370,000 | Heavy traffic analysis |
+| 500 MB | ~1.85M | Stress testing |
+| 1 GB | ~3.7M | Maximum capacity |
+
+### Traffic Mix
+
+Each sample includes a realistic traffic distribution across 16 categories:
+
+- **~57.7% Human traffic** — 500 unique IPs, real browser UAs (Chrome, Firefox, Safari, Edge, mobile)
+- **~12% Googlebot** — 80 unique IPs with verified Google User-Agents
+- **~5.5% GPTBot** — 30 unique IPs (OpenAI's web crawler)
+- **~4.5% Bytespider** — 50 unique IPs (ByteDance AI training scraper)
+- **~3.5% Bingbot** — 40 unique IPs (Microsoft's search crawler)
+- **~3% CCBot** — 25 unique IPs (Common Crawl AI training)
+- **~2.5% PerplexityBot** — 20 unique IPs (Perplexity AI search)
+- ~2% YandexBot, ~2% AhrefsBot, ~1.8% ClaudeBot, ~1.5% SEMrushBot, ~1.5% Facebookbot, ~1.2% OAI-SearchBot, ~1% BaiduSpider, ~0.8% Twitterbot, ~0.5% LinkedInBot
+
+### Data Realism
+
+- **Unique timestamps** spanning 1/7/30/90 days (randomly selected per generation)
+- **Randomized IPs** — no two downloads have the same IP addresses
+- **URL variety** — 8 categories: main pages, products, blog, docs, parameterized URLs, crawl traps, security probes, API endpoints
+- **Realistic status codes** — 72% 200, 10% 301, 6% 304, 5% 404, 3% 429, 2% 500, 2% 403
+- **Response times** vary by category (humans: 30-230ms, search engines: 70-470ms, AI scrapers: 120-1320ms)
+- **Referrers** — humans include Google, Bing, Facebook, Twitter, LinkedIn, Reddit, Hacker News referrals
+- **TLS versions and ciphers** — randomized (TLSv1.3, TLSv1.2)
+- **Cache statuses** — HIT/MISS/EXPIRED/BYPASS with realistic ratios
 
 ---
 
@@ -442,11 +468,32 @@ Threat patterns are defined in the `THREATS` array:
 
 ---
 
+## Changelog
+
+### v4.1 (August 2026) — Bug Fixes & Sample Data Enhancements
+
+**Critical Bug Fixes:**
+- Fixed modules 4-10 showing blank/zero data after file upload — caused by missing `cfg` property in analysis result object
+- Fixed Module 8 (Traffic Patterns) showing blank — caused by missing `hStd` property in traffic pattern results
+- Added error isolation in `renderAll()` — one failing renderer no longer breaks all other tabs
+- Fixed Module 2 (Bot Verification) displaying zero stats — verification summary now includes all required properties
+- Fixed Module 9 (Security) velocity threshold calculation returning undefined
+
+**Sample Data Generator Improvements:**
+- Now generates **unique data every time** — randomized IPs, timestamps, and request patterns
+- Added **configurable file sizes**: 1 MB, 5 MB, 10 MB, 50 MB, 100 MB, 500 MB, 1 GB
+- Expanded bot coverage from 9 to 16 categories with unique IP pools per category
+- Variable time ranges (1/7/30/90 days) randomly selected per generation
+- Downloads include timestamped filenames for easy organization
+
+---
+
 ## Roadmap
 
+- [x] Custom pricing configuration UI — adjustable CDN egress, request, and SSR compute rates
+- [x] Variable-size sample data generator — 1 MB to 1 GB with unique data each download
 - [ ] CSV/TSV log format support
 - [ ] Compressed (.gz, .zip) file support
-- [ ] Custom pricing configuration UI
 - [ ] PDF export for CFO reports
 - [ ] Historical comparison (upload multiple time periods)
 - [ ] Custom bot signature editor
