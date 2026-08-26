@@ -1,176 +1,57 @@
-# Log File & Bot Traffic cost Analyzer
+# Open-Source Log File & Bot Traffic Analyzer
 
-**A free, open-source, client-side alternative to Botify, Loggly, Screaming Frog Log Analyzer, and other $4,000-$8,000+/month enterprise log analysis platforms.**
+A fast, privacy-focused, 100% client-side web utility for parsing server access logs, identifying bot traffic patterns, analyzing crawl budget distribution, and estimating infrastructure egress overhead.
 
-### 🚀 Live Demo
-
-Try the deployed version here: **[https://log-file-bot-traffic-cost-analyzer.onrender.com](https://log-file-bot-traffic-cost-analyzer.onrender.com)**
-
-Upload your server access logs and get instant, in-depth insights into bot traffic, crawl budget waste, infrastructure costs, AI scraper impact, and security threats — all processed entirely in your browser. No data ever leaves your machine. No server uploads. No subscriptions. No tracking.
+🚀 **Live Demo:** [log-file-bot-traffic-cost-analyzer.onrender.com](https://log-file-bot-traffic-cost-analyzer.onrender.com)
 
 ---
 
-## Why This Tool Exists
+## Overview
 
-In 2026, the web is flooded with automated traffic. AI scrapers like GPTBot, ClaudeBot, Bytespider, and PerplexityBot are hitting enterprise servers at unprecedented scale. They rack up cloud compute and CDN egress bills, consume crawl budget away from search engines that actually drive revenue, and generate zero ROI. Meanwhile, legacy log analysis tools charge thousands of dollars per month and still require you to upload sensitive log data to third-party servers.
+Modern web servers face heavy automated traffic from traditional search engine crawlers, SEO scrapers, and AI training bots. Understanding how this traffic impacts your site performance and crawl efficiency usually requires complex server-side pipelines or costly analytics subscriptions.
 
-**This tool solves both problems.** It runs entirely in your browser, processes logs locally, and provides the same depth of analysis that enterprise platforms offer — at zero cost.
-
-### The Problem With Existing Tools
-
-| Tool | Monthly Cost | Data Privacy | Depth of Analysis |
-|------|-------------|--------------|-------------------|
-| Botify | $4,000 - $8,000+ | Data uploaded to their servers | Good |
-| Loggly (Splunk) | $2,000 - $6,000+ | Data uploaded to their servers | Good |
-| Screaming Frog Log Analyzer | $259/year | Local processing | Basic |
-| **This Tool** | **$0** | **100% local — never leaves your browser** | **Enterprise-grade** |
-
-### What You Save
-
-- **CDN Egress Waste**: $5,000 - $20,000/mo by identifying and blocking bots consuming bandwidth with zero return
-- **Origin Compute Costs**: $3,000 - $15,000/mo by blocking rogue bots at the edge before they hit your servers
-- **SaaS Tool Replacement**: $4,000 - $8,000/mo by eliminating Botify, Loggly, or equivalent enterprise licenses
-- **Crawl Budget Optimization**: Improved organic rankings and faster indexation by reclaiming wasted crawl budget
+This open-source tool allows Technical SEOs, developers, and sysadmins to quickly drop JSON/NDJSON log files into their browser to audit bot behaviors, evaluate user-agent distributions, and generate quick edge-filtering recommendations—without uploading sensitive log data to any third-party server.
 
 ---
 
-## Key Features
+## Key Capabilities
 
-### 1. Bot Classification (50+ Known Signatures)
+* **User-Agent & Bot Classification:** Matches request streams against 50+ known search engine, AI scraper (GPTBot, ClaudeBot, Bytespider), and monitoring tool signatures.
+* **Crawl Budget & Trap Diagnostic:** Identifies parameterized query traps, pagination loops, and low-value directory paths consuming crawler attention.
+* **Estimated Egress Cost Calculation:** Maps traffic bandwidth against standard CloudFront/CDN pricing models to calculate approximate infrastructure impact by traffic category.
+* **AI Scraper Impact Matrix:** Helps categorize incoming bot traffic to determine whether to allow, rate-limit, or block specific scrapers at the edge.
+* **CDN Edge Rule Generator:** Automatically outputs ready-to-copy syntax rules for Cloudflare WAF, Fastly VCL, and AWS WAF based on identified suspicious user-agents.
+* **Security & Probe Detection:** Flags automated path traversal attempts (`../`), sensitive file probes (`.env`, `.git`), and vulnerability scanning patterns.
 
-The engine classifies every request against a comprehensive database of **50+ known bot signatures** and **18 real browser fingerprint patterns** from the 2026 ecosystem. Each entity is assigned a value tier:
+---
 
-| Tier | Score Range | Examples | Action |
-|------|------------|----------|--------|
-| Search Engine | +5 to +10 | Googlebot, Bingbot, YandexBot | Allow — critical for SEO |
-| AI Citation | +3 to +7 | PerplexityBot, ClaudeBot, OAI-SearchBot | Rate-limit — conditional ROI |
-| AI Training | -3 to 0 | CCBot, Bytespider, GPTBot | Block — zero ROI |
-| SEO Tool | 0 to +2 | AhrefsBot, SEMrushBot | Monitor |
-| Monitoring | 0 | Pingdom, GTmetrix | Allow |
-| Social | +3 to +5 | Twitterbot, LinkedInBot | Allow |
-| Suspicious | -1 to -3 | Unknown bots, headless browsers | Block |
+## Data Privacy & Architecture
 
-**How classification works:**
-1. The engine first checks if the User-Agent matches a **real browser fingerprint** (checking for AppleWebKit, Gecko, Blink rendering engines with OS/hardware indicators)
-2. If a real browser is found AND no bot signature matches, it is classified as human
-3. If a known bot signature matches first, it is classified as that bot regardless of browser patterns (preventing spoofed Googlebot claims from real browser UAs)
-4. Unknown patterns are flagged for manual review
+* **100% Client-Side Processing:** Log data is parsed locally in-browser using client-side JavaScript. No access logs leave your machine.
+* **Multi-Format Normalization:** Accepts standard JSON, JSONL, and NDJSON logs from Cloudflare, Nginx, Apache, AWS ALB, and Varnish.
 
-### 2. Multi-Layer Bot Verification (4 Independent Layers)
+---
 
-User-Agent spoofing is trivial — any scraper can claim to be Googlebot. But faking a Google IP address, TLS fingerprint, and hosting on Google's ASN simultaneously is extremely difficult. The tool validates each request through four independent verification layers:
+## Quick Start (Local Setup)
 
-- **Layer 1 — Reverse DNS / IP Range**: Validates the source IP against published search engine IP ranges (Google: `66.249.*`, `64.233.*`, etc.; Bing: `13.107.*`, `204.79.*`, etc.)
-- **Layer 2 — TLS Fingerprint**: Checks that the TLS version matches the claimed identity (e.g., Googlebot should use TLSv1.3)
-- **Layer 3 — ASN Intelligence**: Detects whether the IP is from a cloud provider (AWS, GCP, Azure, Hetzner, DigitalOcean) or residential/ISP
-- **Layer 4 — Behavioral Analysis**: Identifies aggressive crawl patterns, excessive parameterized URL access, and honeypot trap triggering
+```bash
+# Clone the repository
+git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
 
-### 3. Crawl Budget & Waste Heat Index
+# Navigate to directory
+cd Log-File-Bot-Traffic-Cost-Analyzer
 
-Crawl budget is the number of pages a search engine will crawl on your site within a given timeframe. When bots waste this budget on parameterized URLs, faceted navigation traps, or low-value pages, your high-quality content gets crawled less frequently, directly impacting search rankings.
+# Start local static server (Node.js)
+node server.js
+```
 
-**What the tool identifies:**
-- Search engine crawl efficiency per crawler (2xx rate, unique URLs vs total requests)
-- Parameterized URL ratio (URLs with query strings that waste crawl budget)
-- Cache hit rates per crawler
-- Average and P95 response times per crawler
-- Crawl trap patterns: faceted navigation, pagination loops, session IDs, infinite calendar loops, internal search, API endpoints, UTM spam
-
-### 4. Infrastructure Cost Analysis (AWS CloudFront 2026 Pricing)
-
-Calculates the actual USD cost of serving each bot category using real cloud pricing:
-
-| Cost Component | Rate |
-|---------------|------|
-| CDN Egress | $0.09/GB |
-| Per-Request Processing | $0.0075 per 10,000 requests |
-| SSR Compute | $0.005 per 1,000 requests |
-
-The tool breaks down costs by bot category, showing exactly where your infrastructure budget is going and what you could save by implementing edge blocking rules.
-
-### 5. AI Scraper Citation ROI Matrix
-
-Not all AI bots should be blocked. Some drive referral traffic and search citations (Perplexity, ChatGPT Search). Others only train models that compete with you (Bytespider, CCBot). The matrix scores each AI bot on:
-
-- **Request volume and bandwidth consumed**
-- **Egress cost incurred**
-- **ROI classification**: Positive, Conditional, or Negative
-- **Recommended action**: ALLOW, RATE-LIMIT, or BLOCK
-
-Includes a step-by-step guide for calculating full ROI by cross-referencing with Google Analytics referral data.
-
-### 6. Automated Edge Rule Generation
-
-Ready-to-deploy rules generated from the analysis, covering three major CDN/WAF providers:
-
-- **Cloudflare WAF Rules**: Custom rules in Cloudflare's expression syntax
-- **Fastly VCL Snippets**: VCL configuration snippets for Fastly edge compute
-- **AWS WAF Rules**: WAFv2 JSON rule statements for AWS CloudFront distributions
-
-Plus recommendations for advanced defense techniques:
-- **Honeypot / Poison Pill**: Serve convincing fabricated content to confirmed scrapers
-- **Tarpitting**: Serve valid responses extremely slowly (1 byte/second) to burn scraper connection pools
-
-### 7. Performance Analysis
-
-- **Response Time by Bot Type**: Average TTFB and P95 TTFB broken down by traffic category
-- **Status Code Distribution**: 2xx, 3xx, 4xx, 5xx breakdown with visual bars
-- **HTTP Method Distribution**: GET, POST, HEAD analysis with interpretation
-
-### 8. Traffic Patterns & Velocity Detection
-
-- **Hourly Request Distribution**: 24-hour heatmap with statistical spike detection (2+ standard deviations above mean)
-- **Day-of-Week Distribution**: Weekly pattern analysis
-- **Top 25 IPs by Request Volume**: Identifies high-traffic sources
-- **Top 40 Most Requested URLs**: Shows which pages attract the most traffic
-- **Top Referrers**: Traffic source analysis
-- **Top User-Agent Strings**: Raw UA breakdown with classification
-
-### 9. Security Threat Analysis
-
-Automated detection of suspicious request patterns:
-
-| Threat | Severity | Description |
-|--------|----------|-------------|
-| Path Traversal Attempt | CRITICAL | `../`, `..\\`, `%2e%2e` patterns |
-| Sensitive File Probe | CRITICAL | `.env`, `.git`, `.htpasswd`, `.sql`, `.pem` access |
-| Shell/CGI Probe | CRITICAL | `/shell`, `/cmd`, `/exec`, `cgi-bin` attempts |
-| WordPress Admin Probe | HIGH | `/wp-admin`, `/wp-login`, `/wp-xmlrpc` |
-| Admin Panel Probe | HIGH | `/phpmyadmin`, `/adminer`, `/admin.php` |
-| Backup File Access | HIGH | `.bak`, `.old`, `.backup`, `.tar.gz` |
-| Log File Access | MEDIUM | `/server-status`, `/access.log`, `/error.log` |
-
-Plus **high-velocity IP detection** (potential DDoS or aggressive scraping) and **large payload request** identification (>10MB).
-
-### 10. CFO / FinOps Executive Report
-
-A boardroom-ready financial summary including:
-
-- **Monthly Total Spend**: Infrastructure + SaaS license costs
-- **Monthly Waste**: Cost of zero-ROI bot traffic
-- **Monthly Savings Available**: Bot blocking + SaaS offset
-- **Annual Savings Projection**: After implementing recommendations
-- **Implementation Cost Estimate**: Hours x hourly rate
-- **Payback Period**: Months to recover implementation cost
-- **Year-One Net Savings and Annual ROI**
+Open **http://localhost:8080** in your browser.
 
 ---
 
 ## Supported Log Formats
 
-The tool accepts JSON-formatted log files. It auto-normalizes field names from multiple platforms:
-
-### Input Formats
-
-| Format | Description |
-|--------|-------------|
-| JSON Array | `[{"field": "value"}, ...]` |
-| JSONL / NDJSON | One JSON object per line |
-| `.json`, `.jsonl`, `.ndjson`, `.log` | File extensions accepted |
-
-### Normalized Fields
-
-The engine recognizes and normalizes field names from:
+The tool accepts JSON-formatted log files and auto-normalizes field names from multiple platforms:
 
 | Platform | IP Field | Timestamp Field | URI Field | Status Field |
 |----------|----------|----------------|-----------|--------------|
@@ -179,146 +60,6 @@ The engine recognizes and normalizes field names from:
 | Apache | `remote_addr` | `time` | `request_uri` | `status` |
 | AWS ALB | `clientIP` | `@timestamp` | `requestURI` | `statusCode` |
 | Varnish | `remote_addr` | `timestamp` | `request` | `status` |
-| Custom | `ip`, `source_ip` | `date`, `datetime` | `url`, `path` | `http_status` |
-
-### Additional Normalized Fields
-
-- `user_agent` / `User-Agent` / `ua` — User-Agent string
-- `bytes_sent` / `body_bytes_sent` / `size` — Response size in bytes
-- `request_time` / `response_time` / `ttfb` — Response time in seconds
-- `referer` / `http_referer` — Referrer URL
-- `tls_protocol` / `ssl_protocol` — TLS version (TLSv1.2, TLSv1.3)
-- `cache_status` / `cf_cache_status` / `x_cache` — CDN cache status
-
----
-
-## Quick Start
-
-### Option 1: Run Locally (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
-
-# Navigate to the project directory
-cd Log-File-Bot-Traffic-Cost-Analyzer
-
-# Start the server (requires Node.js)
-node server.js
-```
-
-Open **http://localhost:8080** in your browser.
-
-### Option 2: Open Directly
-
-Simply open `index.html` in your browser. The tool works without a server (drag-and-drop upload requires a served environment for file access, but the sample data download works fine).
-
-### Option 3: Use Any Static Server
-
-```bash
-# Python
-python -m http.server 8080
-
-# PHP
-php -S localhost:8080
-
-# Go
-go run github.com/nicholasgasior/ghttp@latest -p 8080
-```
-
----
-
-## How to Use
-
-### Step 1: Prepare Your Log File
-
-Convert your server logs to JSON format. Each entry should contain at minimum:
-
-```json
-{
-  "ClientIP": "66.249.66.1",
-  "Timestamp": "2026-01-15T10:30:45Z",
-  "RequestURI": "/products/widget-pro",
-  "RequestMethod": "GET",
-  "HttpStatus": 200,
-  "Bytes": 24500,
-  "UserAgent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-  "RequestTime": 0.125,
-  "TLSProtocol": "TLSv1.3",
-  "CacheStatus": "HIT"
-}
-```
-
-### Step 2: Upload
-
-- Click **Browse Files** or drag-and-drop your JSON log file
-- Or click **Download Sample Log** to generate a unique sample dataset (selectable size: 1 MB — 1 GB)
-
-### Step 3: Review Analysis
-
-The tool generates 10 detailed analysis tabs:
-
-1. **Bot Classification** — Complete breakdown of all traffic categories with volume, bandwidth, and value scores
-2. **Bot Verification** — 4-layer verification results showing verified vs suspicious bots
-3. **Crawl Budget** — Search engine crawl efficiency and trap detection
-4. **Cost Analysis** — USD cost breakdown by bot category with savings opportunity
-5. **AI Scraper Matrix** — ROI scoring for each AI bot with blocking recommendations
-6. **Edge Rules** — Ready-to-deploy Cloudflare, Fastly, and AWS WAF rules
-7. **Performance** — Response time analysis and status code distribution
-8. **Traffic Patterns** — Hourly/daily patterns with velocity spike detection
-9. **Security** — Threat detection, high-velocity IPs, and suspicious patterns
-10. **CFO / FinOps** — Executive financial summary with ROI calculations
-
-### Step 4: Take Action
-
-- Deploy generated edge rules to your CDN/WAF
-- Share the CFO report with stakeholders
-- Prioritize SEO fixes based on crawl budget analysis
-- Block zero-ROI bots at the edge to reduce infrastructure costs
-
----
-
-## Sample Data Generator
-
-The tool includes a built-in sample data generator that creates unique, realistic log datasets **every time** you download. Each generation produces different data with randomized IPs, timestamps, and request patterns.
-
-### Configurable File Sizes
-
-Select your desired file size before downloading:
-
-| Option | Approximate Records | Use Case |
-|--------|-------------------|----------|
-| 1 MB | ~3,700 | Quick testing |
-| 5 MB | ~18,500 | Standard analysis |
-| 10 MB | ~37,000 | Deeper analysis |
-| 50 MB | ~185,000 | Production simulation |
-| 100 MB | ~370,000 | Heavy traffic analysis |
-| 500 MB | ~1.85M | Stress testing |
-| 1 GB | ~3.7M | Maximum capacity |
-
-### Traffic Mix
-
-Each sample includes a realistic traffic distribution across 16 categories:
-
-- **~57.7% Human traffic** — 500 unique IPs, real browser UAs (Chrome, Firefox, Safari, Edge, mobile)
-- **~12% Googlebot** — 80 unique IPs with verified Google User-Agents
-- **~5.5% GPTBot** — 30 unique IPs (OpenAI's web crawler)
-- **~4.5% Bytespider** — 50 unique IPs (ByteDance AI training scraper)
-- **~3.5% Bingbot** — 40 unique IPs (Microsoft's search crawler)
-- **~3% CCBot** — 25 unique IPs (Common Crawl AI training)
-- **~2.5% PerplexityBot** — 20 unique IPs (Perplexity AI search)
-- ~2% YandexBot, ~2% AhrefsBot, ~1.8% ClaudeBot, ~1.5% SEMrushBot, ~1.5% Facebookbot, ~1.2% OAI-SearchBot, ~1% BaiduSpider, ~0.8% Twitterbot, ~0.5% LinkedInBot
-
-### Data Realism
-
-- **Unique timestamps** spanning 1/7/30/90 days (randomly selected per generation)
-- **Randomized IPs** — no two downloads have the same IP addresses
-- **URL variety** — 8 categories: main pages, products, blog, docs, parameterized URLs, crawl traps, security probes, API endpoints
-- **Realistic status codes** — 72% 200, 10% 301, 6% 304, 5% 404, 3% 429, 2% 500, 2% 403
-- **Response times** vary by category (humans: 30-230ms, search engines: 70-470ms, AI scrapers: 120-1320ms)
-- **Referrers** — humans include Google, Bing, Facebook, Twitter, LinkedIn, Reddit, Hacker News referrals
-- **TLS versions and ciphers** — randomized (TLSv1.3, TLSv1.2)
-- **Cache statuses** — HIT/MISS/EXPIRED/BYPASS with realistic ratios
 
 ---
 
@@ -349,91 +90,13 @@ Log-File-Bot-Traffic-Cost-Analyzer/
 
 ---
 
-## Pricing Model
-
-All cost calculations are based on **AWS CloudFront 2026 standard pricing**:
-
-| Component | Rate | Description |
-|-----------|------|-------------|
-| CDN Egress | $0.09/GB | Bandwidth consumed across all traffic |
-| Request Processing | $0.0075 / 10,000 requests | Per-request charges at CDN edge |
-| SSR Compute | $0.005 / 1,000 requests | Server-side rendering for bot requests |
-
-You can adjust these rates in the configuration to match your actual cloud provider pricing.
-
----
-
-## Bot Signature Database
-
-The engine includes signatures for **50+ known bots** across 8 categories:
-
-### Search Engines (12 signatures)
-Googlebot, AdsBot-Google, Mediapartners-Google, Google InspectionTool, FeedFetcher-Google, Bingbot, MSNbot, BingPreview, YandexBot, BaiduSpider, DuckDuckBot, Applebot, Yahoo Slurp
-
-### AI Search / Citation (8 signatures)
-PerplexityBot, ClaudeBot, OAI-SearchBot, ChatGPT-User, GPTBot, YouBot, BraveBot, Amazonbot
-
-### AI Training Scrapers (12 signatures)
-CCBot, Bytespider, Meta-ExternalAgent, Applebot-Extended, Scrapy, Python-requests, Python-urllib, Go-http-client, Java/HTTP, cURL, Wget, HeadlessChrome, PhantomJS, Puppeteer, Playwright
-
-### SEO Tools (5 signatures)
-AhrefsBot, SEMrushBot, DotBot (Moz), MJ12bot, Screaming Frog
-
-### Social Platforms (7 signatures)
-Facebookbot, facebookexternalhit, Twitterbot, LinkedInBot, Slackbot, Discordbot, Pinterestbot
-
-### Monitoring (5 signatures)
-Pingdom, UptimeRobot, GTmetrix, New Relic, Datadog
-
-### Known IP Ranges
-- **Google**: `66.249.*`, `64.233.*`, `72.14.*`, `216.239.*`, `74.125.*`, `172.217.*`, `142.250.*`, `209.85.*`, `108.177.*`, `35.190.*`, `35.191.*`, `34.*`
-- **Bing**: `13.107.*`, `204.79.*`, `199.232.*`
-- **Baidu**: `180.76.*`, `123.125.*`, `220.181.*`
-- **Yandex**: `77.88.*`, `93.158.*`, `5.45.*`, `95.108.*`
-
-### Cloud Provider IP Ranges
-AWS, Google Cloud, Azure, Cloudflare, Hetzner, DigitalOcean, OVH, Fastly
-
----
-
 ## Security & Privacy
 
-- **100% Client-Side**: All processing happens in your browser using JavaScript
-- **No Server Uploads**: Log data never leaves your machine
-- **No Tracking**: No analytics, no cookies, no telemetry
-- **No External Dependencies**: Runs entirely offline after initial page load (Google Fonts cached automatically)
-- **Open Source**: Full source code available for audit
-
----
-
-## Browser Compatibility
-
-| Browser | Minimum Version | Status |
-|---------|----------------|--------|
-| Chrome | 90+ | Fully Supported |
-| Firefox | 90+ | Fully Supported |
-| Safari | 14+ | Fully Supported |
-| Edge | 90+ | Fully Supported |
-| Opera | 76+ | Fully Supported |
-
----
-
-## Use Cases
-
-### E-Commerce Sites
-Identify scrapers stealing product pricing and inventory data. Block AI training crawlers that replicate your product catalog. Optimize crawl budget so Google indexes new products faster.
-
-### SaaS & Tech Companies
-Measure the true cost of AI scrapers consuming your documentation and API reference pages. Generate edge rules to rate-limit or block scrapers while allowing search engine indexing.
-
-### News & Media
-Analyze which bots are consuming your content. Balance between allowing citation-driving AI search bots (Perplexity, ChatGPT Search) and blocking zero-ROI training scrapers.
-
-### Enterprise DevOps
-Replace expensive SaaS monitoring tools with a free, local alternative. Generate CFO-ready cost reports for infrastructure optimization decisions.
-
-### SEO Professionals
-Audit crawl budget efficiency across search engines. Identify crawl traps wasting bot attention. Generate recommendations for robots.txt optimization and canonical URL implementation.
+* **100% Client-Side:** All processing happens in your browser using JavaScript.
+* **No Server Uploads:** Log data never leaves your machine.
+* **No Tracking:** No analytics, no cookies, no telemetry.
+* **No External Dependencies:** Runs entirely offline after initial page load.
+* **Open Source:** Full source code available for audit.
 
 ---
 
@@ -441,80 +104,8 @@ Audit crawl budget efficiency across search engines. Identify crawl traps wastin
 
 Contributions are welcome. Please open an issue or pull request.
 
-### Development Setup
-
-```bash
-git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
-cd Log-File-Bot-Traffic-Cost-Analyzer
-node server.js
-# Open http://localhost:8080
-```
-
-### Adding New Bot Signatures
-
-Bot signatures are defined in the `BOTS` array in `js/analyzer.js`. Each entry follows this format:
-
-```javascript
-{p:'botname', n:'Display Name', cat:'category', tier:'tier', v:5, note:'Description'}
-```
-
-### Adding New Threat Patterns
-
-Threat patterns are defined in the `THREATS` array:
-
-```javascript
-{name:'Threat Name', regex:/pattern/i, sev:'critical'}
-```
-
----
-
-## Changelog
-
-### v4.1 (August 2026) — Bug Fixes & Sample Data Enhancements
-
-**Critical Bug Fixes:**
-- Fixed modules 4-10 showing blank/zero data after file upload — caused by missing `cfg` property in analysis result object
-- Fixed Module 8 (Traffic Patterns) showing blank — caused by missing `hStd` property in traffic pattern results
-- Added error isolation in `renderAll()` — one failing renderer no longer breaks all other tabs
-- Fixed Module 2 (Bot Verification) displaying zero stats — verification summary now includes all required properties
-- Fixed Module 9 (Security) velocity threshold calculation returning undefined
-
-**Sample Data Generator Improvements:**
-- Now generates **unique data every time** — randomized IPs, timestamps, and request patterns
-- Added **configurable file sizes**: 1 MB, 5 MB, 10 MB, 50 MB, 100 MB, 500 MB, 1 GB
-- Expanded bot coverage from 9 to 16 categories with unique IP pools per category
-- Variable time ranges (1/7/30/90 days) randomly selected per generation
-- Downloads include timestamped filenames for easy organization
-
----
-
-## Roadmap
-
-- [x] Custom pricing configuration UI — adjustable CDN egress, request, and SSR compute rates
-- [x] Variable-size sample data generator — 1 MB to 1 GB with unique data each download
-- [ ] CSV/TSV log format support
-- [ ] Compressed (.gz, .zip) file support
-- [ ] PDF export for CFO reports
-- [ ] Historical comparison (upload multiple time periods)
-- [ ] Custom bot signature editor
-- [ ] Real-time log streaming support
-- [ ] Integration with Cloudflare API for automatic rule deployment
-
 ---
 
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-## Credits
-
-Built as a free alternative to enterprise log analysis platforms that charge $4,000-$8,000+ per month. All analysis runs locally in your browser — your log data never touches any external server.
-
----
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/discussions)

@@ -901,17 +901,14 @@ function genSample(targetSizeMB){
 function renderAbout(){
   document.getElementById('about-content').innerHTML=`
 <h1>About This Tool</h1>
-<p>The Log File & Bot Traffic cost Analyzer processes server access logs to identify, classify, and quantify the financial impact of all traffic hitting your infrastructure, with particular focus on bot traffic, AI scrapers, and crawl budget optimization.</p>
-<h2>Why This Tool Exists</h2>
-<p>In 2026, AI scrapers like GPTBot, ClaudeBot, Bytespider, and PerplexityBot are hitting enterprise servers at unprecedented scale. They rack up cloud compute and CDN egress bills, consume crawl budget away from search engines, and generate zero ROI. Legacy tools like Botify or Loggly cost $4,000-$8,000+/month at enterprise scale.</p>
-<h2>What This Tool Saves</h2>
-<div class="savings-grid">
-  <div class="savings-card"><h4>CDN Egress Waste</h4><p>Breaks down bandwidth costs by bot type, showing exactly where money is wasted.</p><div class="savings-val">$5,000 - $20,000/mo</div></div>
-  <div class="savings-card"><h4>Origin Compute</h4><p>Identifies CPU/memory consumed by rogue bots for targeted edge blocking.</p><div class="savings-val">$3,000 - $15,000/mo</div></div>
-  <div class="savings-card"><h4>SaaS Replacement</h4><p>Replaces Botify, Loggly, and similar enterprise platforms.</p><div class="savings-val">$4,000 - $8,000/mo</div></div>
-  <div class="savings-card"><h4>Crawl Budget</h4><p>Reclaims wasted budget by identifying parameterized URL traps.</p><div class="savings-val">Improved Rankings</div></div></div>
-<h2>Core Capabilities</h2>
-<ul><li>50+ known bot signature database with 2026-era AI scraper coverage</li><li>Multi-layer bot verification (IP range, TLS fingerprint, ASN, behavioral)</li><li>Crawl budget ROI analysis with waste heat indexing</li><li>Infrastructure cost calculation with configurable pricing</li><li>AI scraper citation ROI matrix for smart blocking</li><li>Automated edge rule generation (Cloudflare, Fastly, AWS WAF)</li><li>Security threat detection and high-velocity IP identification</li><li>CFO/FinOps executive reports with ROI calculations</li></ul>`;
+<p>A fast, privacy-focused, 100% client-side web utility for parsing server access logs, identifying bot traffic patterns, analyzing crawl budget distribution, and estimating infrastructure egress overhead.</p>
+<h2>Overview</h2>
+<p>Modern web servers face heavy automated traffic from traditional search engine crawlers, SEO scrapers, and AI training bots. Understanding how this traffic impacts your site performance and crawl efficiency usually requires complex server-side pipelines or costly analytics subscriptions.</p>
+<p>This open-source tool allows Technical SEOs, developers, and sysadmins to quickly drop JSON/NDJSON log files into their browser to audit bot behaviors, evaluate user-agent distributions, and generate quick edge-filtering recommendations—without uploading sensitive log data to any third-party server.</p>
+<h2>Key Capabilities</h2>
+<ul><li>User-Agent & Bot Classification: Matches request streams against 50+ known search engine, AI scraper (GPTBot, ClaudeBot, Bytespider), and monitoring tool signatures.</li><li>Crawl Budget & Trap Diagnostic: Identifies parameterized query traps, pagination loops, and low-value directory paths consuming crawler attention.</li><li>Estimated Egress Cost Calculation: Maps traffic bandwidth against standard CloudFront/CDN pricing models to calculate approximate infrastructure impact by traffic category.</li><li>AI Scraper Impact Matrix: Helps categorize incoming bot traffic to determine whether to allow, rate-limit, or block specific scrapers at the edge.</li><li>CDN Edge Rule Generator: Automatically outputs ready-to-copy syntax rules for Cloudflare WAF, Fastly VCL, and AWS WAF based on identified suspicious user-agents.</li><li>Security & Probe Detection: Flags automated path traversal attempts, sensitive file probes, and vulnerability scanning patterns.</li></ul>
+<h2>Data Privacy & Architecture</h2>
+<ul><li>100% Client-Side Processing: Log data is parsed locally in-browser using client-side JavaScript. No access logs leave your machine.</li><li>Multi-Format Normalization: Accepts standard JSON, JSONL, and NDJSON logs from Cloudflare, Nginx, Apache, AWS ALB, and Varnish.</li></ul>`;
 }
 
 function renderHowto(){

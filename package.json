@@ -1,7 +1,7 @@
 {
   "name": "log-file-bot-traffic-cost-analyzer",
   "version": "1.0.0",
-  "description": "Log File & Bot Traffic Cost Analyzer",
+  "description": "Open-Source Log File & Bot Traffic Analyzer",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
