@@ -1,17 +1,17 @@
 # Log File Bot Traffic Cost Analyzer
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.01-orange)](data/bot-ips.json)
-[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
 [![v1.1.0](https://img.shields.io/badge/Version-1.1.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
 Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log leaves your machine.
 
-**[Try Live](https://log-file-bot-traffic-cost-analyzer.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.onrender.com/?sample=10k) · [60-sec walkthrough](#demo)**
+**[Try Live](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer-1.onrender.com/?sample=10k) · [60-sec walkthrough](#demo)**
 
 > [!NOTE]
 > `main` branch. v1.1.0 · Bot DB v2026.09.01 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
@@ -43,7 +43,7 @@ Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages f
 
 ## Demo
 
-1. Open the [live demo](https://log-file-bot-traffic-cost-analyzer.onrender.com/?sample=10k) — 10k deterministic rows load in one click.
+1. Open the [live demo](https://log-file-bot-traffic-cost-analyzer-1.onrender.com/?sample=10k) — 10k deterministic rows load in one click.
 2. KPI strip → AI Matrix (red = training, cyan = search-index, blue = user-triggered) → Edge Rules → Copy.
 3. `sample-data/EXPECTED.md` lists exact expected counts so a reviewer verifies without thinking.
 
@@ -86,7 +86,7 @@ See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). 100k deter
 
 ## Resume bullet
 
-> Log-File Analyzer (JS, 10 tabs, 64 bot signatures) — client-side 100k-line parsing, training vs search vs user split, Cloudflare/Fastly rule export. Live: log-file-bot-traffic-cost-analyzer.onrender.com
+> Log-File Analyzer (JS, 10 tabs, 64 bot signatures) — client-side 100k-line parsing, training vs search vs user split, Cloudflare/Fastly rule export. Live: log-file-bot-traffic-cost-analyzer-1.onrender.com
 
 ## Contributing / Security / License
 
