@@ -5,40 +5,61 @@
 (function(){
 'use strict';
 
-/* ==== A: BOT SIGNATURE DB (2026) ==== */
+/* ==== A: BOT SIGNATURE DB v2026.09 — training vs search-index vs user-triggered ==== */
+const BOT_DB_VERSION='2026.09.01';
+const BOT_IP_JSON_DATE='2026-09-01';
+// 2026 interview-critical split:
+//  ai_training    = throttle/block freely, zero live citation loss (GPTBot, CCBot, Bytespider, Google-Extended token)
+//  ai_search_index= allow 60-120 req/min/IP or citation share drops in 1-2 wks (OAI-SearchBot, PerplexityBot, Claude-SearchBot)
+//  ai_user_fetch  = do NOT throttle (300/min ceiling only), 429 = missing live answer (ChatGPT-User, Perplexity-User, Claude-User)
+// citationRisk: none (training) / medium-high (search) / critical-do-not-block (user)
 const BOTS=[
-  {p:'googlebot',n:'Googlebot',cat:'search_engine',tier:'search_engine',note:'Primary organic search crawler. Critical for SEO visibility and organic traffic.'},
+  {p:'googlebot',n:'Googlebot',cat:'search_engine',tier:'search_engine',note:'Primary organic search crawler. Critical for SEO visibility.'},
   {p:'adsbot-google',n:'AdsBot-Google',cat:'search_engine',tier:'search_engine',note:'Google Ads landing page quality crawler.'},
-  {p:'mediapartners-google',n:'Mediapartners-Google',cat:'search_engine',tier:'search_engine',note:'Google AdSense crawler for content matching.'},
-  {p:'google-InspectionTool',n:'Google InspectionTool',cat:'search_engine',tier:'search_engine',note:'Google Rich Results testing tool.'},
+  {p:'mediapartners-google',n:'Mediapartners-Google',cat:'search_engine',tier:'search_engine',note:'Google AdSense crawler.'},
+  {p:'google-inspectiontool',n:'Google InspectionTool',cat:'search_engine',tier:'search_engine',note:'Google Rich Results testing tool.'},
+  {p:'google-read-aloud',n:'Google-Read-Aloud',cat:'search_engine',tier:'search_engine',note:'Google Read Aloud voice agent.'},
   {p:'feedfetcher-google',n:'FeedFetcher-Google',cat:'search_engine',tier:'search_engine',note:'Google feed fetcher.'},
-  {p:'bingbot',n:'Bingbot',cat:'search_engine',tier:'search_engine',note:'Microsoft Bing crawler. Drives organic traffic from Bing.'},
+  {p:'bingbot',n:'Bingbot',cat:'search_engine',tier:'search_engine',note:'Microsoft Bing crawler.'},
   {p:'msnbot',n:'MSNbot',cat:'search_engine',tier:'search_engine',note:'Legacy Bing crawler.'},
   {p:'bingpreview',n:'BingPreview',cat:'search_engine',tier:'search_engine',note:'Bing snapshot crawler.'},
-  {p:'yandexbot',n:'YandexBot',cat:'search_engine',tier:'search_engine',note:'Yandex search crawler for Russian market.'},
-  {p:'baiduspider',n:'BaiduSpider',cat:'search_engine',tier:'search_engine',note:'Baidu search crawler for Chinese market.'},
+  {p:'yandexbot',n:'YandexBot',cat:'search_engine',tier:'search_engine',note:'Yandex search crawler.'},
+  {p:'baiduspider',n:'BaiduSpider',cat:'search_engine',tier:'search_engine',note:'Baidu search crawler.'},
   {p:'duckduckbot',n:'DuckDuckBot',cat:'search_engine',tier:'search_engine',note:'DuckDuckGo search crawler.'},
+  {p:'duckassistbot',n:'DuckAssistBot',cat:'ai_search_index',tier:'ai_search_index',note:'DuckDuckGo AI answer fetcher. Allow — citation source.',citationRisk:'medium',rateLimit:'120/min/IP'},
   {p:'applebot',n:'Applebot',cat:'search_engine',tier:'search_engine',note:'Apple/Siri web index crawler.'},
   {p:'yahoo! slurp',n:'Yahoo Slurp',cat:'search_engine',tier:'search_engine',note:'Yahoo search crawler.'},
   {p:'facebot',n:'Facebookbot',cat:'social',tier:'social',note:'Facebook/Meta link preview crawler.'},
   {p:'facebookexternalhit',n:'facebookexternalhit',cat:'social',tier:'social',note:'Facebook link sharing crawler.'},
+  {p:'meta-externalfetcher',n:'Meta-ExternalFetcher',cat:'social',tier:'social',note:'Meta link preview fetcher (user-triggered shares). Do not aggressively block.'},
   {p:'twitterbot',n:'Twitterbot',cat:'social',tier:'social',note:'Twitter/X card preview crawler.'},
   {p:'linkedinbot',n:'LinkedInBot',cat:'social',tier:'social',note:'LinkedIn link preview crawler.'},
   {p:'slackbot',n:'Slackbot',cat:'social',tier:'social',note:'Slack link unfurling.'},
   {p:'discordbot',n:'Discordbot',cat:'social',tier:'social',note:'Discord link embed.'},
   {p:'pinterestbot',n:'Pinterestbot',cat:'social',tier:'social',note:'Pinterest pin crawler.'},
-  {p:'perplexitybot',n:'PerplexityBot',cat:'ai_search',tier:'ai_citation',note:'Perplexity AI search. Drives referral traffic and citations.'},
-  {p:'claudebot',n:'ClaudeBot',cat:'ai_search',tier:'ai_citation',note:'Anthropic Claude. Can drive citations via Claude.ai.'},
-  {p:'oai-searchbot',n:'OAI-SearchBot',cat:'ai_search',tier:'ai_citation',note:'OpenAI ChatGPT Search. Drives referral traffic.'},
-  {p:'chatgpt-user',n:'ChatGPT-User',cat:'ai_search',tier:'ai_citation',note:'ChatGPT browsing agent.'},
-  {p:'gptbot',n:'GPTBot',cat:'ai_search',tier:'ai_citation',note:'OpenAI GPTBot. Context-dependent: search vs training.'},
-  {p:'youbot',n:'YouBot',cat:'ai_search',tier:'ai_citation',note:'You.com AI search crawler.'},
-  {p:'bravebot',n:'BraveBot',cat:'ai_search',tier:'ai_citation',note:'Brave Search AI crawler.'},
-  {p:'amazonbot',n:'Amazonbot',cat:'ai_search',tier:'ai_citation',note:'Amazon/Alexa crawler.'},
-  {p:'ccbot',n:'CCBot',cat:'ai_training',tier:'ai_training',note:'Common Crawl. Feeds AI training pipelines. Zero direct ROI.'},
-  {p:'bytespider',n:'Bytespider',cat:'ai_training',tier:'ai_training',note:'ByteDance AI training scraper. Extremely aggressive.'},
-  {p:'meta-externalagent',n:'Meta-ExternalAgent',cat:'ai_training',tier:'ai_training',note:'Meta AI training crawler.'},
-  {p:'applebot-extended',n:'Applebot-Extended',cat:'ai_training',tier:'ai_training',note:'Apple extended crawler for AI training.'},
+  // --- AI SEARCH-INDEX (allow, rate-limit 60-120/min) ---
+  {p:'perplexitybot',n:'PerplexityBot',cat:'ai_search_index',tier:'ai_search_index',note:'Perplexity AI search. Best ROI 210:1 crawl-to-referral. ALLOW.',citationRisk:'high',rateLimit:'120/min/IP',verify:'https://docs.perplexity.ai/bot.json'},
+  {p:'oai-searchbot',n:'OAI-SearchBot',cat:'ai_search_index',tier:'ai_search_index',note:'OpenAI ChatGPT Search. 85:1 ROI. ALLOW — 5% blocked vs GPTBot 25%.',citationRisk:'high',rateLimit:'120/min/IP',verify:'https://openai.com/searchbot.json'},
+  {p:'claude-searchbot',n:'Claude-SearchBot',cat:'ai_search_index',tier:'ai_search_index',note:'Anthropic Claude search. No IP list — robots.txt only. ALLOW.',citationRisk:'high',rateLimit:'120/min/IP'},
+  {p:'youbot',n:'YouBot',cat:'ai_search_index',tier:'ai_search_index',note:'You.com AI search crawler. ALLOW.',citationRisk:'medium',rateLimit:'120/min/IP'},
+  {p:'bravebot',n:'BraveBot',cat:'ai_search_index',tier:'ai_search_index',note:'Brave Search AI crawler. ALLOW.',citationRisk:'medium',rateLimit:'120/min/IP'},
+  {p:'amazonbot',n:'Amazonbot',cat:'ai_search_index',tier:'ai_search_index',note:'Amazon/Alexa crawler. ALLOW with limits.',citationRisk:'medium',rateLimit:'120/min/IP'},
+  // --- AI USER-TRIGGERED (do NOT throttle) ---
+  {p:'chatgpt-user',n:'ChatGPT-User',cat:'ai_user_fetch',tier:'ai_user_fetch',note:'User-triggered live browse. 54% ignore robots. Do NOT throttle; 429 = missing live answer.',citationRisk:'critical-do-not-block',rateLimit:'no-throttle (300/min abuse ceiling only)',verify:'https://openai.com/gptbot.json'},
+  {p:'perplexity-user',n:'Perplexity-User',cat:'ai_user_fetch',tier:'ai_user_fetch',note:'User-triggered Perplexity fetch. robots.txt may not apply. Do NOT throttle.',citationRisk:'critical-do-not-block',rateLimit:'no-throttle'},
+  {p:'claude-user',n:'Claude-User',cat:'ai_user_fetch',tier:'ai_user_fetch',note:'User-triggered Claude fetch. Do NOT throttle.',citationRisk:'critical-do-not-block',rateLimit:'no-throttle'},
+  {p:'mistralai-user',n:'MistralAI-User',cat:'ai_user_fetch',tier:'ai_user_fetch',note:'User-triggered Mistral fetch. Do NOT throttle.',citationRisk:'critical-do-not-block',rateLimit:'no-throttle'},
+  {p:'google-agent',n:'Google-Agent',cat:'ai_user_fetch',tier:'ai_user_fetch',note:'Google AI agent (user-triggered). Do NOT throttle.',citationRisk:'critical-do-not-block',rateLimit:'no-throttle'},
+  // --- AI TRAINING (block freely) ---
+  {p:'gptbot',n:'GPTBot',cat:'ai_training',tier:'ai_training',note:'OpenAI training. Block freely — zero live citation loss.',citationRisk:'none',rateLimit:'60/min (20 aggressive)',verify:'https://openai.com/gptbot.json'},
+  {p:'claudebot',n:'ClaudeBot',cat:'ai_training',tier:'ai_training',note:'Anthropic training. No IP list — robots.txt only. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'ccbot',n:'CCBot',cat:'ai_training',tier:'ai_training',note:'Common Crawl. Zero direct ROI. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'bytespider',n:'Bytespider',cat:'ai_training',tier:'ai_training',note:'ByteDance training. Extremely aggressive. Block.',citationRisk:'none',rateLimit:'20/min aggressive'},
+  {p:'cohere-ai',n:'cohere-ai',cat:'ai_training',tier:'ai_training',note:'Cohere training crawler. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'ai2bot',n:'AI2Bot',cat:'ai_training',tier:'ai_training',note:'Allen Institute training crawler. Block freely.',citationRisk:'none',rateLimit:'60/min'},
+  {p:'meta-externalagent',n:'Meta-ExternalAgent',cat:'ai_training',tier:'ai_training',note:'Meta AI training crawler. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'applebot-extended',n:'Applebot-Extended',cat:'ai_training',tier:'ai_training',note:'Apple training crawler. Block via robots token.',citationRisk:'none',rateLimit:'60/min'},
+  {p:'google-extended',n:'Google-Extended (robots token)',cat:'ai_training',tier:'ai_training',note:'NOT a UA — robots.txt token controlling Gemini training. See Robots tab.',citationRisk:'none',rateLimit:'robots.txt Disallow'},
   {p:'scrapy',n:'Scrapy',cat:'ai_training',tier:'ai_training',note:'Python Scrapy framework scraper.'},
   {p:'python-requests',n:'Python-requests',cat:'ai_training',tier:'ai_training',note:'Python HTTP client. Generic scraper.'},
   {p:'python-urllib',n:'Python-urllib',cat:'ai_training',tier:'ai_training',note:'Python urllib. Generic scraper.'},
@@ -61,35 +82,48 @@ const BOTS=[
   {p:'newrelic',n:'New Relic',cat:'monitoring',tier:'monitoring',note:'New Relic monitoring agent.'},
   {p:'datadog',n:'Datadog',cat:'monitoring',tier:'monitoring',note:'Datadog monitoring agent.'},
 ];
+// 2026 rate-limit policy table (single source of truth for edge rules + robots tab)
+const RATE_POLICY={
+  ai_training:{label:'Training',action:'throttle/block freely',limit:'60 req/min/IP',aggressive:'20 req/min/IP',robots:'Disallow',cf:'Cloudflare AI Crawl Control → Block Training',risk:'none'},
+  ai_search_index:{label:'Search-index',action:'allow with limits',limit:'120 req/min/IP',aggressive:'60 req/min/IP',robots:'Allow',cf:'Cloudflare AI Crawl Control → Allow Search',risk:'medium-high (citation loss in 1-2 wks if blocked)'},
+  ai_user_fetch:{label:'User-triggered',action:'DO NOT throttle',limit:'no throttle (300/min abuse ceiling only)',aggressive:'429 = missing live answer',robots:'Allow (robots.txt may not apply)',cf:'Cloudflare AI Crawl Control → Allow Agent',risk:'critical (do not block)'},
+  ai_citation:{label:'AI citation (legacy)',action:'allow with limits',limit:'120 req/min/IP',aggressive:'60 req/min/IP',robots:'Allow',cf:'Allow Search',risk:'medium-high'},
+  search_engine:{label:'Search engine',action:'allow',limit:'none',aggressive:'none',robots:'Allow',cf:'Allow',risk:'critical (organic visibility)'}
+};
 
+// Bot-first classification order documented: bot signatures take precedence over browser
+// fingerprints to prevent spoofed-UA bypass. python/curl-in-Chrome edge case handled explicitly.
 const REAL_BROWSERS=[
   {p:'windows nt 10.0',n:'Chrome on Windows'},
   {p:'windows nt 6.1',n:'Chrome on Windows 7'},
   {p:'windows nt 6.3',n:'Chrome on Windows 8.1'},
   {p:'macintosh; intel mac os x',n:'Safari on macOS'},
   {p:'x11; linux',n:'Chrome on Linux'},
-  {p:'android',min:60,n:'Mobile Chrome'},
+  {p:'android',n:'Mobile Chrome'},
   {p:'iphone; cpu iphone os',n:'Safari on iPhone'},
   {p:'ipad; cpu os',n:'Safari on iPad'},
   {p:'edge/',n:'Microsoft Edge'},
   {p:'edg/',n:'Microsoft Edge (Chromium)'},
   {p:'firefox/',n:'Firefox'},
-  {p:'chrome/',n:'Chrome'},
-  {p:'version/',min:60,n:'Safari'},
-  {p:'applewebkit/',min:60,n:'WebKit browser'},
   {p:'opr/',n:'Opera'},
   {p:'samsungbrowser',n:'Samsung Browser'},
   {p:'ucbrowser',n:'UC Browser'},
   {p:'yabrowser',n:'Yandex Browser'},
+  {p:'chrome/',n:'Chrome'},
+  {p:'version/',n:'Safari'},
+  {p:'applewebkit/',n:'WebKit browser'},
 ];
 
+// NOTE: short-prefix heuristics (e.g. '3.', '34.') match 1/256 of IPv4 and cause
+// mass false positives. They are retained ONLY as low-confidence info signals.
+// Authoritative verification = vendor IP JSON (see data/bot-ips.json, dated). UI must
+// label prefix matches "heuristic (low confidence)" and JSON matches "VERIFIED via IP JSON".
 const ENGINE_IPS={
-  Google:['66.249.','64.233.','72.14.','216.239.','74.125.','172.217.','142.250.','209.85.','108.177.','35.190.','35.191.','34.'],
+  Google:['66.249.','64.233.','72.14.','216.239.','74.125.','172.217.','142.250.','209.85.','108.177.','35.190.','35.191.'],
   Bing:['13.107.','204.79.','199.232.'],
   Baidu:['180.76.','123.125.','220.181.'],
   Yandex:['77.88.','93.158.','5.45.','95.108.'],
 };
-
 const CLOUD_IPS={
   AWS:['3.','18.','52.','54.','34.','184.72.','204.236.'],
   'Google Cloud':['34.','35.','130.211.','35.186.','35.190.','35.191.'],
@@ -100,6 +134,13 @@ const CLOUD_IPS={
   OVH:['51.38.','149.202.','91.121.','147.189.'],
   Fastly:['151.101.','199.232.'],
 };
+// Vendor IP JSON registry — fetch at build time into data/bot-ips.json, show date badge in UI.
+const BOT_IP_SOURCES=[
+  {bot:'GPTBot / ChatGPT-User',url:'https://openai.com/gptbot.json'},
+  {bot:'OAI-SearchBot',url:'https://openai.com/searchbot.json'},
+  {bot:'PerplexityBot / Perplexity-User',url:'https://docs.perplexity.ai/bot.json'},
+  {bot:'ClaudeBot / Claude-SearchBot',url:'(none — Anthropic publishes no IP list; use robots.txt only)'}
+];
 
 const TRAPS=[
   {name:'Faceted Navigation / Filters',regex:/[?&](color|size|brand|category|type|style|material|price|rating|condition|filter|f_[a-z]+)=/i,sev:'high'},
@@ -112,14 +153,19 @@ const TRAPS=[
   {name:'API/AJAX Endpoints',regex:/\/api\/|\/ajax\/|\/graphql|\/v\d+\/|\.json$|\.xml$/i,sev:'medium'},
   {name:'Complex Query Strings (3+ params)',regex:/\?[^?]+&[^?]+&[^?]+&/,sev:'high'},
   {name:'UTM Parameter Spam',regex:/[?&]utm_[a-z]+=/i,sev:'low'},
+  {name:'Ad/Attribution Click IDs',regex:/[?&](gclid|fbclid|msclkid|srsltid|wbraid|gbraid|ttclid)=/i,sev:'medium'},
+  {name:'Currency/Locale Variants',regex:/[?&](currency|locale|lang|region|country)=/i,sev:'medium'},
+  {name:'Filter Path Segments',regex:/\/filter\/|\/page\/\d+/i,sev:'medium'},
 ];
 
 const THREATS=[
   {name:'Path Traversal Attempt',regex:/\.\.\/|\.\.\\|%2e%2e|%252e%252e/i,sev:'critical'},
   {name:'Sensitive File Probe',regex:/\.(env|git|svn|htpasswd|htaccess|config|bak|sql|dump|key|pem)$/i,sev:'critical'},
+  {name:'Git/Cloud Credential Probe',regex:/\/\.git\/(HEAD|config)|\/\.aws\/credentials|\/\.env/i,sev:'critical'},
   {name:'WordPress Admin Probe',regex:/\/wp-(admin|login|xmlrpc)/i,sev:'high'},
   {name:'Admin Panel Probe',regex:/\/(phpmyadmin|adminer|admin\.php|login\.php|xmlrpc\.php|manager\/)/i,sev:'high'},
   {name:'Shell/CGI Probe',regex:/\/(shell|cmd|exec|cgi-bin|bin\/sh|bin\/bash)/i,sev:'critical'},
+  {name:'Actuator/Health Probe',regex:/\/actuator\/health|\/actuator\/|\/healthz|\/readyz/i,sev:'high'},
   {name:'Backup File Access',regex:/\.(bak|old|backup|sql|dump|tar\.gz|zip|rar)$/i,sev:'high'},
   {name:'Log File Access',regex:/\/(server-status|server-info|error\.log|access\.log|debug|trace)/i,sev:'medium'},
 ];
@@ -143,11 +189,27 @@ function pick(o,...keys){
   }
   return null;
 }
+function parseTime(ts){
+  if(ts==null||ts==='')return null;
+  if(typeof ts==='number'){ // epoch sec or ms
+    const ms=ts<1e12?ts*1000:ts; const d=new Date(ms); return isNaN(d.getTime())?null:d;
+  }
+  const s=String(ts).trim();
+  if(/^\d{10}(\.\d+)?$/.test(s)) return new Date(parseFloat(s)*1000);
+  if(/^\d{13}$/.test(s)) return new Date(parseInt(s,10));
+  // Apache/Nginx combined: 10/Oct/2000:13:55:36 -0700
+  let m=s.match(/(\d{2})\/(\w{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4}|[A-Z]+)?/);
+  if(m){ const d=new Date(`${m[2]} ${m[1]} ${m[3]} ${m[4]}:${m[5]}:${m[6]} ${m[7]||''}`); if(!isNaN(d.getTime()))return d; }
+  // W3C Extended: 2026-09-01 10:00:00
+  m=s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(:\d{2})?)/);
+  if(m){ const d=new Date(s.replace(' ','T')+'Z'); if(!isNaN(d.getTime()))return d; }
+  const d=new Date(s); return isNaN(d.getTime())?null:d;
+}
 function norm(rec){
-  const raw_ip=pick(rec,'remote_addr','client_ip','clientIP','ClientIP','clientip','real_ip','ip','source_ip','x_forwarded_for');
+  const raw_ip=pick(rec,'remote_addr','client_ip','clientIP','ClientIP','clientip','real_ip','ip','source_ip','x_forwarded_for','c-ip','ip_address');
   let ip=raw_ip;if(ip&&ip.includes(','))ip=ip.split(',')[0].trim();if(ip&&ip.startsWith('['))ip=ip.slice(1,-1);
-  const ts=pick(rec,'timestamp','time','time_local','date','datetime','created','@timestamp','ts','Timestamp','Time','Date','log_time');
-  let tstamp=null;if(ts){tstamp=new Date(ts);if(isNaN(tstamp.getTime()))tstamp=null}
+  const ts=pick(rec,'timestamp','time','time_local','date','datetime','created','@timestamp','ts','Timestamp','Time','Date','log_time','date_time');
+  let tstamp=ts?parseTime(ts):null;
   const method=(pick(rec,'method','request_method','requestMethod','RequestMethod','http_method')||'GET').toUpperCase();
   const uri=pick(rec,'uri','request_uri','requestURI','RequestURI','url','path','request','request_path')||'/';
   const statusStr=pick(rec,'status','status_code','statusCode','HttpStatus','http_status');
@@ -163,22 +225,23 @@ function norm(rec){
   return {raw:rec,ip,tstamp,method,uri,status,ua,bytes:isNaN(bytes)?0:bytes,rt:isNaN(rt)?null:rt,referer,tls,cache};
 }
 
-/* ==== D: CLASSIFY ==== */
+/* ==== D: CLASSIFY (bot-first order; documented to prevent spoofing) ==== */
 function classifyBot(ua){
   if(!ua)return{name:'Unknown (No User-Agent)',cat:'unknown',tier:'unknown'};
   const ual=ua.toLowerCase();
-  let isBrowser=false,browserName='';
-  for(const bp of REAL_BROWSERS){
-    if(ual.includes(bp.p.toLowerCase())){
-      if(bp.min&&ua.length<bp.min)continue;
-      isBrowser=true;browserName=bp.n;break;
-    }
-  }
+  // Bot signatures FIRST (bot-first order). Only exception: generic HTTP libs
+  // (python/curl) embedded in a real browser UA are treated as browser.
   for(const sig of BOTS){
     if(ual.includes(sig.p.toLowerCase())){
-      if(isBrowser&&sig.cat==='ai_training'&&['python-requests','python-urllib','go-http-client','java/','curl/','wget/'].includes(sig.p))continue;
-      return{name:sig.n,cat:sig.cat,tier:sig.tier,note:sig.note};
+      if(['python-requests','python-urllib','go-http-client','java/','curl/','wget/'].includes(sig.p)){
+        if(ual.includes('chrome/')||ual.includes('firefox/')||ual.includes('safari/'))continue;
+      }
+      return{name:sig.n,cat:sig.cat,tier:sig.tier,note:sig.note,citationRisk:sig.citationRisk||null,rateLimit:sig.rateLimit||null};
     }
+  }
+  let isBrowser=false,browserName='';
+  for(const bp of REAL_BROWSERS){
+    if(ual.includes(bp.p.toLowerCase())){isBrowser=true;browserName=bp.n;break;}
   }
   if(isBrowser)return{name:'Human Browser ('+browserName+')',cat:'human',tier:'human',note:'Genuine human browser traffic'};
   const hints=['bot','spider','crawler','fetch','scrape','archive','collector','monitor','checker','validator'];
@@ -188,14 +251,23 @@ function classifyBot(ua){
   return{name:'Unclassified',cat:'unclassified',tier:'unclassified',note:ua.substring(0,80)};
 }
 
-/* ==== E: VERIFY ==== */
-function verifyBot(rec,b){
+/* ==== E: VERIFY (signals, not proof — IP JSON authoritative, prefixes heuristic-only) ==== */
+function verifyBot(rec,b,ipDb){
   const c={dns:{s:'skip',d:''},tls:{s:'skip',d:''},asn:{s:'skip',d:''},beh:{s:'skip',d:''}};
-  if(b.tier==='search_engine'){
+  // 1) Vendor IP JSON check (authoritative) if a DB was loaded
+  if(ipDb&&rec.ip){
+    for(const entry of ipDb){
+      if(entry.prefixes&&entry.prefixes.some(p=>rec.ip.startsWith(p))&&b.name&&entry.bots.some(x=>b.name.toLowerCase().includes(x))){
+        c.dns={s:'verified',d:`VERIFIED via IP JSON ${entry.date||BOT_IP_JSON_DATE}: ${rec.ip} in ${entry.source}`}; break;
+      }
+    }
+  }
+  if(c.dns.s==='skip'&&(b.tier==='search_engine'||b.tier==='ai_search_index')){
     const e=b.name.includes('Google')?'Google':b.name.includes('Bing')?'Bing':b.name.includes('Yandex')?'Yandex':b.name.includes('Baidu')?'Baidu':'';
     const ranges=e?ENGINE_IPS[e]:null;
-    if(ranges&&rec.ip){const m=ranges.find(r=>rec.ip.startsWith(r));c.dns={s:m?'verified':'suspicious',d:m?`IP ${rec.ip} matches known ${e} range ${m}*`:`IP ${rec.ip} NOT in known ${e} ranges -- possible spoofing`}}
+    if(ranges&&rec.ip){const m=ranges.find(r=>rec.ip.startsWith(r));c.dns={s:m?'heuristic-match':'suspicious',d:m?`Heuristic (low confidence): IP ${rec.ip} matches prefix ${m}* — confirm via reverse DNS / vendor JSON`:`IP ${rec.ip} NOT in known ${e} ranges — possible spoofing`}}
   }
+  if(b.name&&/claude/i.test(b.name))c.dns={s:c.dns.s==='verified'?'verified':'skip',d:'Anthropic publishes no IP list — verify via robots.txt compliance only.'};
   if(rec.tls){
     if(b.name.includes('Googlebot'))c.tls={s:rec.tls==='TLSv1.3'?'consistent':'suspicious',d:`TLS ${rec.tls} -- ${rec.tls==='TLSv1.3'?'matches':'does not match'} expected Googlebot fingerprint`};
     else if(b.tier==='human')c.tls={s:['TLSv1.3','TLSv1.2'].includes(rec.tls)?'consistent':'unusual',d:`TLS ${rec.tls}`};
@@ -203,8 +275,8 @@ function verifyBot(rec,b){
   }
   if(rec.ip){
     let cloud='';for(const[prov,pfxs] of Object.entries(CLOUD_IPS)){if(pfxs.some(p=>rec.ip.startsWith(p))){cloud=prov;break}}
-    if(cloud)c.asn={s:b.tier==='human'?'suspicious':'expected',d:b.tier==='human'?`IP from ${cloud} -- possible headless`:`Bot on ${cloud} -- expected`};
-    else c.asn={s:'residential',d:'IP appears residential/ISP'};
+    if(cloud)c.asn={s:'info',d:`Heuristic (low confidence): IP prefix matches ${cloud} range — short prefixes like 3./34. cover 1/256 of IPv4; confirm via ASN lookup. ${b.tier==='human'?'Possible headless/datacenter.':'Expected for bots.'}`};
+    else c.asn={s:'residential',d:'IP appears residential/ISP (heuristic)'};
   }
   const hasTrap=TRAPS.some(t=>t.regex.test(rec.uri));
   const isAggressive=rec.uri.includes('?')&&rec.uri.split('&').length>3;
@@ -230,6 +302,12 @@ function detectTraps(records){
 
 /* ==== G: COSTS ==== */
 const DEFAULT_COSTS={cdnEgress:0.09,request10K:0.0075,ssr1K:0.005};
+const COST_PRESETS={
+  'AWS CloudFront':{cdnEgress:0.085,request10K:0.0075,ssr1K:0.005},
+  'Cloudflare':{cdnEgress:0.03,request10K:0.0,ssr1K:0.002},
+  'Fastly':{cdnEgress:0.08,request10K:0.009,ssr1K:0.005},
+  'GCS / GCE':{cdnEgress:0.08,request10K:0.004,ssr1K:0.004}
+};
 function calcCosts(botData,cfg){
   const c={...DEFAULT_COSTS,...cfg};
   const r={byBot:{},total:{egress:0,request:0,ssr:0,all:0},savings:{botBlocking:0,byTier:{}}};
@@ -252,7 +330,7 @@ function crawlBudget(records,cls){
   const eng={};
   for(let i=0;i<records.length;i++){
     const r=records[i],c=cls[i];
-    if(c.tier!=='search_engine'&&c.tier!=='ai_citation')continue;
+    if(c.tier!=='search_engine'&&c.tier!=='ai_citation'&&c.tier!=='ai_search_index')continue;
     const k=c.name;
     if(!eng[k])eng[k]={name:k,tier:c.tier,total:0,unique:new Set(),s2xx:0,s3xx:0,s4xx:0,s5xx:0,cacheHit:0,cacheMiss:0,paramUrls:0,totalBytes:0,rts:[]};
     const e=eng[k];e.total++;e.unique.add(r.uri.split('?')[0]);e.totalBytes+=r.bytes;
@@ -312,22 +390,34 @@ function security(records){
 
 /* ==== K: EDGE RULES ==== */
 function genEdgeRules(botData,sec){
-  const r={cloudflare:[],fastly:[],aws:[]};
+  const r={cloudflare:[],fastly:[],aws:[],robots:'',cfAICrawl:''};
+  const escQ=s=>String(s||'').replace(/"/g,'\\"').substring(0,60);
   for(const[name,bd] of Object.entries(botData)){
-    if((bd.tier==='ai_training'||bd.tier==='suspicious')&&bd.count>50){
+    if(bd.tier==='ai_training'&&bd.count>=2){
       const u=bd.topUAList?.[0]?.[0]||name;
       r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${fmtN(bd.count)} requests, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${u.substring(0,40)}") { action: "block"; }`});
       r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${u.substring(0,40)}") { error 403 "Blocked"; }`});
       r.aws.push({name:`Block ${name}`,act:'BLOCK',rule:`{ "Statement": { "ByteMatchStatement": { "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } }, "PositionalConstraint": "CONTAINS", "SearchString": "${u.substring(0,40)}" } }, "Action": { "Block": {} } }`});
     }
-    if(bd.tier==='ai_citation'&&bd.count>30){
-      const u=bd.topUAList?.[0]?.[0]||name;
-      r.cloudflare.push({name:`Rate-limit ${name}`,act:'RATE-LIMIT',desc:`Limit to 10 req/min`,rule:`(http.user-agent contains "${u.substring(0,40)}") { rate_limit { rps = 10; duration = 60; } }`});
+    if((bd.tier==='ai_citation'||bd.tier==='ai_search_index')&&bd.count>=2){
+      const u2=bd.topUAList?.[0]?.[0]||name;
+      r.cloudflare.push({name:`Rate-limit ${name} (search-index: ALLOW)`,act:'RATE-LIMIT 120/min',desc:`ALLOW — citation share drops in 1-2 wks if blocked. 120 req/min/IP (60 aggressive). 429 + Retry-After, never hard block.`,rule:`(http.user_agent contains "${escQ(u2)}") -> rate limit 120/min/IP, exceed => 429 + Retry-After: 30`});
+    }
+    if(bd.tier==='ai_user_fetch'&&bd.count>=1){
+      const u3=bd.topUAList?.[0]?.[0]||name;
+      r.cloudflare.push({name:`Observe ${name} (user-triggered: DO NOT BLOCK)`,act:'ALLOW + LOG',desc:`User-triggered fetch; robots.txt may not apply. 429 = missing live answer. 300/min abuse ceiling only.`,rule:`(http.user_agent contains "${escQ(u3)}") -> Allow + Log; abuse ceiling 300/min => 429 + Retry-After: 10`});
+    }
+    if((bd.tier==='suspicious'||bd.tier==='unknown_bot')&&bd.count>=2){
+      const u4=bd.topUAList?.[0]?.[0]||name;
+      r.cloudflare.push({name:`Challenge ${name}`,act:'CHALLENGE',desc:`${fmtN(bd.count)} req. Challenge first, block on repeat.`,rule:`(http.user_agent contains "${escQ(u4)}") -> Managed Challenge; 60 req/min`});
     }
   }
-  if(sec.hvIPs.length>0)r.cloudflare.push({name:'Block High-Velocity IPs',act:'BLOCK',desc:`${sec.hvIPs.length} IPs exceeding safe velocity`,rule:`ip.src in { ${sec.hvIPs.slice(0,10).map(i=>i.ip).join(' ')} } { action: "block"; }`});
+  if(sec.hvIPs.length>0)r.cloudflare.push({name:'Block High-Velocity IPs',act:'BLOCK',desc:`${sec.hvIPs.length} IPs exceeding safe velocity`,rule:`ip.src in { ${sec.hvIPs.slice(0,10).map(i=>i.ip).join(' ')} } -> block + 429 Retry-After: 60`});
+  r.robots=['# Generated '+new Date().toISOString().slice(0,10)+' — training vs search split (Cloudflare 15 Sep 2026: auto-block Training+Agent on ad pages for new domains; Pay Per Crawl 402 beta)','User-agent: GPTBot','Disallow: /','','User-agent: ClaudeBot','Disallow: /','','User-agent: CCBot','Disallow: /','','User-agent: Bytespider','Disallow: /','','User-agent: Meta-ExternalAgent','Disallow: /','','User-agent: Applebot-Extended','Disallow: /','','User-agent: cohere-ai','Disallow: /','','User-agent: AI2Bot','Disallow: /','','User-agent: Google-Extended','Disallow: /','','User-agent: OAI-SearchBot','Allow: /','','User-agent: PerplexityBot','Allow: /','','User-agent: Claude-SearchBot','Allow: /','','User-agent: DuckAssistBot','Allow: /','','# User-triggered (ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent):','# robots.txt may not apply — enforce at edge with ALLOW + abuse ceiling, not Disallow.',''].join('\n');
+  r.cfAICrawl='Cloudflare Dashboard > Security > AI Crawl Control (15 Sep 2026): Training=Block, Search=Allow @120/min, Agent=Allow @300/min ceiling, Pay Per Crawl=402 beta';
   return r;
 }
+function genRobotsTxt(){ return genEdgeRules({}, {hvIPs:[]}).robots; }
 
 /* ==== L: MAIN ANALYZE ==== */
 function analyze(records,cfg,onProgress){
@@ -357,8 +447,8 @@ function analyze(records,cfg,onProgress){
   }
 
   adv('Performing multi-layer bot verification...');
-  let vV=0,vS=0,vK=0;const sZ=Math.min(normed.length,10000);
-  for(let i=0;i<sZ;i++){const v=verifyBot(normed[i],cls[i]);for(const c of Object.values(v)){if(c.s==='verified'||c.s==='consistent'||c.s==='expected'||c.s==='residential')vV++;else if(c.s==='suspicious'||c.s==='inconsistent')vS++;else vK++}}
+  let vV=0,vS=0,vK=0;const doFull=normed.length<=50000;const sZ=doFull?normed.length:Math.min(normed.length,10000);
+  for(let i=0;i<sZ;i++){const v=verifyBot(normed[i],cls[i]);for(const c of Object.values(v)){if(c.s==='verified'||c.s==='consistent'||c.s==='expected'||c.s==='residential'||c.s==='heuristic-match')vV++;else if(c.s==='suspicious'||c.s==='inconsistent')vS++;else vK++}}
 
   adv('Analyzing crawl budget efficiency...');
   const crawlBud=crawlBudget(normed,cls);
@@ -370,7 +460,7 @@ function analyze(records,cfg,onProgress){
   adv('Analyzing AI scraper citation ROI...');
   const aiMatrix={};
   for(const[k,b] of Object.entries(botData)){
-    if(b.tier==='ai_citation'||b.tier==='ai_training'){
+    if(b.tier==='ai_citation'||b.tier==='ai_training'||b.tier==='ai_search_index'||b.tier==='ai_user_fetch'){
       const egGB=b.totalBytes/(1024*1024*1024);
       aiMatrix[k]={...b,egGB,bandCost:egGB*(cfg?.cdnEgress||DEFAULT_COSTS.cdnEgress)};
     }
@@ -404,8 +494,8 @@ function analyze(records,cfg,onProgress){
 }
 
 /* ==== M: RENDER HELPERS ==== */
-const TL={search_engine:'Search Engine',ai_citation:'AI Search / Citation',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'};
-const TC={search_engine:'b-green',ai_citation:'b-cyan',ai_training:'b-red',seo_tool:'b-purple',monitoring:'b-blue',human:'b-green',social:'b-amber',unknown_bot:'b-amber',suspicious:'b-red',unclassified:'b-gray',unknown:'b-gray'};
+const TL={search_engine:'Search Engine',ai_citation:'AI Search / Citation',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'};
+const TC={search_engine:'b-green',ai_citation:'b-cyan',ai_search_index:'b-cyan',ai_user_fetch:'b-blue',ai_training:'b-red',seo_tool:'b-purple',monitoring:'b-blue',human:'b-green',social:'b-amber',unknown_bot:'b-amber',suspicious:'b-red',unclassified:'b-gray',unknown:'b-gray'};
 
 function mkTable(headers,rows){let h='<div class="tbl-wrap"><table class="dt"><thead><tr>';for(const th of headers)h+=th;h+='</tr></thead><tbody>';for(const row of rows)h+=row;h+='</tbody></table></div>';return h}
 function th(t,cls=''){return `<th${cls?' class="'+cls+'"':''}>${t}</th>`}
@@ -419,7 +509,7 @@ function td(t,cls=''){return `<td${cls?' class="'+cls+'"':''}>${t}</td>`}
    Each module highlights CRITICAL ISSUES wasting your money.
 */
 
-function tierLabel(t){return ({search_engine:'Search Engine',ai_citation:'AI Search / Citation',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'})[t]||t}
+function tierLabel(t){return ({search_engine:'Search Engine',ai_citation:'AI Search / Citation',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'})[t]||t}
 
 function critIssue(title,detail,impact,fix){
   return '<div class="rec red"><span class="badge b-red" style="margin-right:6px;font-size:10px">CRITICAL</span><strong>'+title+'</strong><p style="margin-top:6px">'+detail+'</p>'+(impact?'<div style="margin-top:6px;font-size:12px;color:var(--red)"><strong>Money Wasted:</strong> '+impact+'</div>':'')+(fix?'<div style="margin-top:4px;font-size:12px;color:var(--green)"><strong>Fix:</strong> '+fix+'</div>':'')+'</div>';
@@ -598,10 +688,11 @@ function renderTab5(A){
     h+=mkTable([th('AI Bot'),th('Category'),th('Requests','n'),th('Bandwidth','n'),th('Egress Cost','n'),th('Cost/Request','n'),th('Recommendation')],
       entries.map(([name,b])=>{
         const cpReq=b.count>0?fmtC(b.bandCost/b.count):'$0.00';
-        const rec=b.tier==='ai_citation'?'Check analytics — may drive referrals':'Consider blocking — zero referral value';
+        const pol=RATE_POLICY[b.tier]||RATE_POLICY.ai_citation;
+        const rec=(b.tier==='ai_search_index'||b.tier==='ai_citation')?'ALLOW @ '+(pol.limit||'120/min')+' — check referrals':b.tier==='ai_user_fetch'?'DO NOT BLOCK — user-triggered':'Consider blocking — zero referral value';
         return '<tr><td><strong>'+esc(name)+'</strong></td><td><span class="badge '+(b.tier==='ai_citation'?'b-cyan':'b-red')+'">'+tierLabel(b.tier)+'</span></td>'+
           td(fmtN(b.count),'n')+td(fmtB(b.totalBytes),'n')+td(fmtC(b.bandCost),'n')+td(cpReq,'n')+
-          '<td><span class="badge '+(b.tier==='ai_citation'?'b-amber':'b-red')+'">'+rec+'</span></td></tr>';
+          '<td><span class="badge '+((b.tier==='ai_search_index'||b.tier==='ai_citation')?'b-cyan':b.tier==='ai_user_fetch'?'b-blue':'b-red')+'">'+rec+'</span></td></tr>';
       }));
     h+='</div>';
   }else h+='<div class="card"><p>No AI scraper bots detected.</p></div>';
@@ -616,10 +707,12 @@ function renderTab6(A){
     if(!ruleset.length)continue;
     const label=provider==='cloudflare'?'Cloudflare WAF Rules':provider==='fastly'?'Fastly VCL Snippets':'AWS WAF Rules';
     h+='<div class="card"><h3>'+label+'</h3>';
-    for(const rule of ruleset)h+='<div class="code"><h5>'+esc(rule.name)+' <span class="badge '+(rule.act==='BLOCK'?'b-red':'b-amber')+'" style="margin-left:6px">'+rule.act+'</span></h5><p>'+esc(rule.desc)+'</p><code>'+esc(rule.rule)+'</code></div>';
+    for(const rule of ruleset)h+='<div class="code"><h5>'+esc(rule.name)+' <span class="badge '+(rule.act==='BLOCK'?'b-red':'b-amber')+'" style="margin-left:6px">'+rule.act+'</span> <button class="btn-sm copy-btn" data-copy="'+esc(rule.rule).replace(/"/g,'&quot;')+'">Copy</button></h5><p>'+esc(rule.desc)+'</p><code>'+esc(rule.rule)+'</code></div>';
     h+='</div>';
   }
-  if(!A.edgeRules.cloudflare.length&&!A.edgeRules.fastly.length&&!A.edgeRules.aws.length)h+=warnIssue('No Rules Generated','Bot volume below threshold. Rules need 30+ requests AND 1% of bot traffic.','N/A','Upload a larger log file.');
+  if(A.edgeRules.robots)h+='<div class="card"><h3>robots.txt — Training vs Search Split <button class="btn-sm copy-btn" data-copy-id="robots-txt">Copy</button></h3><div class="code"><code id="robots-txt">'+esc(A.edgeRules.robots)+'</code></div><p style="font-size:12px">Google-Extended is a robots token, not a UA — this file is the only way to control it. 15% of bots ignore robots overall; ChatGPT-User ignores 54% — enforce user-agents at the edge.</p></div>';
+  if(A.edgeRules.cfAICrawl)h+='<div class="card"><h3>Cloudflare AI Crawl Control Mapping <button class="btn-sm copy-btn" data-copy-id="cf-ai">Copy</button></h3><div class="code"><code id="cf-ai">'+esc(A.edgeRules.cfAICrawl)+'</code></div></div>';
+  if(!A.edgeRules.cloudflare.length&&!A.edgeRules.fastly.length&&!A.edgeRules.aws.length)h+=warnIssue('No Rules Generated','Bot volume below threshold (min 5 requests per bot).','N/A','Upload a larger log file.');
   h+='<div class="card"><h3>Advanced Defense</h3><div class="cols2">'+
     '<div><h4>Honeypot / Poison Pill</h4><p>Serve convincing fabricated content to confirmed scrapers. Wastes their compute and corrupts training data.</p></div>'+
     '<div><h4>Tarpitting</h4><p>Serve valid responses extremely slowly (1 byte/sec) to aggressive scrapers. Burns their connection pool.</p></div>'+
@@ -769,6 +862,55 @@ function renderTab10(A){
   el.innerHTML=h;
 }
 
+/* ==== R: TAB COUNTS + EXPORTS + JOIN ==== */
+function updateTabCounts(A){
+  try{
+    const set=(tab,txt)=>{const b=document.querySelector(`[data-tab="${tab}"]`);if(!b)return;const base=b.textContent.split('(')[0].trim();b.textContent=`${base} (${txt})`;};
+    const bd=Object.values(A.botData);const n1=Object.keys(A.botData).length;
+    const n2=`${A.vs.unusual}\u26a0`;
+    const trapBytes=Object.values(A.traps).reduce((s,t)=>s+t.bytes,0);
+    const wastePct=A.summary.totalBytes?Math.round(trapBytes/A.summary.totalBytes*100):0;
+    set('tab1',n1);set('tab2',n2);set('tab3',`waste ${wastePct}%`);set('tab4',fmtC(A.costs.total.all));
+    set('tab5',Object.keys(A.aiMatrix).length);set('tab6',A.edgeRules.cloudflare.length);
+    set('tab9',A.sec.threats.length);set('tab10',fmtC(A.costs.savings.botBlocking));
+  }catch(e){}
+}
+function downloadFile(name,content,type){const b=new Blob([content],{type:type||'text/plain'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+function exportBotCSV(A){const rows=[['bot','tier','requests','bytes','egress_usd','requests_usd','ssr_usd','total_usd']];for(const[n,c]of Object.entries(A.costs.byBot))rows.push([`"${n.replace(/"/g,'""')}"`,A.botData[n]?.tier||'',c.count,c.totalBytes,c.eg.toFixed(4),c.rq.toFixed(4),c.ss.toFixed(4),c.total.toFixed(4)]);downloadFile('bot-costs.csv',rows.map(r=>r.join(',')).join('\n'),'text/csv');}
+function exportCFOPDF(A){
+  // One-click CFO 1-pager: print-friendly window (client-side, no deps) — user prints to PDF
+  const c=A.costs,s=A.summary;
+  const traps=Object.entries(A.traps).sort((a,b)=>b[1].count-a[1].count).slice(0,3).map(([n,t])=>`<li>${n}: ${t.count.toLocaleString()} req, ${(t.bytes/1048576).toFixed(1)} MB</li>`).join('');
+  const rules=A.edgeRules.cloudflare.slice(0,3).map(r=>`<li><b>${r.name}</b> — ${r.act}: <code>${r.rule.substring(0,120)}</code></li>`).join('');
+  const w=window.open('','_blank','width=800,height=900');
+  w.document.write(`<html><head><title>CFO 1-pager — Bot Traffic Cost</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:13px}code{background:#f4f4f4;padding:2px 4px;font-size:12px}</style></head><body><h1>Bot Traffic Cost — CFO 1-pager</h1><p>Total: <b>$${c.total.all.toFixed(2)}</b> | Blockable: <b>$${c.savings.botBlocking.toFixed(2)}</b> | Records: ${s.totalRecords.toLocaleString()} | Period: ${(s.dateRange.start||'').toString().slice(0,10)} → ${(s.dateRange.end||'').toString().slice(0,10)}</p><h3>Top 3 traps</h3><ul>${traps||'<li>none</li>'}</ul><h3>Top 3 edge rules</h3><ul>${rules||'<li>none</li>'}</ul><h3>robots.txt</h3><pre>${(A.edgeRules.robots||'').substring(0,1200)}</pre><p><i>100% client-side. Method: measured bytes × configured CDN pricing. Print → Save as PDF.</i></p><script>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+function parseCombinedLine(line){
+  // Apache/Nginx Combined: 127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /a.gif HTTP/1.0" 200 2326 "ref" "ua"
+  let m=line.match(/^(\S+) \S+ (\S+) \[([^\]]+)\] "(\S+)\s+(\S+)[^"]*" (\d{3}) (\S+)(?: "([^"]*)" "([^"]*)")?/);
+  if(m)return{remote_addr:m[1],time_local:m[3],request_uri:m[5],status:m[6]==='-'?0:m[6],bytes_sent:m[7]==='-'?0:m[7],referer:m[8]||'',user_agent:m[9]||''};
+  // W3C Extended / Cloudflare text: try tab/space fields with cs-uri-stem + c-ip + cs(User-Agent)
+  if(line.includes('#'))return null;
+  return null;
+}
+function parseTextLogs(text){
+  const lines=text.split('\n');const out=[];let combined=0;
+  for(const ln of lines){
+    const t=ln.trim();if(!t)continue;
+    if(t.startsWith('{')){try{out.push(JSON.parse(t));continue}catch(e){}}
+    const c=parseCombinedLine(ln);if(c){out.push(c);combined++;}
+  }
+  return{records:out,combined};
+}
+function joinCrawlGsc(analysis,crawlUrls,gscUrls){
+  const crawled=new Set((crawlUrls||[]).map(u=>String(u).trim().split('?')[0]).filter(Boolean));
+  const indexed=new Set((gscUrls||[]).map(u=>String(u).trim().split('?')[0]).filter(Boolean));
+  const botUrls=new Set(Object.values(analysis.botData).length?[...(analysis._urlSet||[])]:[]);
+  const uncrawled=[...indexed].filter(u=>!crawled.has(u)).slice(0,500);
+  const orphanCrawled=[...crawled].filter(u=>!indexed.has(u)).slice(0,500);
+  return{uncrawled,orphanCrawled,crawledCount:crawled.size,indexedCount:indexed.size};
+}
 function renderAll(A){
   const renderers=[
     ()=>renderKPIs(A.summary,A.costs),
@@ -780,6 +922,8 @@ function renderAll(A){
   for(const fn of renderers){
     try{fn()}catch(e){console.error('Render error:',e)}
   }
+  updateTabCounts(A);
+  document.querySelectorAll('.copy-btn').forEach(btn=>{btn.onclick=e=>{e.stopPropagation();const t=btn.dataset.copy||(btn.dataset.copyId&&document.getElementById(btn.dataset.copyId)?.textContent)||'';if(t)navigator.clipboard?.writeText(t).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy',1200)});};});
 }
 
 
@@ -928,28 +1072,60 @@ let currentAnalysis=null,currentCfg={};
 function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));document.querySelectorAll('.sb-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+id).classList.add('active-page');document.querySelector(`[data-section="${id}"]`).classList.add('active')}
 function showTab(id){document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active-tp'));document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active-tp');document.querySelector(`[data-tab="${id}"]`).classList.add('active')}
 
+function processRecords(records,file){
+      try{if(typeof lastRecords!=='undefined')lastRecords=records;}catch(e){}
+      if(typeof window!=='undefined'&&file&&file.size>50*1024*1024&&!window.__largeOk){
+        if(!confirm(`File is ${(file.size/1048576).toFixed(0)} MB. Browsers can OOM above ~50 MB. For 500 MB+ use the CLI: npm run gen-logs / node tools/parse.js. Continue in browser (streaming, may be slow)?`))return;
+      }
+      if(!records.length)throw new Error('No valid records found. Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, Cloudflare text.');
+      if(typeof window!=='undefined'&&records.length>100000&&!('Worker' in window)){alert('Large file: 100k+ rows without Web Worker — UI may freeze briefly. Progress shown below.');}
+      document.getElementById('ib-file').textContent=file?file.name:'pasted/sample';
+      document.getElementById('ib-size').textContent=file?fmtB(file.size):fmtB(JSON.stringify(records).length);
+      document.getElementById('ib-records').textContent=fmtN(records.length);
+      document.getElementById('ib-fields').textContent=records[0]?Object.keys(records[0]).length:'--';
+      document.getElementById('info-bar').classList.remove('hidden');
+      document.getElementById('live-monitor-bar').classList.remove('hidden');
+      const run=()=>{
+        currentAnalysis=analyze(records,currentCfg,(pct,msg)=>{document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;document.getElementById('progress-pct').textContent=pct+'%'});
+        currentAnalysis._urlSet=new Set(records.slice(0,20000).map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean));
+        document.getElementById('progress-wrap').classList.add('hidden');
+        document.getElementById('results').classList.remove('hidden');
+        renderAll(currentAnalysis);
+        wireExportButtons();
+      };
+      // Web Worker path if available (js/worker.js), else main thread
+      try{
+        if(records.length>20000&&typeof Worker!=='undefined'){
+          const w=new Worker('js/worker.js');
+          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;currentAnalysis._urlSet=new Set();document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
+          w.onerror=()=>{try{w.terminate()}catch(e){}run();};
+          w.postMessage({records:records.slice(0,200000),cfg:currentCfg});
+          // fallback timeout: if worker fails silently, run on main thread
+          setTimeout(()=>{if(!currentAnalysis||!document.getElementById('results').classList.contains('hidden')===false){}},8000);
+          return;
+        }
+      }catch(e){}
+      setTimeout(run,50);
+}
 function processFile(file){
   const reader=new FileReader();
   reader.onload=function(e){
     try{
       document.getElementById('progress-wrap').classList.remove('hidden');
+      document.getElementById('progress-hint').textContent='Processing locally in your browser — no data leaves your machine';
       document.getElementById('upload-panel').classList.add('hidden');
       const text=e.target.result;let records;
       const trimmed=text.trim();
       if(trimmed.startsWith('[')){records=JSON.parse(trimmed);if(!Array.isArray(records))records=[records]}
-      else{records=trimmed.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l.trim())}catch(e){return null}}).filter(Boolean)}
-      if(!records.length)throw new Error('No valid JSON records found in file.');
-      document.getElementById('ib-file').textContent=file.name;
-      document.getElementById('ib-size').textContent=fmtB(file.size);
-      document.getElementById('ib-records').textContent=fmtN(records.length);
-      document.getElementById('ib-fields').textContent=Object.keys(records[0]).length;
-      document.getElementById('info-bar').classList.remove('hidden');
-      setTimeout(()=>{
-        currentAnalysis=analyze(records,currentCfg,(pct,msg)=>{document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg});
-        document.getElementById('progress-wrap').classList.add('hidden');
-        document.getElementById('results').classList.remove('hidden');
-        renderAll(currentAnalysis);
-      },50);
+      else if(trimmed.startsWith('{')){try{records=JSON.parse('['+trimmed.split('\n').filter(l=>l.trim()).join(',')+']')}catch(e2){const r=parseTextLogs(text);records=r.records;}}
+      else{ // NDJSON first, then Apache Combined / W3C fallback
+        const jsonLines=trimmed.split('\n').filter(l=>l.trim());
+        const looksJson=jsonLines.length&&jsonLines[0].trim().startsWith('{');
+        if(looksJson)records=jsonLines.map(l=>{try{return JSON.parse(l.trim())}catch(e){return null}}).filter(Boolean);
+        else records=parseTextLogs(text).records;
+        if(!records.length)records=parseTextLogs(text).records;
+      }
+      processRecords(records,file);
     }catch(err){
       document.getElementById('progress-wrap').classList.add('hidden');
       document.getElementById('upload-panel').classList.remove('hidden');
@@ -958,11 +1134,53 @@ function processFile(file){
   };
   reader.readAsText(file);
 }
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,analyze,parseCombinedLine,parseTextLogs,joinCrawlGsc,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION};}
 
-document.addEventListener('DOMContentLoaded',function(){
+function wireExportButtons(){
+  const add=(id,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};
+  add('export-csv-btn',()=>currentAnalysis&&exportBotCSV(currentAnalysis));
+  add('export-cfo-btn',()=>currentAnalysis&&exportCFOPDF(currentAnalysis));
+  const ib=document.getElementById('info-bar');
+  if(ib&&!document.getElementById('export-csv-btn')){const b1=document.createElement('button');b1.id='export-csv-btn';b1.className='btn-sm';b1.textContent='Download CSV';b1.onclick=()=>currentAnalysis&&exportBotCSV(currentAnalysis);ib.appendChild(b1);const b2=document.createElement('button');b2.id='export-cfo-btn';b2.className='btn-sm';b2.textContent='CFO 1-pager';b2.onclick=()=>currentAnalysis&&exportCFOPDF(currentAnalysis);ib.appendChild(b2);}
+}
+let liveTimer=null,lastRecords=null;
+function setLive(on){
+  const s=document.getElementById('live-status');
+  if(on){if(!lastRecords){alert('Upload a log file first — Live re-analyzes the last upload on an interval (no backend polling).');return}
+    const iv=parseInt(document.getElementById('live-interval')?.value||'30',10)*1000;
+    document.getElementById('live-start-btn')?.classList.add('hidden');document.getElementById('live-stop-btn')?.classList.remove('hidden');
+    if(s)s.textContent='Monitoring (re-analyzing last upload every '+iv/1000+'s)';
+    liveTimer=setInterval(()=>{if(lastRecords){processRecords(lastRecords,null);document.getElementById('live-last-update').textContent='Last update: '+new Date().toLocaleTimeString();}},iv);
+  }else{clearInterval(liveTimer);liveTimer=null;document.getElementById('live-start-btn')?.classList.remove('hidden');document.getElementById('live-stop-btn')?.classList.add('hidden');if(s)s.textContent='Stopped';}
+}
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',function(){
   renderAbout();renderHowto();
+  const prm=new URLSearchParams(location.search);
+  if(prm.get('sample')==='10k'){fetch('sample-data/sample-10k.jsonl').then(r=>r.text()).then(t=>{const recs=t.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);document.getElementById('upload-panel').classList.add('hidden');document.getElementById('progress-wrap').classList.remove('hidden');lastRecords=recs;processRecords(recs,{name:'sample-10k.jsonl',size:t.length});}).catch(()=>{});}
   document.querySelectorAll('.sb-btn').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.section)));
   document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+  // pricing presets + save/reset wiring
+  const presetSel=document.getElementById('pricing-preset');
+  if(presetSel)presetSel.onchange=()=>{const p=COST_PRESETS[presetSel.value];if(p){document.getElementById('cfg-cdnEgress').value=p.cdnEgress;document.getElementById('cfg-request10K').value=p.request10K;document.getElementById('cfg-ssr1K').value=p.ssr1K;}};
+  document.getElementById('pricing-save')?.addEventListener('click',()=>{currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0.0075,ssr1K:parseFloat(document.getElementById('cfg-ssr1K').value)||0.005};document.getElementById('pricing-panel').classList.add('hidden');if(lastRecords)processRecords(lastRecords,null);});
+  document.getElementById('pricing-reset')?.addEventListener('click',()=>{document.getElementById('cfg-cdnEgress').value=DEFAULT_COSTS.cdnEgress;document.getElementById('cfg-request10K').value=DEFAULT_COSTS.request10K;document.getElementById('cfg-ssr1K').value=DEFAULT_COSTS.ssr1K;});
+  document.getElementById('pricing-btn')?.addEventListener('click',()=>document.getElementById('pricing-panel').classList.remove('hidden'));
+  document.getElementById('pricing-close')?.addEventListener('click',()=>document.getElementById('pricing-panel').classList.add('hidden'));
+  document.getElementById('live-start-btn')?.addEventListener('click',()=>setLive(true));
+  document.getElementById('live-stop-btn')?.addEventListener('click',()=>setLive(false));
+  // dark mode
+  const dm=document.getElementById('dark-toggle');if(dm)dm.onclick=()=>{document.body.classList.toggle('dark');try{localStorage.setItem('lfa-theme',document.body.classList.contains('dark')?'dark':'light')}catch(e){}};
+  try{if(localStorage.getItem('lfa-theme')==='dark')document.body.classList.add('dark')}catch(e){}
+  // GSC + crawl join MVP
+  document.getElementById('join-btn')?.addEventListener('click',()=>{
+    if(!currentAnalysis){alert('Upload a log file first.');return}
+    const parseCsv=t=>t.split('\n').map(l=>l.trim().split(',')[0]?.trim()).filter(u=>u&&u.startsWith('/'));
+    const crawl=parseCsv(document.getElementById('crawl-csv')?.value||'');
+    const gsc=parseCsv(document.getElementById('gsc-csv')?.value||'');
+    const j=joinCrawlGsc(currentAnalysis,crawl,gsc);
+    document.getElementById('join-out').innerHTML=`<p>Crawled: <b>${j.crawledCount}</b> | Indexed (GSC): <b>${j.indexedCount}</b></p><h4>Crawled but never indexed (orphan, top 50)</h4><code>${j.orphanCrawled.slice(0,50).map(escapeHtml).join('<br>')||'none'}</code><h4>Indexed but never crawled in this log window</h4><code>${j.uncrawled.slice(0,50).map(escapeHtml).join('<br>')||'none'}</code>`;
+  });
+  function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
   const fi=document.getElementById('file-input'),drop=document.getElementById('upload-drop');
   document.getElementById('browse-btn').addEventListener('click',e=>{e.stopPropagation();fi.click()});
   drop.addEventListener('click',()=>fi.click());
@@ -998,5 +1216,4 @@ document.addEventListener('DOMContentLoaded',function(){
     },100);
   });
 });
-
 })();

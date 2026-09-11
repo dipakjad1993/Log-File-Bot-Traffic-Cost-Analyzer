@@ -1,0 +1,8 @@
+66.249.66.1 - - [25/Jul/2026:10:00:00 +0000] "GET / HTTP/1.1" 200 24500 "-" "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+40.88.0.1 - - [25/Jul/2026:10:00:10 +0000] "GET /api/products?sort=price&filter=red&page=47 HTTP/1.1" 200 89000 "-" "GPTBot/1.0 (+https://openai.com/gptbot)"
+34.102.136.180 - - [25/Jul/2026:10:00:12 +0000] "GET /blog/seo-guide-2026 HTTP/1.1" 200 18700 "-" "Mozilla/5.0 Chrome/122.0.0.0 Mobile Safari/537.36 Bytespider/5.0"
+23.236.192.1 - - [25/Jul/2026:10:00:15 +0000] "GET /products HTTP/1.1" 200 42000 "https://www.perplexity.ai/" "PerplexityBot/1.0 (+https://docs.perplexity.ai)"
+104.18.32.7 - - [25/Jul/2026:10:00:18 +0000] "GET / HTTP/1.1" 200 24500 "https://www.google.com/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+52.96.123.45 - - [25/Jul/2026:10:00:40 +0000] "GET /.env HTTP/1.1" 404 500 "-" "python-requests/2.31.0"
+40.88.0.3 - - [25/Jul/2026:10:01:25 +0000] "GET / HTTP/1.1" 200 24500 "https://chatgpt.com/" "OAI-SearchBot/1.0 (+https://openai.com/searchbot)"
+34.102.136.182 - - [25/Jul/2026:10:01:35 +0000] "GET /wp-admin/install.php HTTP/1.1" 404 500 "-" "python-requests/2.31.0"

@@ -2,5 +2,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+!sample-data/sample-combined.log
 .vscode/
 .idea/

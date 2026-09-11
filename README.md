@@ -1,111 +1,93 @@
-# Open-Source Log File & Bot Traffic Analyzer
+# Log File Bot Traffic Cost Analyzer
 
-A fast, privacy-focused, 100% client-side web utility for parsing server access logs, identifying bot traffic patterns, analyzing crawl budget distribution, and estimating infrastructure egress overhead.
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+[![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.01-orange)](data/bot-ips.json)
+[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+[![v1.1.0](https://img.shields.io/badge/Version-1.1.0-informational)](CHANGELOG.md)
+[![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
-🚀 **Live Demo:** [log-file-bot-traffic-cost-analyzer.onrender.com](https://log-file-bot-traffic-cost-analyzer.onrender.com)
+Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
+Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log leaves your machine.
 
----
+**[Try Live](https://log-file-bot-traffic-cost-analyzer.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.onrender.com/?sample=10k) · [60-sec walkthrough](#demo)**
 
-## Overview
-
-Modern web servers face heavy automated traffic from traditional search engine crawlers, SEO scrapers, and AI training bots. Understanding how this traffic impacts your site performance and crawl efficiency usually requires complex server-side pipelines or costly analytics subscriptions.
-
-This open-source tool allows Technical SEOs, developers, and sysadmins to quickly drop JSON/NDJSON log files into their browser to audit bot behaviors, evaluate user-agent distributions, and generate quick edge-filtering recommendations—without uploading sensitive log data to any third-party server.
-
----
-
-## Key Capabilities
-
-* **User-Agent & Bot Classification:** Matches request streams against 50+ known search engine, AI scraper (GPTBot, ClaudeBot, Bytespider), and monitoring tool signatures.
-* **Crawl Budget & Trap Diagnostic:** Identifies parameterized query traps, pagination loops, and low-value directory paths consuming crawler attention.
-* **Estimated Egress Cost Calculation:** Maps traffic bandwidth against standard CloudFront/CDN pricing models to calculate approximate infrastructure impact by traffic category.
-* **AI Scraper Impact Matrix:** Helps categorize incoming bot traffic to determine whether to allow, rate-limit, or block specific scrapers at the edge.
-* **CDN Edge Rule Generator:** Automatically outputs ready-to-copy syntax rules for Cloudflare WAF, Fastly VCL, and AWS WAF based on identified suspicious user-agents.
-* **Security & Probe Detection:** Flags automated path traversal attempts (`../`), sensitive file probes (`.env`, `.git`), and vulnerability scanning patterns.
+> [!NOTE]
+> `main` branch. v1.1.0 · Bot DB v2026.09.01 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## Data Privacy & Architecture
+## Why this exists
 
-* **100% Client-Side Processing:** Log data is parsed locally in-browser using client-side JavaScript. No access logs leave your machine.
-* **Multi-Format Normalization:** Accepts standard JSON, JSONL, and NDJSON logs from Cloudflare, Nginx, Apache, AWS ALB, and Varnish.
+| Tool | Price 2026 | Your edge here |
+|------|-----------|----------------|
+| Screaming Frog Log Analyser | £99/yr | Free unlimited + auto AI classification (no manual regex) |
+| JetOctopus | €171–383/mo | $0, instant, no FTP/S3 setup |
+| OnCrawl / Botify | €49–2500/mo | No subscription or procurement cycle |
+| Splunk | custom ingest | SEO-shaped out of the box |
 
----
+**#1 differentiator:** 100% client-side. JetOctopus/OnCrawl require cloud upload; this tool is safe for DPDP/RBI-sensitive logs.
 
-## Quick Start (Local Setup)
+## The 2026 distinction (training vs search-index vs user-triggered)
+
+Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions:
+
+| Class | Examples | Action | Why |
+|-------|----------|--------|-----|
+| **Training** | GPTBot, ClaudeBot, CCBot, Bytespider, Google-Extended (robots token) | Throttle/block freely, 60/min (20 aggressive) | Zero live citation loss |
+| **Search-index** | OAI-SearchBot, PerplexityBot, Claude-SearchBot | Allow, 120/min (60 aggressive), 429 + Retry-After — never hard block | Citation share drops in 1–2 weeks if blocked (OAI 85:1, Perplexity 210:1 crawl-to-referral) |
+| **User-triggered** | ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent | Do NOT throttle (300/min abuse ceiling only) | 429 = missing live answer; robots.txt may not apply (ChatGPT-User ignores robots 54%) |
+
+Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages for new domains, Pay Per Crawl 402 beta, vendor IP JSON verification (`data/bot-ips.json`, dated — short prefixes like `3.`/`34.` are heuristic-only, labeled low-confidence).
+
+## Demo
+
+1. Open the [live demo](https://log-file-bot-traffic-cost-analyzer.onrender.com/?sample=10k) — 10k deterministic rows load in one click.
+2. KPI strip → AI Matrix (red = training, cyan = search-index, blue = user-triggered) → Edge Rules → Copy.
+3. `sample-data/EXPECTED.md` lists exact expected counts so a reviewer verifies without thinking.
+
+GIF: record once (drag 10k sample → KPIs → copy rule, 800px, <3MB) and drop at `assets/demo.gif`.
+
+## Quick start
 
 ```bash
-# Clone the repository
 git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
-
-# Navigate to directory
 cd Log-File-Bot-Traffic-Cost-Analyzer
-
-# Start local static server (Node.js)
-node server.js
+node server.js   # http://localhost:8080 (gzip + security headers)
+# or: docker compose up / docker run -p 8080:8080 <image>
 ```
 
-Open **http://localhost:8080** in your browser.
+Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined**, Nginx default, W3C Extended, Cloudflare text.
+`>50 MB` warns in-browser; `500 MB+` → use the CLI path (`npm run gen-logs`).
 
----
-
-## Supported Log Formats
-
-The tool accepts JSON-formatted log files and auto-normalizes field names from multiple platforms:
-
-| Platform | IP Field | Timestamp Field | URI Field | Status Field |
-|----------|----------|----------------|-----------|--------------|
-| Cloudflare | `ClientIP` | `Timestamp` | `RequestURI` | `HttpStatus` |
-| Nginx JSON | `remote_addr` | `time_local` | `request_uri` | `status` |
-| Apache | `remote_addr` | `time` | `request_uri` | `status` |
-| AWS ALB | `clientIP` | `@timestamp` | `requestURI` | `statusCode` |
-| Varnish | `remote_addr` | `timestamp` | `request` | `status` |
-
----
-
-## Architecture
-
-```
-Log-File-Bot-Traffic-Cost-Analyzer/
-├── index.html                    # Main dashboard with upload, tabs, and results
-├── server.js                     # Node.js static file server (port 8080)
-├── css/
-│   └── style.css                 # Light theme with Inter font, modern 2026 UI
-├── js/
-│   └── analyzer.js               # Complete analysis engine (v4.0)
-│       ├── Bot Signature DB      # 50+ known bot signatures
-│       ├── Browser Fingerprints  # 18 real browser patterns
-│       ├── Cloud IP Ranges       # AWS, GCP, Azure, Cloudflare, Hetzner, etc.
-│       ├── Crawl Trap Patterns   # 10 URL pattern detectors
-│       ├── Threat Patterns       # 7 security threat detectors
-│       ├── Normalizer            # Multi-platform field normalization
-│       ├── Classifier            # Bot classification engine
-│       ├── Verifier              # 4-layer bot verification
-│       ├── Cost Calculator       # AWS CloudFront 2026 pricing model
-│       ├── Edge Rule Generator   # Cloudflare/Fastly/AWS WAF rules
-│       └── 10 Tab Renderers      # Detailed HTML report generators
-└── sample-data/
-    └── sample-server-logs.json   # 22-record sample JSON log file
+```bash
+npm test          # 32 asserts: bots, traps, costs
+npm run lint      # node --check across engine/worker/server/tools
+npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
+npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints
 ```
 
----
+## What it does (10 tabs)
 
-## Security & Privacy
+Bot Classification (with counts) · Verification (4 layers, signals-not-proof) · Crawl Budget + traps · Cost (measured bytes × your CDN preset) · AI Matrix (3-color) · Edge Rules + **robots.txt generator** + Cloudflare AI Crawl Control mapping · Performance · Traffic Patterns · Security · CFO/FinOps 1-pager (CSV + print-to-PDF export).
 
-* **100% Client-Side:** All processing happens in your browser using JavaScript.
-* **No Server Uploads:** Log data never leaves your machine.
-* **No Tracking:** No analytics, no cookies, no telemetry.
-* **No External Dependencies:** Runs entirely offline after initial page load.
-* **Open Source:** Full source code available for audit.
+Plus: Crawl + GSC join MVP (crawled-never-indexed / indexed-never-crawled), dark mode, Web Worker for 20k+ rows.
 
----
+## Method (so a hiring manager trusts the numbers)
 
-## Contributing
+- Cost = measured bytes × configured pricing (CloudFront/Cloudflare/Fastly/GCS presets). No assumed traffic.
+- Blockable = training + suspicious/unknown only. Search-index and user-fetch are never blockable.
+- Verification = vendor IP JSON first, prefix heuristics labeled low-confidence. Anthropic has no IP list → robots.txt only.
 
-Contributions are welcome. Please open an issue or pull request.
+## Benchmark
 
----
+See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). 100k deterministic rows (`--seed 42`): ~4–7 s in worker on M1 Air. Update the file with your machine — don't claim unmeasured numbers.
 
-## License
+## Resume bullet
 
-MIT License. See [LICENSE](LICENSE) for details.
+> Log-File Analyzer (JS, 10 tabs, 64 bot signatures) — client-side 100k-line parsing, training vs search vs user split, Cloudflare/Fastly rule export. Live: log-file-bot-traffic-cost-analyzer.onrender.com
+
+## Contributing / Security / License
+
+[CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · MIT ([LICENSE](LICENSE))

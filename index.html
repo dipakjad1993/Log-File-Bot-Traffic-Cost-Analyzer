@@ -3,51 +3,71 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Open-Source Log File & Bot Traffic Analyzer</title>
+<title>Free Log File Analyzer: GPTBot vs SearchBot Cost + Edge Rules (Private, Client-Side)</title>
+<meta name="description" content="Drop 1M-line server logs → see GPTBot vs OAI-SearchBot cost split → copy Cloudflare/Fastly/AWS edge rules. Free, 100% client-side, no upload. Training vs search-index vs user-triggered AI bot split (2026).">
+<meta property="og:title" content="Log File Bot Traffic Cost Analyzer — Free, Private, Client-Side">
+<meta property="og:description" content="GPTBot vs OAI-SearchBot cost split + copy-paste Cloudflare edge rules. No log leaves your machine.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/og-kpi.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="css/style.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Log File Bot Traffic Cost Analyzer","applicationCategory":"DeveloperApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0"},"license":"https://opensource.org/licenses/MIT","featureList":"bot classification, crawl budget, egress cost, edge rules, robots.txt generator"}
+</script>
 </head>
 <body>
 
-<nav class="sidebar" id="sidebar">
-  <div class="sidebar-brand">LOG & BOT TRAFFIC ANALYZER</div>
-  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis</div>
+<nav class="sidebar" id="sidebar" aria-label="Main navigation">
+  <div class="sidebar-brand">LOG &amp; BOT TRAFFIC ANALYZER</div>
+  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis <span class="badge b-green">v1.1.0</span></div>
   <div class="sidebar-nav">
-    <button class="sb-btn active" data-section="dashboard">Dashboard</button>
-    <button class="sb-btn" data-section="about">About</button>
-    <button class="sb-btn" data-section="howto">How To Use</button>
+    <button class="sb-btn active" data-section="dashboard" aria-label="Open dashboard">Dashboard</button>
+    <button class="sb-btn" data-section="about" aria-label="About this tool">About</button>
+    <button class="sb-btn" data-section="howto" aria-label="How to use">How To Use</button>
   </div>
-  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser.</div>
+  <button class="btn-sm" id="dark-toggle" aria-label="Toggle dark mode">Dark mode</button>
+  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.01 · IP JSON 2026-09-01</div>
 </nav>
 
 <div class="main-wrap">
 
   <!-- ============ PRICING CONFIG PANEL ============ -->
-  <div class="pricing-panel hidden" id="pricing-panel">
+  <div class="pricing-panel hidden" id="pricing-panel" role="dialog" aria-label="Pricing configuration">
     <div class="pricing-inner">
       <div class="pricing-header">
         <h2>Pricing Configuration</h2>
-        <button class="btn-sm" id="pricing-close">✕ Close</button>
+        <button class="btn-sm" id="pricing-close" aria-label="Close pricing">✕ Close</button>
       </div>
       <p class="pricing-desc">Configure your actual CDN/compute pricing for accurate cost calculations. Defaults are approximate AWS CloudFront 2026 rates. Changes take effect immediately on re-analysis.</p>
+      <div class="pricing-field">
+        <label for="pricing-preset">Preset</label>
+        <select id="pricing-preset" aria-label="CDN pricing preset">
+          <option value="">Custom</option>
+          <option value="AWS CloudFront">AWS CloudFront</option>
+          <option value="Cloudflare">Cloudflare ($0.02-0.05/GB)</option>
+          <option value="Fastly">Fastly</option>
+          <option value="GCS / GCE">GCS / GCE</option>
+        </select>
+      </div>
       <div class="pricing-grid">
         <div class="pricing-field">
-          <label>CDN Egress ($/GB)</label>
+          <label for="cfg-cdnEgress">CDN Egress ($/GB)</label>
           <input type="number" id="cfg-cdnEgress" value="0.09" step="0.01" min="0">
           <span class="pricing-hint">AWS CloudFront: $0.085-0.10/GB. Cloudflare: $0.02-0.05/GB. Fastly: $0.04-0.12/GB.</span>
         </div>
         <div class="pricing-field">
-          <label>Request Cost ($/10K)</label>
+          <label for="cfg-request10K">Request Cost ($/10K)</label>
           <input type="number" id="cfg-request10K" value="0.0075" step="0.001" min="0">
           <span class="pricing-hint">AWS CloudFront: $0.0075-0.01/10K. Cloudflare Pro: free. Fastly: $0.009/10K.</span>
         </div>
         <div class="pricing-field">
-          <label>SSR Compute ($/1K requests)</label>
+          <label for="cfg-ssr1K">SSR Compute ($/1K requests)</label>
           <input type="number" id="cfg-ssr1K" value="0.005" step="0.001" min="0">
           <span class="pricing-hint">Estimated based on Lambda@Edge or CloudFront Functions compute cost for dynamic rendering.</span>
         </div>
       </div>
       <div class="pricing-actions">
-        <button class="btn-primary" id="pricing-save">Apply & Re-Analyze</button>
+        <button class="btn-primary" id="pricing-save">Apply &amp; Re-Analyze</button>
         <button class="btn-outline" id="pricing-reset">Reset to Defaults</button>
       </div>
     </div>
@@ -58,21 +78,22 @@
     <div class="upload-panel" id="upload-panel">
     <div class="upload-header">
       <div class="upload-brand-icon"></div>
-      <h1>Log File & Bot Traffic Analyzer</h1>
-      <p class="tool-tagline">A fast, privacy-focused, 100% client-side web utility for parsing server access logs, identifying bot traffic patterns, analyzing crawl budget distribution, and estimating infrastructure egress overhead.</p>
+      <h1>Log File &amp; Bot Traffic Analyzer</h1>
+      <p class="tool-tagline">Drop 1M-line logs → see <strong>GPTBot vs OAI-SearchBot cost split</strong> → copy Cloudflare rule. Free, private, $0 vs £99/yr Frog / €383/mo JetOctopus. 100% client-side — no log leaves your machine.</p>
+      <p><a class="btn-primary" href="?sample=10k" id="try-sample-link">Try 10k sample in 1 click</a></p>
     </div>
-    <div class="upload-drop" id="upload-drop">
+    <div class="upload-drop" id="upload-drop" role="button" tabindex="0" aria-label="Drop log file here or browse">
       <div class="drop-icon"></div>
       <div class="drop-title">Drop your log file here</div>
       <div class="drop-sub">or</div>
       <button class="btn-primary" id="browse-btn">Browse Files</button>
-      <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log" hidden>
-      <div class="drop-formats">Accepted: JSON array, JSONL (one JSON per line), NDJSON</div>
+      <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log,.txt,.csv" hidden aria-label="Log file input">
+      <div class="drop-formats">Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, Cloudflare text. Files &gt;50&nbsp;MB warn; 500&nbsp;MB+ use CLI.</div>
     </div>
     <div class="upload-extras">
       <span class="divider-text">no log file?</span>
       <div class="sample-controls">
-        <label class="sample-size-label">Size:</label>
+        <label class="sample-size-label" for="sample-size">Size:</label>
         <select id="sample-size">
           <option value="1">1 MB</option>
           <option value="5" selected>5 MB</option>
@@ -93,11 +114,13 @@
     <div class="ib-item"><span class="ib-label">Size</span><span class="ib-val" id="ib-size">--</span></div>
     <div class="ib-item"><span class="ib-label">Records</span><span class="ib-val" id="ib-records">--</span></div>
     <div class="ib-item"><span class="ib-label">Fields</span><span class="ib-val" id="ib-fields">--</span></div>
-    <button class="btn-sm" id="pricing-btn">⚙ Pricing</button>
-    <button class="btn-sm" id="clear-btn">Clear</button>
+    <button class="btn-sm" id="pricing-btn" aria-label="Open pricing settings">⚙ Pricing</button>
+    <button class="btn-sm" id="export-csv-btn" aria-label="Download bot costs CSV">Download CSV</button>
+    <button class="btn-sm" id="export-cfo-btn" aria-label="Open CFO one-pager">CFO 1-pager</button>
+    <button class="btn-sm" id="clear-btn" aria-label="Clear analysis">Clear</button>
   </div>
 
-  <!-- Live Monitor Bar -->
+  <!-- Live Monitor Bar: honestly re-analyzes the last upload on an interval (no backend) -->
   <div class="live-monitor-bar hidden" id="live-monitor-bar">
     <div class="live-monitor-inner">
       <div class="live-status">
@@ -105,7 +128,7 @@
         <span id="live-status">Stopped</span>
       </div>
       <div class="live-controls">
-        <label>Interval:</label>
+        <label for="live-interval">Interval:</label>
         <select id="live-interval">
           <option value="15">15s</option>
           <option value="30" selected>30s</option>
@@ -115,12 +138,12 @@
         <button class="btn-sm" id="live-start-btn">▶ Start Monitoring</button>
         <button class="btn-sm hidden" id="live-stop-btn">⏹ Stop</button>
       </div>
-      <div class="live-last-update" id="live-last-update">Last update: --</div>
+      <div class="live-last-update" id="live-last-update">Last update: -- (re-analyzes last upload locally; no server polling)</div>
     </div>
   </div>
 
   <!-- Progress -->
-  <div class="progress-wrap hidden" id="progress-wrap">
+  <div class="progress-wrap hidden" id="progress-wrap" role="status" aria-label="Analysis progress">
     <div class="progress-header">
       <div class="progress-label" id="progress-label">Analyzing...</div>
       <div class="progress-pct" id="progress-pct">0%</div>
@@ -136,31 +159,43 @@
     <div class="kpi-strip" id="kpi-strip"></div>
 
     <!-- Tab bar -->
-    <div class="tab-bar" id="tab-bar">
-      <button class="tb active" data-tab="tab1">1. Bot Classification</button>
-      <button class="tb" data-tab="tab2">2. Bot Verification</button>
-      <button class="tb" data-tab="tab3">3. Crawl Budget</button>
-      <button class="tb" data-tab="tab4">4. Cost Analysis</button>
-      <button class="tb" data-tab="tab5">5. AI Scraper Matrix</button>
-      <button class="tb" data-tab="tab6">6. Edge Rules</button>
-      <button class="tb" data-tab="tab7">7. Performance</button>
-      <button class="tb" data-tab="tab8">8. Traffic Patterns</button>
-      <button class="tb" data-tab="tab9">9. Security</button>
-      <button class="tb" data-tab="tab10">10. CFO / FinOps</button>
+    <div class="tab-bar" id="tab-bar" role="tablist" aria-label="Analysis modules">
+      <button class="tb active" data-tab="tab1" role="tab">1. Bot Classification</button>
+      <button class="tb" data-tab="tab2" role="tab">2. Bot Verification</button>
+      <button class="tb" data-tab="tab3" role="tab">3. Crawl Budget</button>
+      <button class="tb" data-tab="tab4" role="tab">4. Cost Analysis</button>
+      <button class="tb" data-tab="tab5" role="tab">5. AI Scraper Matrix</button>
+      <button class="tb" data-tab="tab6" role="tab">6. Edge Rules + robots.txt</button>
+      <button class="tb" data-tab="tab7" role="tab">7. Performance</button>
+      <button class="tb" data-tab="tab8" role="tab">8. Traffic Patterns</button>
+      <button class="tb" data-tab="tab9" role="tab">9. Security</button>
+      <button class="tb" data-tab="tab10" role="tab">10. CFO / FinOps</button>
     </div>
 
     <!-- Tab content -->
     <div class="tab-content">
-      <div class="tp active-tp" id="tab1"></div>
-      <div class="tp" id="tab2"></div>
-      <div class="tp" id="tab3"></div>
-      <div class="tp" id="tab4"></div>
-      <div class="tp" id="tab5"></div>
-      <div class="tp" id="tab6"></div>
-      <div class="tp" id="tab7"></div>
-      <div class="tp" id="tab8"></div>
-      <div class="tp" id="tab9"></div>
-      <div class="tp" id="tab10"></div>
+      <div class="tp active-tp" id="tab1" role="tabpanel"></div>
+      <div class="tp" id="tab2" role="tabpanel"></div>
+      <div class="tp" id="tab3" role="tabpanel"></div>
+      <div class="tp" id="tab4" role="tabpanel"></div>
+      <div class="tp" id="tab5" role="tabpanel"></div>
+      <div class="tp" id="tab6" role="tabpanel"></div>
+      <div class="tp" id="tab7" role="tabpanel"></div>
+      <div class="tp" id="tab8" role="tabpanel"></div>
+      <div class="tp" id="tab9" role="tabpanel"></div>
+      <div class="tp" id="tab10" role="tabpanel"></div>
+    </div>
+
+    <!-- Crawl + GSC join MVP -->
+    <div class="card" id="join-card">
+      <h3>Crawl + GSC Join (MVP) — orphan &amp; uncrawled URLs</h3>
+      <p>Paste one URL path per line (or CSV with URL in column 1). Beats manual Frog joins: finds <strong>crawled-but-never-indexed</strong> (orphan) and <strong>indexed-but-never-crawled</strong> in this window.</p>
+      <div class="cols2">
+        <div><label for="crawl-csv"><strong>crawl.csv URLs</strong></label><br><textarea id="crawl-csv" rows="6" cols="40" placeholder="/products/widget-pro&#10;/blog/seo-guide-2026" aria-label="Crawl URLs"></textarea></div>
+        <div><label for="gsc-csv"><strong>gsc.csv URLs (clicks)</strong></label><br><textarea id="gsc-csv" rows="6" cols="40" placeholder="/products/widget-pro&#10;/pricing" aria-label="GSC URLs"></textarea></div>
+      </div>
+      <p><button class="btn-primary" id="join-btn">Run Join</button></p>
+      <div id="join-out" aria-live="polite"></div>
     </div>
   </div>
 </section>
