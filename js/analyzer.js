@@ -969,75 +969,95 @@ const SAMPLE_UAS={
   mozilla:['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15','Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0','Mozilla/5.0 (Linux; Android 14) Chrome/125.0.0.0 Mobile Safari/537.36','Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1']
 };
 
-function genSample(targetSizeMB){
-  const seed=Date.now();
-  const uniqueSeed=seed+Math.floor(Math.random()*1000000);
-  const baseRand=uniqueSeed%9973/9973;
-
-  const durations=[1,7,30,90];
-  const durationDays=durations[Math.floor(baseRand*durations.length)];
-  const endTime=new Date();
-  const startTime=new Date(endTime.getTime()-durationDays*24*3600*1000);
-
-  const avgRecordSize=280;
-  const targetRecords=Math.max(100,Math.round((targetSizeMB*1024*1024)/avgRecordSize));
-
+const SAMPLE_CATS=[
+  {c:'googlebot',w:.12,ipCount:80,ua:'googlebot'},
+  {c:'bingbot',w:.035,ipCount:40,ua:'bingbot'},
+  {c:'gptbot',w:.055,ipCount:30,ua:'gptbot'},
+  {c:'bytespider',w:.045,ipCount:50,ua:'bytespider'},
+  {c:'perplexity',w:.025,ipCount:20,ua:'perplexity'},
+  {c:'claudebot',w:.018,ipCount:15,ua:'claudebot'},
+  {c:'oai',w:.012,ipCount:12,ua:'oai'},
+  {c:'ccbot',w:.03,ipCount:25,ua:'ccbot'},
+  {c:'ahrefs',w:.02,ipCount:15,ua:'ahrefs'},
+  {c:'semrush',w:.015,ipCount:12,ua:'semrush'},
+  {c:'yandex',w:.02,ipCount:20,ua:'yandex'},
+  {c:'baidu',w:.01,ipCount:15,ua:'baidu'},
+  {c:'facebook',w:.015,ipCount:10,ua:'facebook'},
+  {c:'twitter',w:.008,ipCount:8,ua:'twitter'},
+  {c:'linkedin',w:.005,ipCount:6,ua:'linkedin'},
+  {c:'human',w:.577,ipCount:500,ua:'mozilla'}
+];
+const SAMPLE_REF=['https://www.google.com/','https://www.bing.com/','https://duckduckgo.com/','https://www.facebook.com/','https://t.co/','https://www.linkedin.com/','https://www.reddit.com/','https://news.ycombinator.com/'];
+const SAMPLE_METHODS=['GET','GET','GET','GET','GET','GET','POST','HEAD','PUT','DELETE'];
+const SAMPLE_TLS=['TLSv1.3','TLSv1.2','TLSv1.3','TLSv1.3'];
+const SAMPLE_CIPHERS=['TLS_AES_256_GCM_SHA384','TLS_CHACHA20_POLY1305_SHA256','TLS_AES_128_GCM_SHA256'];
+const SAMPLE_CACHE=['HIT','MISS','MISS','EXPIRED','BYPASS','HIT','MISS'];
+function buildSamplePools(){
   const ipPools={};
-  const categories=[
-    {c:'googlebot',w:.12,ipCount:80,ua:'googlebot'},
-    {c:'bingbot',w:.035,ipCount:40,ua:'bingbot'},
-    {c:'gptbot',w:.055,ipCount:30,ua:'gptbot'},
-    {c:'bytespider',w:.045,ipCount:50,ua:'bytespider'},
-    {c:'perplexity',w:.025,ipCount:20,ua:'perplexity'},
-    {c:'claudebot',w:.018,ipCount:15,ua:'claudebot'},
-    {c:'oai',w:.012,ipCount:12,ua:'oai'},
-    {c:'ccbot',w:.03,ipCount:25,ua:'ccbot'},
-    {c:'ahrefs',w:.02,ipCount:15,ua:'ahrefs'},
-    {c:'semrush',w:.015,ipCount:12,ua:'semrush'},
-    {c:'yandex',w:.02,ipCount:20,ua:'yandex'},
-    {c:'baidu',w:.01,ipCount:15,ua:'baidu'},
-    {c:'facebook',w:.015,ipCount:10,ua:'facebook'},
-    {c:'twitter',w:.008,ipCount:8,ua:'twitter'},
-    {c:'linkedin',w:.005,ipCount:6,ua:'linkedin'},
-    {c:'human',w:.577,ipCount:500,ua:'mozilla'}
-  ];
-
-  for(const cat of categories){
+  for(const cat of SAMPLE_CATS){
     ipPools[cat.c]=[];
     for(let i=0;i<cat.ipCount;i++)ipPools[cat.c].push(randIP());
   }
-
-  const refDomains=['https://www.google.com/','https://www.bing.com/','https://duckduckgo.com/','https://www.facebook.com/','https://t.co/','https://www.linkedin.com/','https://www.reddit.com/','https://news.ycombinator.com/'];
-  const methods=['GET','GET','GET','GET','GET','GET','POST','HEAD','PUT','DELETE'];
-  const tlsVersions=['TLSv1.3','TLSv1.2','TLSv1.3','TLSv1.3'];
-  const tlsCiphers=['TLS_AES_256_GCM_SHA384','TLS_CHACHA20_POLY1305_SHA256','TLS_AES_128_GCM_SHA256'];
-  const cacheStatuses=['HIT','MISS','MISS','EXPIRED','BYPASS','HIT','MISS'];
-
-  const recs=[];
-  const batches=Math.ceil(targetRecords/100000);
-  for(let b=0;b<batches&&recs.length<targetRecords;b++){
-    const batchEnd=Math.min((b+1)*100000,targetRecords);
-    for(let i=b*100000;i<batchEnd;i++){
-      let r=Math.random(),cum=0,cat=categories[0];
-      for(const x of categories){cum+=x.w;if(r<=cum){cat=x.c;break}}
-      const ua=randChoice(SAMPLE_UAS[cat]||SAMPLE_UAS.mozilla);
-      const ip=randChoice(ipPools[cat]);
-      const pr=Math.random();
-      let path;
-      if(cat==='human')path=pr<.45?randChoice(SAMPLE_URLS.main):pr<.65?randChoice(SAMPLE_URLS.products):pr<.82?randChoice(SAMPLE_URLS.blog):pr<.92?randChoice(SAMPLE_URLS.docs):pr<.97?randChoice(SAMPLE_URLS.param):randChoice(SAMPLE_URLS.api);
-      else if(cat==='googlebot'||cat==='bingbot')path=pr<.3?randChoice(SAMPLE_URLS.main):pr<.5?randChoice(SAMPLE_URLS.products):pr<.68?randChoice(SAMPLE_URLS.blog):pr<.82?randChoice(SAMPLE_URLS.docs):pr<.92?randChoice(SAMPLE_URLS.param):randChoice(SAMPLE_URLS.api);
-      else path=pr<.1?randChoice(SAMPLE_URLS.main):pr<.25?randChoice(SAMPLE_URLS.products):pr<.4?randChoice(SAMPLE_URLS.blog):pr<.55?randChoice(SAMPLE_URLS.docs):pr<.7?randChoice(SAMPLE_URLS.param):pr<.85?randChoice(SAMPLE_URLS.trap):pr<.93?randChoice(SAMPLE_URLS.sec):randChoice(SAMPLE_URLS.api);
-      const sr=Math.random();
-      let st;
-      if(path.startsWith('/.'))st=404;else if(path.includes('wp-')||path.includes('phpmyadmin')||path.includes('adminer'))st=sr<.7?404:403;
-      else if(sr<.72)st=200;else if(sr<.82)st=301;else if(sr<.88)st=304;else if(sr<.93)st=404;else if(sr<.96)st=429;else if(sr<.98)st=500;else st=403;
-      const bytes=st===304?0:st===301?200:Math.floor(500+Math.random()*150000);
-      const rtBase=cat==='human'?.03:cat==='googlebot'||cat==='bingbot'?.07:cat==='gptbot'||cat==='bytespider'?.2:.12;
-      const rt=rtBase+Math.random()*(cat==='human'?.2:1.2);
-      const ts=randDate(startTime.getTime(),endTime.getTime());
-      recs.push({ClientIP:ip,Timestamp:ts.toISOString(),RequestURI:path,RequestMethod:randChoice(methods),HttpStatus:st,Bytes:bytes,UserAgent:ua,Referer:cat==='human'?randChoice(refDomains):'',RequestTime:+rt.toFixed(3),CacheStatus:randChoice(cacheStatuses),TLSProtocol:randChoice(tlsVersions),TLSCipher:randChoice(tlsCiphers)});
-    }
+  return ipPools;
+}
+function sampleTimeRange(){
+  const durations=[1,7,30,90];
+  const durationDays=randChoice(durations);
+  const endTime=new Date();
+  return{startTime:new Date(endTime.getTime()-durationDays*24*3600*1000),endTime};
+}
+function genOneSample(ipPools,startTime,endTime){
+  let r=Math.random(),cum=0,cat=SAMPLE_CATS[0];
+  for(const x of SAMPLE_CATS){cum+=x.w;if(r<=cum){cat=x.c;break}}
+  const ua=randChoice(SAMPLE_UAS[cat]||SAMPLE_UAS.mozilla);
+  const ip=randChoice(ipPools[cat]);
+  const pr=Math.random();
+  let path;
+  if(cat==='human')path=pr<.45?randChoice(SAMPLE_URLS.main):pr<.65?randChoice(SAMPLE_URLS.products):pr<.82?randChoice(SAMPLE_URLS.blog):pr<.92?randChoice(SAMPLE_URLS.docs):pr<.97?randChoice(SAMPLE_URLS.param):randChoice(SAMPLE_URLS.api);
+  else if(cat==='googlebot'||cat==='bingbot')path=pr<.3?randChoice(SAMPLE_URLS.main):pr<.5?randChoice(SAMPLE_URLS.products):pr<.68?randChoice(SAMPLE_URLS.blog):pr<.82?randChoice(SAMPLE_URLS.docs):pr<.92?randChoice(SAMPLE_URLS.param):randChoice(SAMPLE_URLS.api);
+  else path=pr<.1?randChoice(SAMPLE_URLS.main):pr<.25?randChoice(SAMPLE_URLS.products):pr<.4?randChoice(SAMPLE_URLS.blog):pr<.55?randChoice(SAMPLE_URLS.docs):pr<.7?randChoice(SAMPLE_URLS.param):pr<.85?randChoice(SAMPLE_URLS.trap):pr<.93?randChoice(SAMPLE_URLS.sec):randChoice(SAMPLE_URLS.api);
+  const sr=Math.random();
+  let st;
+  if(path.startsWith('/.'))st=404;else if(path.includes('wp-')||path.includes('phpmyadmin')||path.includes('adminer'))st=sr<.7?404:403;
+  else if(sr<.72)st=200;else if(sr<.82)st=301;else if(sr<.88)st=304;else if(sr<.93)st=404;else if(sr<.96)st=429;else if(sr<.98)st=500;else st=403;
+  const bytes=st===304?0:st===301?200:Math.floor(500+Math.random()*150000);
+  const rtBase=cat==='human'?.03:cat==='googlebot'||cat==='bingbot'?.07:cat==='gptbot'||cat==='bytespider'?.2:.12;
+  const rt=rtBase+Math.random()*(cat==='human'?.2:1.2);
+  const ts=randDate(startTime.getTime(),endTime.getTime());
+  return{ClientIP:ip,Timestamp:ts.toISOString(),RequestURI:path,RequestMethod:randChoice(SAMPLE_METHODS),HttpStatus:st,Bytes:bytes,UserAgent:ua,Referer:cat==='human'?randChoice(SAMPLE_REF):'',RequestTime:+rt.toFixed(3),CacheStatus:randChoice(SAMPLE_CACHE),TLSProtocol:randChoice(SAMPLE_TLS),TLSCipher:randChoice(SAMPLE_CIPHERS)};
+}
+function sampleTargetRecords(targetSizeMB){
+  const avgRecordSize=400; // measured compact-NDJSON bytes/record (long bot UAs)
+  return Math.max(100,Math.round((targetSizeMB*1024*1024)/avgRecordSize));
+}
+/* Chunked NDJSON generator — never builds one giant string, so >100MB downloads
+ * don't throw "Invalid string length". Batches of 20k records (~5MB/string). */
+function genSampleStream(targetSizeMB,onChunk,onDone,onError){
+  const total=sampleTargetRecords(targetSizeMB);
+  const ipPools=buildSamplePools();
+  const{startTime,endTime}=sampleTimeRange();
+  const PER=20000;
+  let done=0;
+  function step(){
+    try{
+      const n=Math.min(PER,total-done);
+      const lines=new Array(n);
+      for(let k=0;k<n;k++)lines[k]=JSON.stringify(genOneSample(ipPools,startTime,endTime));
+      done+=n;
+      onChunk&&onChunk(lines.join('\n')+'\n',done,total);
+      if(done<total)setTimeout(step,0);
+      else onDone&&onDone(total);
+    }catch(err){onError&&onError(err);}
   }
+  setTimeout(step,0);
+  return{total};
+}
+function genSample(targetSizeMB){
+  const ipPools=buildSamplePools();
+  const{startTime,endTime}=sampleTimeRange();
+  const targetRecords=sampleTargetRecords(targetSizeMB);
+  const recs=new Array(targetRecords);
+  for(let i=0;i<targetRecords;i++)recs[i]=genOneSample(ipPools,startTime,endTime);
   return JSON.stringify(recs,null,2);
 }
 
@@ -1134,7 +1154,7 @@ function processFile(file){
   };
   reader.readAsText(file);
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,analyze,parseCombinedLine,parseTextLogs,joinCrawlGsc,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION};}
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,analyze,parseCombinedLine,parseTextLogs,joinCrawlGsc,genSample,genSampleStream,sampleTargetRecords,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION};}
 
 function wireExportButtons(){
   const add=(id,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};
@@ -1195,25 +1215,43 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
     const maxSizeMB=1024;
     const actualSizeMB=Math.min(sizeMB,maxSizeMB);
     if(sizeMB>maxSizeMB) alert('Maximum sample size is 1 GB. Generating 1 GB file.');
-    document.getElementById('download-sample-btn').textContent='Generating...';
-    document.getElementById('download-sample-btn').disabled=true;
-    setTimeout(()=>{
-      try{
-        const json=genSample(actualSizeMB);
-        const b=new Blob([json],{type:'application/json'});
-        const u=URL.createObjectURL(b);
-        const a=document.createElement('a');
-        const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-        a.href=u;
-        a.download=`sample-logs-${actualSizeMB}MB-${ts}.json`;
-        a.click();
-        URL.revokeObjectURL(u);
-      }catch(err){
-        alert('Error generating sample: '+err.message);
-      }
-      document.getElementById('download-sample-btn').textContent='Download Sample Log';
-      document.getElementById('download-sample-btn').disabled=false;
-    },100);
+    if(actualSizeMB>100&&!confirm(`${actualSizeMB} MB will take a while in-browser (streaming, tab stays responsive). For 500 MB+ the CLI is faster: npm run gen-logs -- --lines N --out file.jsonl. Continue in browser?`))return;
+    const btn=document.getElementById('download-sample-btn');
+    btn.textContent='Generating 0%...';
+    btn.disabled=true;
+    const parts=[];
+    try{
+      genSampleStream(actualSizeMB,
+        (chunk,doneCount,total)=>{
+          parts.push(chunk); // Blob parts: no single giant string, no "Invalid string length"
+          btn.textContent=`Generating ${Math.round(doneCount/total*100)}%...`;
+        },
+        (total)=>{
+          try{
+            const b=new Blob(parts,{type:'application/x-ndjson'});
+            const u=URL.createObjectURL(b);
+            const a=document.createElement('a');
+            const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+            a.href=u;
+            a.download=`sample-logs-${actualSizeMB}MB-${ts}.jsonl`;
+            a.click();
+            setTimeout(()=>URL.revokeObjectURL(u),5000);
+          }catch(err){
+            alert('Error generating sample: '+err.message);
+          }
+          btn.textContent='Download Sample Log';
+          btn.disabled=false;
+        },
+        (err)=>{
+          alert('Error generating sample: '+err.message);
+          btn.textContent='Download Sample Log';
+          btn.disabled=false;
+        });
+    }catch(err){
+      alert('Error generating sample: '+err.message);
+      btn.textContent='Download Sample Log';
+      btn.disabled=false;
+    }
   });
 });
 })();
