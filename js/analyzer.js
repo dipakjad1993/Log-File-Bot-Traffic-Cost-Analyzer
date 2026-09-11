@@ -211,7 +211,10 @@ function norm(rec){
   const ts=pick(rec,'timestamp','time','time_local','date','datetime','created','@timestamp','ts','Timestamp','Time','Date','log_time','date_time');
   let tstamp=ts?parseTime(ts):null;
   const method=(pick(rec,'method','request_method','requestMethod','RequestMethod','http_method')||'GET').toUpperCase();
-  const uri=pick(rec,'uri','request_uri','requestURI','RequestURI','url','path','request','request_path')||'/';
+  let uri=pick(rec,'uri','request_uri','requestURI','RequestURI','url','path','request','request_path')||'/';
+  // Some JSON logs put the FULL request line ("GET /path HTTP/1.1") in `request` — extract the path
+  const rm=String(uri).match(/^(GET|POST|PUT|DELETE|HEAD|PATCH|OPTIONS|TRACE|CONNECT)\s+(\S+)/i);
+  if(rm)uri=rm[2];
   const statusStr=pick(rec,'status','status_code','statusCode','HttpStatus','http_status');
   const status=statusStr?parseInt(statusStr,10):0;
   const ua=pick(rec,'user_agent','useragent','userAgent','UserAgent','User-Agent','ua','http_user_agent')||'';
@@ -712,7 +715,7 @@ function renderTab6(A){
   }
   if(A.edgeRules.robots)h+='<div class="card"><h3>robots.txt — Training vs Search Split <button class="btn-sm copy-btn" data-copy-id="robots-txt">Copy</button></h3><div class="code"><code id="robots-txt">'+esc(A.edgeRules.robots)+'</code></div><p style="font-size:12px">Google-Extended is a robots token, not a UA — this file is the only way to control it. 15% of bots ignore robots overall; ChatGPT-User ignores 54% — enforce user-agents at the edge.</p></div>';
   if(A.edgeRules.cfAICrawl)h+='<div class="card"><h3>Cloudflare AI Crawl Control Mapping <button class="btn-sm copy-btn" data-copy-id="cf-ai">Copy</button></h3><div class="code"><code id="cf-ai">'+esc(A.edgeRules.cfAICrawl)+'</code></div></div>';
-  if(!A.edgeRules.cloudflare.length&&!A.edgeRules.fastly.length&&!A.edgeRules.aws.length)h+=warnIssue('No Rules Generated','Bot volume below threshold (min 5 requests per bot).','N/A','Upload a larger log file.');
+  if(!A.edgeRules.cloudflare.length&&!A.edgeRules.fastly.length&&!A.edgeRules.aws.length)h+=warnIssue('No Rules Generated','No bot met the rule threshold (training/search/suspicious: 2+ requests; user-triggered: 1+).','N/A','Upload a larger log file.');
   h+='<div class="card"><h3>Advanced Defense</h3><div class="cols2">'+
     '<div><h4>Honeypot / Poison Pill</h4><p>Serve convincing fabricated content to confirmed scrapers. Wastes their compute and corrupts training data.</p></div>'+
     '<div><h4>Tarpitting</h4><p>Serve valid responses extremely slowly (1 byte/sec) to aggressive scrapers. Burns their connection pool.</p></div>'+
@@ -1208,7 +1211,7 @@ function processRecords(records,file,meta){
       if(!records.length)throw new Error('No valid records found. Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, Cloudflare text.');
       if(typeof window!=='undefined'&&records.length>100000&&!('Worker' in window)){alert('Large file: 100k+ rows without Web Worker — UI may freeze briefly. Progress shown below.');}
       document.getElementById('ib-file').textContent=file?file.name:'pasted/sample';
-      document.getElementById('ib-size').textContent=file?fmtB(file.size):fmtB(JSON.stringify(records).length);
+      document.getElementById('ib-size').textContent=file?fmtB(file.size):'~'+fmtB(records.length*400);
       document.getElementById('ib-records').textContent=meta.stride>1?fmtN(records.length)+' (1-in-'+meta.stride+' of '+fmtN(meta.totalLines||records.length)+')':fmtN(records.length);
       document.getElementById('ib-fields').textContent=records[0]?Object.keys(records[0]).length:'--';
       document.getElementById('info-bar').classList.remove('hidden');

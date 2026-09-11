@@ -53,6 +53,14 @@ test('readFileRecords: NDJSON blob streams with progress', async () => {
   assert.ok(seen.length >= 1 && seen[seen.length - 1] === 1);
 });
 
+test('norm extracts path from full request-line `request` field', () => {
+  const A2 = require('../js/analyzer.js');
+  const r = A2.norm({ remote_addr: '1.1.1.1', request: 'GET /products/widget-pro HTTP/1.1', status: 200, user_agent: 'x' });
+  assert.equal(r.uri, '/products/widget-pro');
+  const r2 = A2.norm({ request_uri: '/plain-path', request: 'GET /ignored HTTP/1.1', status: 200, user_agent: 'x' });
+  assert.equal(r2.uri, '/plain-path');
+});
+
 test('readFileRecords: pretty JSON array + empty file', async () => {
   const arr = await A.readFileRecords(new Blob(['[\n{"a":1},\n{"a":2}\n]']), () => {});
   assert.equal(arr.format, 'json-array');
