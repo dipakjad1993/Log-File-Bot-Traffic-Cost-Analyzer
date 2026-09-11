@@ -1,5 +1,5 @@
 /* Web Worker: off-main-thread analyze() for 20k+ row logs. Falls back to main thread on error. */
-importScripts('analyzer.js?v=1.1.0');
+importScripts('analyzer.js?v=1.1.1');
 
 self.onmessage = function (ev) {
   try {
