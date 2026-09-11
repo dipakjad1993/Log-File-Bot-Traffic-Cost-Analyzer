@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.1 — 2026-09-11
+
+- Asset cache-bust (`analyzer.js?v=1.1.1`, worker + importScripts) so browsers fetch the streaming-upload code instead of a cached pre-fix bundle.
+
 ## v1.1.0 — 2026-09-11
 
 Bot DB v2026.09: the 2026 interview split lands.

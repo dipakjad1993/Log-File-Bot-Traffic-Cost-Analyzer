@@ -5,7 +5,7 @@
 [![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.01-orange)](data/bot-ips.json)
 [![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
-[![v1.1.0](https://img.shields.io/badge/Version-1.1.0-informational)](CHANGELOG.md)
+[![v1.1.1](https://img.shields.io/badge/Version-1.1.1-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
@@ -14,7 +14,7 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 **[Try Live](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer-1.onrender.com/?sample=10k) · [60-sec walkthrough](#demo)**
 
 > [!NOTE]
-> `main` branch. v1.1.0 · Bot DB v2026.09.01 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
+> `main` branch. v1.1.1 · Bot DB v2026.09.01 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
