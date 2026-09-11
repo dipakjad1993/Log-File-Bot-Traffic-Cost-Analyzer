@@ -887,12 +887,122 @@ function exportCFOPDF(A){
   w.document.close();
 }
 function parseCombinedLine(line){
-  // Apache/Nginx Combined: 127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /a.gif HTTP/1.0" 200 2326 "ref" "ua"
-  let m=line.match(/^(\S+) \S+ (\S+) \[([^\]]+)\] "(\S+)\s+(\S+)[^"]*" (\d{3}) (\S+)(?: "([^"]*)" "([^"]*)")?/);
-  if(m)return{remote_addr:m[1],time_local:m[3],request_uri:m[5],status:m[6]==='-'?0:m[6],bytes_sent:m[7]==='-'?0:m[7],referer:m[8]||'',user_agent:m[9]||''};
-  // W3C Extended / Cloudflare text: try tab/space fields with cs-uri-stem + c-ip + cs(User-Agent)
-  if(line.includes('#'))return null;
+  // Apache/Nginx Combined (lenient): 127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /a.gif HTTP/1.0" 200 2326 "ref" "ua"
+  // Tolerates "-" request, "-" status/bytes, and a missing trailing UA quote group.
+  const m=line.match(/^(\S+) \S+ (\S+) \[([^\]]+)\] "([^"]*)" (\d{3}|-) (\S+)(?: "([^"]*)"( "([^"]*)")?)?/);
+  if(!m)return null;
+  let method='GET',uri='/';
+  const rq=(m[4]||'').trim();
+  if(rq&&rq!=='-'){const rm=rq.match(/^(\S+)\s+(\S+)/);if(rm){method=rm[1];uri=rm[2]}else uri=rq.split(' ')[0]||'/';}
+  return{remote_addr:m[1],time_local:m[3],request_uri:uri,request_method:method,status:m[5]==='-'?0:m[5],bytes_sent:m[6]==='-'?0:m[6],referer:m[7]||'',user_agent:m[9]||''};
+}
+// Quote-aware splitter for W3C Extended (fields may be quoted, UAs contain spaces)
+function splitTokens(line){const m=String(line).match(/"[^"]*"|\S+/g);return m||[]}
+function parseW3CFields(headerLine){
+  const body=headerLine.replace(/^#Fields:\s*/i,'');
+  return splitTokens(body).map(t=>t.toLowerCase());
+}
+function parseW3C(line,fields){
+  const toks=splitTokens(line);
+  if(!toks.length||toks.length<5)return null;
+  const unq=t=>String(t||'').replace(/^"|"$/g,'');
+  const at=n=>n>=0&&n<toks.length?unq(toks[n]):'';
+  const idx={};fields.forEach((f,i)=>{if(!(f in idx))idx[f]=i});
+  const di=idx['date'],ti=idx['time'];
+  // Without a header we guess: date time c-ip ... cs-method cs-uri-stem sc-status sc-bytes
+  let ip=idx['c-ip']!==undefined?at(idx['c-ip']):'';
+  if(!ip&&toks.length>2&&/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(unq(toks[2])))ip=unq(toks[2]);
+  const date=di!==undefined?at(di):(toks[0]||'');
+  const time=ti!==undefined?at(ti):(toks[1]||'');
+  const method=idx['cs-method']!==undefined?at(idx['cs-method']):(toks[3]||'GET');
+  let uri=idx['cs-uri-stem']!==undefined?at(idx['cs-uri-stem']):(toks[4]||'/');
+  const q=idx['cs-uri-query']!==undefined?at(idx['cs-uri-query']):'';
+  if(q&&q!=='-')uri+=(/^[\?&]/.test(q)?'':'?')+q;
+  const status=idx['sc-status']!==undefined?at(idx['sc-status']):(toks[5]||0);
+  const bytes=idx['sc-bytes']!==undefined?at(idx['sc-bytes']):(toks[6]||0);
+  let ua='';
+  for(const k of ['cs(user-agent)','cs-user-agent','cs_user_agent']){if(idx[k]!==undefined){ua=at(idx[k]);break}}
+  if(!ua){const last=toks[toks.length-1];if(last&&last.startsWith('"'))ua=unq(last);}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
+  return{remote_addr:ip,time_local:(date+' '+(time||'00:00:00')).trim(),request_uri:uri||'/',request_method:method||'GET',status:status==='-'?0:status,bytes_sent:bytes==='-'?0:bytes,referer:'',user_agent:ua};
+}
+/* Single-line dispatcher shared by streaming upload + tests.
+ * Returns {rec, fmt} on success, {skip:true} for comments/brackets, null when unparseable. */
+function parseLine(line,ctx){
+  ctx=ctx||{w3c:null,format:'unknown'};
+  const t=String(line).trim();
+  if(!t)return{skip:true};
+  if(t[0]==='#'){
+    if(/^#Fields:/i.test(t)){ctx.w3c=parseW3CFields(t);ctx.format='w3c';}
+    return{skip:true};
+  }
+  if(t==='['||t===']')return{skip:true};
+  if(t[0]==='{'){
+    let body=t;
+    if(body.endsWith(','))body=body.slice(0,-1); // JSON-array style line
+    if(body.endsWith(']'))body=body.slice(0,-1).trim();
+    try{return{rec:JSON.parse(body),fmt:'json'};}catch(e){}
+    const c=parseCombinedLine(t);
+    if(c)return{rec:c,fmt:'combined'};
+    return null;
+  }
+  const c=parseCombinedLine(t);
+  if(c)return{rec:c,fmt:'combined'};
+  if(ctx.w3c){const w=parseW3C(t,ctx.w3c);if(w)return{rec:w,fmt:'w3c'};}
+  else{const w=parseW3C(t,['date','time','c-ip','cs-method','cs-uri-stem','sc-status','sc-bytes']);if(w)return{rec:w,fmt:'w3c-guess'};}
   return null;
+}
+function sliceText(blob){
+  if(blob.text)return blob.text();
+  return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=e=>resolve(e.target.result);r.onerror=()=>reject(new Error('slice read failed'));r.readAsText(blob);});
+}
+const ANALYZE_CAP=300000; // max records analyzed in-browser; bigger files use systematic sampling
+/* Streaming file reader: 8MB slices, never holds the whole file as one string,
+ * so 500MB-1GB uploads don't die in FileReader.readAsText. Returns analyzed records
+ * plus sampling metadata. Pure except onProgress — unit-testable in Node (Blob). */
+async function readFileRecords(file,onProgress){
+  const SLICE=8*1024*1024;
+  const size=file.size||0;
+  // Small JSON arrays (<64MB): exact whole-read path (handles pretty-printed arrays)
+  if(size>0&&size<64*1024*1024){
+    try{
+      const head=(await sliceText(file.slice(0,Math.min(65536,size)))).replace(/^[\uFEFF\s]*/,'');
+      if(head.startsWith('[')){
+        const full=await sliceText(file);
+        const arr=JSON.parse(full);
+        const recs=(Array.isArray(arr)?arr:[arr]).filter(Boolean);
+        onProgress&&onProgress(1);
+        return{records:recs,totalLines:recs.length,stride:1,format:'json-array'};
+      }
+    }catch(e){/* fall through to streaming */}
+  }
+  const estLines=Math.max(1,Math.round(size/400));
+  const stride=Math.max(1,Math.ceil(estLines/ANALYZE_CAP));
+  const records=[];
+  const ctx={w3c:null,format:'unknown'};
+  let offset=0,leftover='',lineIdx=0;
+  while(offset<size){
+    const end=Math.min(offset+SLICE,size);
+    const chunk=await sliceText(file.slice(offset,end));
+    offset=end;
+    onProgress&&onProgress(size?offset/size:1);
+    const text=leftover+chunk;
+    const lines=text.split('\n');
+    leftover=lines.pop();
+    for(const ln of lines){
+      const p=parseLine(ln,ctx);
+      if(!p||p.skip)continue;
+      lineIdx++;
+      if(stride===1||lineIdx%stride===0)records.push(p.rec);
+      if(p.fmt&&ctx.format==='unknown')ctx.format=p.fmt;
+    }
+    await new Promise(r=>setTimeout(r,0)); // keep tab responsive
+  }
+  if(leftover&&leftover.trim()){
+    const p=parseLine(leftover,ctx);
+    if(p&&!p.skip){lineIdx++;if(stride===1||lineIdx%stride===0)records.push(p.rec);if(p.fmt&&ctx.format==='unknown')ctx.format=p.fmt;}
+  }
+  return{records,totalLines:lineIdx,stride,format:ctx.format};
 }
 function parseTextLogs(text){
   const lines=text.split('\n');const out=[];let combined=0;
@@ -1078,7 +1188,7 @@ function renderAbout(){
 function renderHowto(){
   document.getElementById('howto-content').innerHTML=`
 <h1>How To Use</h1>
-<div class="step"><div class="step-n">1</div><div class="step-body"><h3>Prepare Your Log File</h3><p>JSON format required. Accepted: JSON Array, JSONL (one JSON per line), or NDJSON. Each entry should contain: timestamp, user_agent, remote_addr (IP), request_uri (URL), status (HTTP code), and optionally bytes, request_time, tls_protocol, cache_status. The tool auto-normalizes field names from Cloudflare, Nginx, Apache, AWS ALB, Varnish, and custom formats.</p></div></div>
+<div class="step"><div class="step-n">1</div><div class="step-body"><h3>Prepare Your Log File</h3><p>Accepted: JSON Array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended (with #Fields header), Cloudflare text. Files stream in 8MB slices — 1GB uploads work; above ~300k lines a systematic sample is analyzed and labeled. Each entry should contain: timestamp, user_agent, remote_addr (IP), request_uri (URL), status (HTTP code), and optionally bytes, request_time, tls_protocol, cache_status. The tool auto-normalizes field names from Cloudflare, Nginx, Apache, AWS ALB, Varnish, and custom formats.</p></div></div>
 <div class="step"><div class="step-n">2</div><div class="step-body"><h3>Upload</h3><p>Click Browse or drag-drop. All analysis runs locally in your browser. No data leaves your machine.</p></div></div>
 <div class="step"><div class="step-n">3</div><div class="step-body"><h3>Review</h3><p>10 analysis tabs cover: Bot Classification, Bot Verification, Crawl Budget, Cost Analysis, AI Scraper Matrix, Edge Rules, Performance, Traffic Patterns, Security, and CFO/FinOps Report.</p></div></div>
 <div class="step"><div class="step-n">4</div><div class="step-body"><h3>Act</h3><p>Deploy generated edge rules. Share CFO report. Prioritize SEO fixes based on crawl budget analysis.</p></div></div>
@@ -1092,16 +1202,14 @@ let currentAnalysis=null,currentCfg={};
 function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));document.querySelectorAll('.sb-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+id).classList.add('active-page');document.querySelector(`[data-section="${id}"]`).classList.add('active')}
 function showTab(id){document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active-tp'));document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active-tp');document.querySelector(`[data-tab="${id}"]`).classList.add('active')}
 
-function processRecords(records,file){
+function processRecords(records,file,meta){
       try{if(typeof lastRecords!=='undefined')lastRecords=records;}catch(e){}
-      if(typeof window!=='undefined'&&file&&file.size>50*1024*1024&&!window.__largeOk){
-        if(!confirm(`File is ${(file.size/1048576).toFixed(0)} MB. Browsers can OOM above ~50 MB. For 500 MB+ use the CLI: npm run gen-logs / node tools/parse.js. Continue in browser (streaming, may be slow)?`))return;
-      }
+      meta=meta||{};
       if(!records.length)throw new Error('No valid records found. Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, Cloudflare text.');
       if(typeof window!=='undefined'&&records.length>100000&&!('Worker' in window)){alert('Large file: 100k+ rows without Web Worker — UI may freeze briefly. Progress shown below.');}
       document.getElementById('ib-file').textContent=file?file.name:'pasted/sample';
       document.getElementById('ib-size').textContent=file?fmtB(file.size):fmtB(JSON.stringify(records).length);
-      document.getElementById('ib-records').textContent=fmtN(records.length);
+      document.getElementById('ib-records').textContent=meta.stride>1?fmtN(records.length)+' (1-in-'+meta.stride+' of '+fmtN(meta.totalLines||records.length)+')':fmtN(records.length);
       document.getElementById('ib-fields').textContent=records[0]?Object.keys(records[0]).length:'--';
       document.getElementById('info-bar').classList.remove('hidden');
       document.getElementById('live-monitor-bar').classList.remove('hidden');
@@ -1111,15 +1219,17 @@ function processRecords(records,file){
         document.getElementById('progress-wrap').classList.add('hidden');
         document.getElementById('results').classList.remove('hidden');
         renderAll(currentAnalysis);
+        if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);
+        else{const old=document.getElementById('sample-note');old&&old.remove();}
         wireExportButtons();
       };
       // Web Worker path if available (js/worker.js), else main thread
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
-          const w=new Worker('js/worker.js');
-          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;currentAnalysis._urlSet=new Set();document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
+          const w=new Worker('js/worker.js?v=1.1.0');
+          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;currentAnalysis._urlSet=new Set();document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
-          w.postMessage({records:records.slice(0,200000),cfg:currentCfg});
+          w.postMessage({records,cfg:currentCfg});
           // fallback timeout: if worker fails silently, run on main thread
           setTimeout(()=>{if(!currentAnalysis||!document.getElementById('results').classList.contains('hidden')===false){}},8000);
           return;
@@ -1127,34 +1237,34 @@ function processRecords(records,file){
       }catch(e){}
       setTimeout(run,50);
 }
-function processFile(file){
-  const reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      document.getElementById('progress-wrap').classList.remove('hidden');
-      document.getElementById('progress-hint').textContent='Processing locally in your browser — no data leaves your machine';
-      document.getElementById('upload-panel').classList.add('hidden');
-      const text=e.target.result;let records;
-      const trimmed=text.trim();
-      if(trimmed.startsWith('[')){records=JSON.parse(trimmed);if(!Array.isArray(records))records=[records]}
-      else if(trimmed.startsWith('{')){try{records=JSON.parse('['+trimmed.split('\n').filter(l=>l.trim()).join(',')+']')}catch(e2){const r=parseTextLogs(text);records=r.records;}}
-      else{ // NDJSON first, then Apache Combined / W3C fallback
-        const jsonLines=trimmed.split('\n').filter(l=>l.trim());
-        const looksJson=jsonLines.length&&jsonLines[0].trim().startsWith('{');
-        if(looksJson)records=jsonLines.map(l=>{try{return JSON.parse(l.trim())}catch(e){return null}}).filter(Boolean);
-        else records=parseTextLogs(text).records;
-        if(!records.length)records=parseTextLogs(text).records;
-      }
-      processRecords(records,file);
-    }catch(err){
-      document.getElementById('progress-wrap').classList.add('hidden');
-      document.getElementById('upload-panel').classList.remove('hidden');
-      alert('Error: '+err.message);
-    }
-  };
-  reader.readAsText(file);
+function showSampleBanner(stride,kept,totalLines,ms){
+  try{
+    let b=document.getElementById('sample-note');
+    if(!b){b=document.createElement('div');b.id='sample-note';b.className='rec amber';const k=document.getElementById('kpi-strip');k&&k.parentNode.insertBefore(b,k);}
+    b.innerHTML='<strong>Large file — systematic 1-in-'+stride+' sample.</strong> Analyzed '+fmtN(kept)+' of '+fmtN(totalLines)+' log lines in '+(ms/1000).toFixed(1)+'s. All figures below describe the analyzed sample (costs scale ~'+stride+'x to the full file). For exact full-file totals use the CLI on a machine with more RAM.';
+  }catch(e){}
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,analyze,parseCombinedLine,parseTextLogs,joinCrawlGsc,genSample,genSampleStream,sampleTargetRecords,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION};}
+async function processFile(file){
+  document.getElementById('progress-wrap').classList.remove('hidden');
+  document.getElementById('progress-hint').textContent='Reading locally in 8MB slices — no data leaves your machine';
+  document.getElementById('upload-panel').classList.add('hidden');
+  try{
+    if(file&&file.size>500*1024*1024&&!confirm('This file is '+fmtB(file.size)+'. The browser will stream it (progress below) and analyze a systematic sample capped at '+fmtN(ANALYZE_CAP)+' records. For exact full-file totals use the CLI instead. Continue in browser?')){throw{cancelled:true}}
+    const t0=Date.now();
+    const{records,totalLines,stride,format}=await readFileRecords(file,(frac)=>{
+      document.getElementById('progress-fill').style.width=Math.round(frac*90)+'%';
+      document.getElementById('progress-label').textContent='Reading file... '+Math.round(frac*100)+'%';
+      document.getElementById('progress-pct').textContent=Math.round(frac*90)+'%';
+    });
+    if(!records.length)throw new Error('No valid records found ('+fmtN(totalLines)+' data lines seen, detected format: '+format+'). Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended (with #Fields header), Cloudflare text. Tip: open your file and check the first line looks like one of the How To Use examples.');
+    processRecords(records,file,{totalLines,stride,format,readMs:Date.now()-t0});
+  }catch(err){
+    document.getElementById('progress-wrap').classList.add('hidden');
+    document.getElementById('upload-panel').classList.remove('hidden');
+    if(!err||!err.cancelled)alert('Error: '+(err&&err.message||err));
+  }
+}
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,analyze,parseCombinedLine,parseTextLogs,joinCrawlGsc,genSample,genSampleStream,sampleTargetRecords,parseLine,readFileRecords,ANALYZE_CAP,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION};}
 
 function wireExportButtons(){
   const add=(id,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};

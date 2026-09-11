@@ -17,6 +17,7 @@ Bot DB v2026.09: the 2026 interview split lands.
 - Dark mode, tab counts, keyboard-focus styles, mobile table scroll.
 - `tools/gen-logs.js` deterministic generator (`npm run gen-logs -- --lines 10000 --seed 42`), `sample-data/sample-10k.jsonl` + `EXPECTED.md`, `sample-combined.log` fixture.
 - Tests (`npm test`, 40+ asserts), GitHub Actions CI, Dockerfile, security headers + gzip in `server.js`.
+- Streaming uploads: 8MB slices (no whole-file `readAsText`, so 1GB files load), systematic sampling capped at 300k records with an honest banner, resilient Combined regex (`-` request/bytes tolerated), real W3C `#Fields` parsing, cache-busted `analyzer.js?v=1.1.0`.
 
 ### Fixed
 - Removed `3.`/`34.`-style short-prefix false positives: prefix matches relabeled heuristic (low confidence); verification verdicts require vendor IP JSON.

@@ -58,8 +58,8 @@ node server.js   # http://localhost:8080 (gzip + security headers)
 # or: docker compose up / docker run -p 8080:8080 <image>
 ```
 
-Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined**, Nginx default, W3C Extended, Cloudflare text.
-`>50 MB` warns in-browser; `500 MB+` → use the CLI path (`npm run gen-logs`).
+Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined**, Nginx default, W3C Extended (with `#Fields` header), Cloudflare text.
+Uploads stream in 8MB slices — 1GB files work; above ~300k lines a labeled systematic sample is analyzed (`500 MB+` exact totals → CLI).
 Sample downloads (1 MB–1 GB) stream in 20k-row Blob chunks with live progress — no "Invalid string length" failure; `>100 MB` confirms first and suggests the CLI.
 
 ```bash
