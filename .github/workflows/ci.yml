@@ -1,0 +1,16 @@
+name: ci
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run lint
+      - run: npm test
+      - run: node tools/gen-logs.js --lines 2000 --seed 42 --out /tmp/sample.jsonl && node -e "const A=require('./js/analyzer.js');const fs=require('fs');const recs=fs.readFileSync('/tmp/sample.jsonl','utf8').split('\n').filter(Boolean).map(JSON.parse);const r=A.analyze(recs,{},()=>{});console.log('records:',r.summary.totalRecords,'tiers:',Object.keys(r.tierData).join(','));if(!r.tierData.ai_training||!r.tierData.human)process.exit(1)"
