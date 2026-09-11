@@ -51,13 +51,12 @@ const URLS = ['/', '/pricing', '/blog/seo-guide-2026', '/products/widget-pro',
   '/api/products?limit=50&offset=500', '/.env', '/wp-login.php', '/calendar/2026/01'];
 
 const base = Date.UTC(2026, 6, 25, 10, 0, 0);
-const out = [];
-for (let i = 0; i < LINES; i++) {
+function makeLine(i) {
   const isBot = rnd() < BOT_FRAC;
   const ua = isBot ? pick(BOT_UAS) : pick(HUMAN_UAS);
   const uri = isBot && rnd() < 0.4 ? pick(URLS.slice(4)) : pick(URLS.slice(0, 4));
   const status = uri.startsWith('/.') || uri.includes('wp-') ? 404 : rnd() < 0.9 ? 200 : 301;
-  out.push(JSON.stringify({
+  return JSON.stringify({
     ClientIP: isBot ? pick(['40.88.0.1', '35.192.0.1', '66.249.66.1', '34.102.136.180']) : rip(),
     Timestamp: new Date(base + i * 1000).toISOString(),
     RequestURI: uri,
@@ -69,8 +68,29 @@ for (let i = 0; i < LINES; i++) {
     RequestTime: +(0.05 + rnd() * 1.5).toFixed(3),
     CacheStatus: rnd() < 0.4 ? 'HIT' : 'MISS',
     TLSProtocol: 'TLSv1.3',
-  }));
+  });
 }
-const data = out.join('\n') + '\n';
-if (OUT) fs.writeFileSync(OUT, data);
-else process.stdout.write(data);
+// Batched generate+write: peak memory is one 20k-line batch, so 1GB+ is safe.
+// NOTE: identical output to the old whole-array version (same seed sequence).
+async function main() {
+  const PER = 20000;
+  let ws = null;
+  if (OUT) ws = fs.createWriteStream(OUT);
+  async function emitBatch(batch) {
+    const data = batch.join('\n') + '\n';
+    if (!OUT) {
+      if (!process.stdout.write(data)) await new Promise((r) => process.stdout.once('drain', r));
+      return;
+    }
+    if (!ws.write(data)) await new Promise((r) => ws.once('drain', r));
+  }
+  let batch = [];
+  for (let i = 0; i < LINES; i++) {
+    batch.push(makeLine(i));
+    if (batch.length >= PER) { await emitBatch(batch); batch = []; }
+  }
+  if (batch.length) await emitBatch(batch);
+  if (ws) await new Promise((r) => ws.end(r));
+  if (OUT && LINES > 500000) process.stderr.write(`gen-logs: wrote ${LINES} lines to ${OUT}\n`);
+}
+main().catch((e) => { console.error(e.message); process.exit(1); });
