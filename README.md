@@ -25,7 +25,7 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 - **8 new 2026 bots:** DeepSeekBot, QwenBot, Timpibot, Sidetiq, Firecrawl, Bright Data (training — block freely), MistralAI-Search (search-index, ALLOW @120/min), PetalBot (search-engine, allow). `ai_citation` legacy tier consolidated into `ai_search_index`.
 - **Trap + threat coverage:** 16 traps (+cart/variant, `/_next/data/`, price sliders), 14 threats (+`.well-known`/`.svn`, `/vendor/phpunit`, Spring `/env`, GraphQL consoles, cloud-metadata SSRF).
 - **Verification precision:** `fetch-bot-ips` keeps full CIDRs (`40.88.220.0/24`) + IPv6, never truncates to `/16`; worker path preserves the GSC URL set; `* Allow` robots lines carry the RFC 9309 most-specific-wins comment.
-- **SEO + hiring docs:** canonical, FAQ schema, repo-root `llms.txt`, `BIGQUERY.md`, `EXPERIMENTS.md`, `LOOM.md`; `prefers-reduced-motion`; live dot pulses only while running with last-diff label; mobile 50MB upload guard.
+- **Polish:** repo-root `llms.txt`; `prefers-reduced-motion`; live dot pulses only while running with last-diff label; mobile 50MB upload guard.
 
 ## What's new in v1.2.0 (Bot DB v2026.09.02, 67 signatures)
 
@@ -184,11 +184,9 @@ npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
 ```
 
-Hiring docs: [BIGQUERY.md](BIGQUERY.md) (logs.csv + SQL) · [EXPERIMENTS.md](EXPERIMENTS.md) (hypothesis → rule → diff) · [LOOM.md](LOOM.md) (90-sec script).
-
 ---
 
-## 8. Method (so a hiring manager trusts the numbers)
+## 8. Method
 
 - **Cost = measured bytes × configured pricing.** No assumed traffic. Proven by perturbation test: +1 GiB on one record moves the total exactly +$0.09.
 - **Origin-compute is opt-in (OFF by default).** No log distinguishes SSR from static, so the engine adds $0 unless you enable it in Pricing.
@@ -200,7 +198,7 @@ Hiring docs: [BIGQUERY.md](BIGQUERY.md) (logs.csv + SQL) · [EXPERIMENTS.md](EXP
 ## 9. Architecture
 
 ```
-index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets, canonical + FAQ schema)
+index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets)
 server.js                   # static server: gzip, CSP/nosniff/DENY, traversal guard
 js/analyzer.js              # engine: 75-signature DB, 4-layer verify, 14-step analyze, 10 renderers
 js/worker.js                # off-main-thread analyze() for 20k+ rows
@@ -209,7 +207,7 @@ tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
 tests/                      # 70+ asserts (bots/traps/costs/samples/upload/.gz/CIDR)
 llms.txt                    # repo-root AI-use policy (generated per-site in Module 6)
-BIGQUERY.md / EXPERIMENTS.md / LOOM.md  # hiring docs: SQL, experimentation, demo script
+BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
 ```
 

@@ -9,8 +9,7 @@ Bot DB v2026.09.13 (75 signatures) + verification precision + 2026 trap/threat c
 - 3 crawl traps (16 total): cart/variant combos (`add-to-cart`, `variant=`), Next.js `/_next/data/` routes, price-slider facets (`price_min/max`, `facet=`).
 - 5 threat patterns (14 total): `.well-known`/`.svn` VCS probes, `/vendor/phpunit` + Laravel exposure, Spring `/env` endpoints, GraphQL/debug consoles, cloud-metadata SSRF (`169.254.169.254`).
 - `normalizeTier()`: `ai_citation` legacy alias consolidated into `ai_search_index` everywhere (RATE_POLICY, crawlBudget, aiMatrix, edge rules, CF JSON, badges). Old exports still render.
-- SEO: canonical, `og:url`/`twitter:image`/`theme-color`, FAQPage JSON-LD, repo-root `llms.txt`.
-- Hiring docs: `BIGQUERY.md` (logs.csv + DuckDB/BigQuery SQL), `EXPERIMENTS.md` (hypothesis → rule → diff), `LOOM.md` (90-sec script).
+- Repo-root `llms.txt` + Module 6 export card.
 - A11y: `prefers-reduced-motion` disables pulse/transitions; live dot pulses ONLY while monitoring + shows last diff (`0 new (static snapshot)` vs changed).
 - Mobile 50MB upload guard with CLI hint (sample-gen cap already existed).
 
