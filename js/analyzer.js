@@ -1511,7 +1511,7 @@ function processRecords(records,file,meta){
       // Web Worker path if available (js/worker.js), else main thread
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
-          const w=new Worker('js/worker.js?v=1.2.0');
+          const w=new Worker('js/worker.js?v=1.2.1');
           w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;currentAnalysis._urlSet=new Set();document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
           w.postMessage({records,cfg:currentCfg});

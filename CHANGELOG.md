@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.1 — 2026-09-13
+
+- Fix: 1GB upload `Maximum call stack size exceeded` — the multi-file merge used `all.push(...r.records)`, spreading ~320k records as function arguments. Replaced with a plain loop + 300k-line regression test (`tests/upload.test.js`).
+- Cache-bust bump (`analyzer.js?v=1.2.1`, worker) so browsers/CDN fetch the fixed bundle instead of the cached pre-fix one. If you still see the error: hard-refresh (Ctrl+Shift+R) — you are running old JS.
+
 ## v1.2.0 — 2026-09-13
 
 Bot DB v2026.09.02 (67 signatures) + enterprise log plumbing + honest-cost fixes.

@@ -1,6 +1,6 @@
 {
   "name": "log-file-bot-traffic-cost-analyzer",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Free, private, client-side log file analyzer: GPTBot vs SearchBot cost split + Cloudflare/Fastly/AWS edge rules. Training vs search-index vs user-triggered AI split (2026).",
   "main": "server.js",
   "scripts": {
