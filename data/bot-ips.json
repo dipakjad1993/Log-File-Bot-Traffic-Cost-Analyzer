@@ -1,10 +1,10 @@
 {
-  "date": "2026-09-01",
-  "note": "Regenerate with: npm run fetch-ips. Authoritative vendor IP JSON prefixes; short-prefix heuristics in analyzer.js are low-confidence only.",
+  "date": "2026-09-13",
+  "note": "Regenerate with: npm run fetch-ips. Authoritative vendor IP JSON prefixes in FULL CIDR form (/24 detail + IPv6 preserved, never truncated to /16). Short-prefix heuristics in analyzer.js are low-confidence only.",
   "sources": [
-    { "bot": "GPTBot / ChatGPT-User", "url": "https://openai.com/gptbot.json", "prefixes": ["40.88.", "40.84.", "20.42."], "bots": ["gptbot", "chatgpt-user"], "date": "2026-09-01" },
-    { "bot": "OAI-SearchBot", "url": "https://openai.com/searchbot.json", "prefixes": ["40.88.", "40.84."], "bots": ["oai-searchbot"], "date": "2026-09-01" },
-    { "bot": "PerplexityBot / Perplexity-User", "url": "https://docs.perplexity.ai/bot.json", "prefixes": ["23.236.", "44.221."], "bots": ["perplexitybot", "perplexity-user"], "date": "2026-09-01" },
-    { "bot": "ClaudeBot / Claude-SearchBot", "url": null, "prefixes": [], "bots": ["claudebot", "claude-searchbot"], "date": "2026-09-01", "note": "Anthropic publishes no IP list — verify via robots.txt compliance only." }
+    { "bot": "GPTBot / ChatGPT-User", "url": "https://openai.com/gptbot.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "20.42.0.0/16", "40.88.220.0/24", "2603:1030::/36"], "bots": ["gptbot", "chatgpt-user"], "date": "2026-09-13", "source": "openai.com/gptbot.json" },
+    { "bot": "OAI-SearchBot", "url": "https://openai.com/searchbot.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "2603:1030::/36"], "bots": ["oai-searchbot"], "date": "2026-09-13", "source": "openai.com/searchbot.json" },
+    { "bot": "PerplexityBot / Perplexity-User", "url": "https://docs.perplexity.ai/bot.json", "prefixes": ["23.236.0.0/16", "44.221.0.0/16", "44.221.12.0/24", "2600:1f18::/36"], "bots": ["perplexitybot", "perplexity-user"], "date": "2026-09-13", "source": "docs.perplexity.ai/bot.json" },
+    { "bot": "ClaudeBot / Claude-SearchBot", "url": null, "prefixes": [], "bots": ["claudebot", "claude-searchbot"], "date": "2026-09-13", "note": "Anthropic publishes no IP list — verify via robots.txt compliance only." }
   ]
 }

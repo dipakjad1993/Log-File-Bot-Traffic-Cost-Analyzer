@@ -1,6 +1,7 @@
 # EXPECTED — sample-10k.jsonl (seed 42, 10,000 lines, 30% bots)
 
 Regenerate: `node tools/gen-logs.js --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl`
+Engine: v1.3.0 · Bot DB v2026.09.13 (75 signatures) · IP JSON 2026-09-13 (full CIDRs + IPv6)
 
 - Records: 10000
 - Bytes: 349.42 MB
@@ -10,6 +11,8 @@ Regenerate: `node tools/gen-logs.js --lines 10000 --bots 0.3 --seed 42 --out sam
 - (v1.1.x pinned $0.08 / $0.01 with the old invented SSR $0.005/1K; v1.2.0 removed it — origin-compute is opt-in, OFF by default. Egress+request math unchanged.)
 - Edge rules: 9 cloudflare / 4 fastly / 4 aws
 - Threats: 558 | Traps: 8
+- (v1.3.0 adds 8 bots, 3 traps, 5 threats — none appear in this fixture's UAs/URLs,
+  so pinned counts above are byte-identical. New patterns are covered by unit tests.)
 
 ## Top bots
 
@@ -31,3 +34,9 @@ Regenerate: `node tools/gen-logs.js --lines 10000 --bots 0.3 --seed 42 --out sam
 Reviewer check: load `?sample=10k`, confirm GPTBot lands in ai_training (blockable),
 OAI-SearchBot/PerplexityBot in ai_search_index (rate-limit only), ChatGPT-User in
 ai_user_fetch (observe, never block).
+
+Reviewer check (v1.3.0): DeepSeekBot/QwenBot/Timpibot/Sidetiq/Firecrawl/BrightData →
+ai_training (blockable); MistralAI-Search → ai_search_index (120/min, never block);
+PetalBot → search_engine (allow). `/shop?add-to-cart=` / `?variant=` / `/_next/data/`
+→ trap table; `/.well-known/` / `/vendor/phpunit` / `/actuator/env` → threat table.
+`ai_citation` must not appear as a tier anywhere (legacy alias → ai_search_index).

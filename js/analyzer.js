@@ -6,8 +6,8 @@
 'use strict';
 
 /* ==== A: BOT SIGNATURE DB v2026.09 — training vs search-index vs user-triggered ==== */
-const BOT_DB_VERSION='2026.09.02';
-const BOT_IP_JSON_DATE='2026-09-01';
+const BOT_DB_VERSION='2026.09.13';
+const BOT_IP_JSON_DATE='2026-09-13';
 // 2026 interview-critical split:
 //  ai_training    = throttle/block freely, zero live citation loss (GPTBot, CCBot, Bytespider, Google-Extended token)
 //  ai_search_index= allow 60-120 req/min/IP or citation share drops in 1-2 wks (OAI-SearchBot, PerplexityBot, Claude-SearchBot)
@@ -84,15 +84,28 @@ const BOTS=[
   {p:'gtmetrix',n:'GTmetrix',cat:'monitoring',tier:'monitoring',note:'GTmetrix performance monitor.'},
   {p:'newrelic',n:'New Relic',cat:'monitoring',tier:'monitoring',note:'New Relic monitoring agent.'},
   {p:'datadog',n:'Datadog',cat:'monitoring',tier:'monitoring',note:'Datadog monitoring agent.'},
+  // --- AI TRAINING wave 2026-09 (block freely; zero live citation loss) ---
+  {p:'deepseekbot',n:'DeepSeekBot',cat:'ai_training',tier:'ai_training',note:'DeepSeek model training crawler (2026 surge). Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'qwenbot',n:'QwenBot (Alibaba)',cat:'ai_training',tier:'ai_training',note:'Alibaba Qwen training crawler. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'timpibot',n:'Timpibot (Timpi)',cat:'ai_training',tier:'ai_training',note:'Timpi decentralized-index crawler. Aggressive on faceted pages. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'sidetiq',n:'Sidetiq',cat:'ai_training',tier:'ai_training',note:'Sidetiq scraping/prospecting bot. No referral value. Block freely.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'firecrawl',n:'Firecrawl',cat:'ai_training',tier:'ai_training',note:'Firecrawl scraping infra (user-configured crawls). Block by default, allowlist paying partners.',citationRisk:'none',rateLimit:'60/min (20 aggressive)'},
+  {p:'brightdata',n:'Bright Data (brightdata)',cat:'ai_training',tier:'ai_training',note:'Bright Data proxy-network scraper. Rotates residential IPs — block at WAF + ASN.',citationRisk:'none',rateLimit:'20/min aggressive'},
+  // --- SEARCH-INDEX additions 2026-09 (ALLOW @120/min, never hard block) ---
+  {p:'petalbot',n:'PetalBot (Huawei)',cat:'search_engine',tier:'search_engine',note:'Huawei Petal Search crawler. ALLOW — organic visibility in Petal/HarmonyOS surfaces.'},
+  {p:'mistralai-search',n:'MistralAI-Search',cat:'ai_search_index',tier:'ai_search_index',note:'Mistral AI search-index fetcher (distinct from MistralAI-User). ALLOW @120/min.',citationRisk:'medium',rateLimit:'120/min/IP'},
 ];
 // 2026 rate-limit policy table (single source of truth for edge rules + robots tab)
+// NOTE: ai_citation was a legacy alias of ai_search_index and is now consolidated.
+// Old logs/exports may still carry ai_citation — normalizeTier() maps it to
+// ai_search_index at read time. Do NOT add new ai_citation entries.
 const RATE_POLICY={
   ai_training:{label:'Training',action:'throttle/block freely',limit:'60 req/min/IP',aggressive:'20 req/min/IP',robots:'Disallow',cf:'Cloudflare AI Crawl Control → Block Training',risk:'none'},
   ai_search_index:{label:'Search-index',action:'allow with limits',limit:'120 req/min/IP',aggressive:'60 req/min/IP',robots:'Allow',cf:'Cloudflare AI Crawl Control → Allow Search',risk:'medium-high (citation loss in 1-2 wks if blocked)'},
   ai_user_fetch:{label:'User-triggered',action:'DO NOT throttle',limit:'no throttle (300/min abuse ceiling only)',aggressive:'429 = missing live answer',robots:'Allow (robots.txt may not apply)',cf:'Cloudflare AI Crawl Control → Allow Agent',risk:'critical (do not block)'},
-  ai_citation:{label:'AI citation (legacy alias of Search-index)',action:'allow with limits',limit:'120 req/min/IP',aggressive:'60 req/min/IP',robots:'Allow',cf:'Allow Search',risk:'medium-high'},
   search_engine:{label:'Search engine',action:'allow',limit:'none',aggressive:'none',robots:'Allow',cf:'Allow',risk:'critical (organic visibility)'}
 };
+function normalizeTier(t){return t==='ai_citation'?'ai_search_index':t;}
 
 // Bot-first classification order documented: bot signatures take precedence over browser
 // fingerprints to prevent spoofed-UA bypass. python/curl-in-Chrome edge case handled explicitly.
@@ -197,6 +210,9 @@ const TRAPS=[
   {name:'Ad/Attribution Click IDs',regex:/[?&](gclid|fbclid|msclkid|srsltid|wbraid|gbraid|ttclid)=/i,sev:'medium'},
   {name:'Currency/Locale Variants',regex:/[?&](currency|locale|lang|region|country)=/i,sev:'medium'},
   {name:'Filter Path Segments',regex:/\/filter\/|\/page\/\d+/i,sev:'medium'},
+  {name:'Cart / Variant Combos (ecomm)',regex:/[?&](add-to-cart|add_to_cart|variant|variation_id|attribute_|pdp)=/i,sev:'high'},
+  {name:'Next.js Data Routes',regex:/\/_next\/data\//i,sev:'medium'},
+  {name:'Price-Slider Facets',regex:/[?&](price_min|price_max|min_price|max_price|price_range|facet|facets)=/i,sev:'medium'},
 ];
 
 const THREATS=[
@@ -209,6 +225,11 @@ const THREATS=[
   {name:'Actuator/Health Probe',regex:/\/actuator\/health|\/actuator\/|\/healthz|\/readyz/i,sev:'high'},
   {name:'Backup File Access',regex:/\.(bak|old|backup|sql|dump|tar\.gz|zip|rar)$/i,sev:'high'},
   {name:'Log File Access',regex:/\/(server-status|server-info|error\.log|access\.log|debug|trace)/i,sev:'medium'},
+  {name:'Well-Known / VCS Probe',regex:/\/\.well-known\/|\/\.svn\/|\/\.hg\/|\/\.bzr\//i,sev:'medium'},
+  {name:'Exposed Env / Vendor Probe',regex:/\/api\/\.env|\/vendor\/phpunit|\/vendor\/|\/laravel\/|\/\.s3cfg|\/server\.cfg/i,sev:'critical'},
+  {name:'Spring / Env Endpoint Probe',regex:/\/env\b|\/actuator\/env|\/spring\.|\/eureka\/|\/nacos\/|\/druid\//i,sev:'high'},
+  {name:'GraphQL / Debug Probe',regex:/\/graphql\/console|\/graphiql|\/altair|\/playground|\/__debugbar|\/phpinfo/i,sev:'medium'},
+  {name:'Cloud Metadata Probe (SSRF)',regex:/\/latest\/meta-data|\/metadata\/v1|169\.254\.169\.254/i,sev:'critical'},
 ];
 
 /* ==== B: UTILITIES ==== */
@@ -308,7 +329,7 @@ function verifyBot(rec,b,ipDb){
   if(ipDb&&nip){
     for(const entry of ipDb){
       if(entry.prefixes&&ipMatchesAny(nip,entry.prefixes)&&b.name&&entry.bots.some(x=>b.name.toLowerCase().includes(x))){
-        c.dns={s:'verified',d:`VERIFIED via IP JSON ${entry.date||BOT_IP_JSON_DATE}: ${nip} in ${entry.source}`}; break;
+        c.dns={s:'verified',d:`VERIFIED via IP JSON ${entry.date||BOT_IP_JSON_DATE}: ${nip} in ${entry.source||entry.url||'vendor JSON'} (${entry.prefixes.length} CIDRs)`}; break;
       }
     }
   }
@@ -402,7 +423,8 @@ function crawlBudget(records,cls){
   const eng={};
   for(let i=0;i<records.length;i++){
     const r=records[i],c=cls[i];
-    if(c.tier!=='search_engine'&&c.tier!=='ai_citation'&&c.tier!=='ai_search_index')continue;
+    const nt=normalizeTier(c.tier);
+    if(nt!=='search_engine'&&nt!=='ai_search_index')continue;
     const k=c.name;
     if(!eng[k])eng[k]={name:k,tier:c.tier,total:0,unique:new Set(),s2xx:0,s3xx:0,s4xx:0,s5xx:0,cacheHit:0,cacheMiss:0,paramUrls:0,totalBytes:0,rts:[]};
     const e=eng[k];e.total++;e.unique.add(r.uri.split('?')[0]);e.totalBytes+=r.bytes;
@@ -471,7 +493,7 @@ function genEdgeRules(botData,sec){
       r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${u.substring(0,40)}") { error 403 "Blocked"; }`});
       r.aws.push({name:`Block ${name}`,act:'BLOCK',rule:`{ "Statement": { "ByteMatchStatement": { "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } }, "PositionalConstraint": "CONTAINS", "SearchString": "${u.substring(0,40)}" } }, "Action": { "Block": {} } }`});
     }
-    if((bd.tier==='ai_citation'||bd.tier==='ai_search_index')&&bd.count>=2){
+    if(normalizeTier(bd.tier)==='ai_search_index'&&bd.count>=2){
       const u2=bd.topUAList?.[0]?.[0]||name;
       r.cloudflare.push({name:`Rate-limit ${name} (search-index: ALLOW)`,act:'RATE-LIMIT 120/min',desc:`ALLOW — citation share drops in 1-2 wks if blocked. 120 req/min/IP (60 aggressive). 429 + Retry-After, never hard block.`,rule:`(http.user_agent contains "${escQ(u2)}") -> rate limit 120/min/IP, exceed => 429 + Retry-After: 30`});
     }
@@ -485,7 +507,7 @@ function genEdgeRules(botData,sec){
     }
   }
   if(sec.hvIPs.length>0)r.cloudflare.push({name:'Block High-Velocity IPs',act:'BLOCK',desc:`${sec.hvIPs.length} IPs exceeding safe velocity`,rule:`ip.src in { ${sec.hvIPs.slice(0,10).map(i=>i.ip).join(' ')} } -> block + 429 Retry-After: 60`});
-  r.robots=['# Generated '+new Date().toISOString().slice(0,10)+' — training vs search split (Cloudflare 15 Sep 2026: auto-block Training+Agent on ad pages for new domains; Pay Per Crawl 402 beta)','User-agent: GPTBot','Disallow: /','','User-agent: ClaudeBot','Disallow: /','','User-agent: CCBot','Disallow: /','','User-agent: Bytespider','Disallow: /','','User-agent: Meta-ExternalAgent','Disallow: /','','User-agent: Applebot-Extended','Disallow: /','','User-agent: cohere-ai','Disallow: /','','User-agent: AI2Bot','Disallow: /','','User-agent: GoogleOther','Disallow: /','','User-agent: ImageSiftBot','Disallow: /','','User-agent: Google-Extended','Disallow: /','','User-agent: OAI-SearchBot','Allow: /','','User-agent: OAI-AdsBot','Allow: /','# OAI-AdsBot verifies ChatGPT shopping ads — never Disallow on ecommerce','','User-agent: PerplexityBot','Allow: /','','User-agent: Claude-SearchBot','Allow: /','','User-agent: DuckAssistBot','Allow: /','','# User-triggered (ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent):','# robots.txt may not apply — enforce at edge with ALLOW + abuse ceiling, not Disallow.',''].join('\n');
+  r.robots=['# Generated '+new Date().toISOString().slice(0,10)+' — training vs search split (Cloudflare 15 Sep 2026: auto-block Training+Agent on ad pages for new domains; Pay Per Crawl 402 beta)','User-agent: GPTBot','Disallow: /','','User-agent: ClaudeBot','Disallow: /','','User-agent: CCBot','Disallow: /','','User-agent: Bytespider','Disallow: /','','User-agent: Meta-ExternalAgent','Disallow: /','','User-agent: Applebot-Extended','Disallow: /','','User-agent: cohere-ai','Disallow: /','','User-agent: AI2Bot','Disallow: /','','User-agent: GoogleOther','Disallow: /','','User-agent: ImageSiftBot','Disallow: /','','User-agent: DeepSeekBot','Disallow: /','','User-agent: QwenBot','Disallow: /','','User-agent: Timpibot','Disallow: /','','User-agent: Sidetiq','Disallow: /','','User-agent: Firecrawl','Disallow: /','','User-agent: Google-Extended','Disallow: /','','User-agent: OAI-SearchBot','Allow: /','','User-agent: OAI-AdsBot','Allow: /','# OAI-AdsBot verifies ChatGPT shopping ads — never Disallow on ecommerce','','User-agent: PerplexityBot','Allow: /','','User-agent: Claude-SearchBot','Allow: /','','User-agent: DuckAssistBot','Allow: /','','User-agent: MistralAI-Search','Allow: /','','# User-triggered (ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent):','# robots.txt may not apply — enforce at edge with ALLOW + abuse ceiling, not Disallow.','','# NOTE: a trailing "User-agent: * / Allow: /" (if you append one) does NOT override','# the specific Disallows above — most-specific group wins per RFC 9309.',''].join('\n');
   r.cfAICrawl='Cloudflare Dashboard > Security > AI Crawl Control (15 Sep 2026): Training=Block, Search=Allow @120/min, Agent=Allow @300/min ceiling, Pay Per Crawl=402 beta';
   return r;
 }
@@ -513,9 +535,10 @@ function genCfAICrawlJSON(botData){
   const training=[],search=[],agent=[];
   for(const[name,bd] of Object.entries(botData||{})){
     const ua=(bd.topUAList&&bd.topUAList[0]&&bd.topUAList[0][0])||name;
-    if(bd.tier==='ai_training')training.push(ua.substring(0,80));
-    else if(bd.tier==='ai_search_index'||bd.tier==='ai_citation')search.push(ua.substring(0,80));
-    else if(bd.tier==='ai_user_fetch')agent.push(ua.substring(0,80));
+    const _nt=normalizeTier(bd.tier);
+    if(_nt==='ai_training')training.push(ua.substring(0,80));
+    else if(_nt==='ai_search_index')search.push(ua.substring(0,80));
+    else if(_nt==='ai_user_fetch')agent.push(ua.substring(0,80));
   }
   return JSON.stringify({version:'2026.09',managed:'ai-crawl-control',
     training:{action:'block',user_agents:training,note:'Zero live citation loss'},
@@ -613,9 +636,10 @@ function analyze(records,cfg,onProgress){
   adv('Analyzing AI scraper citation ROI...');
   const aiMatrix={};
   for(const[k,b] of Object.entries(botData)){
-    if(b.tier==='ai_citation'||b.tier==='ai_training'||b.tier==='ai_search_index'||b.tier==='ai_user_fetch'){
+    const nt=normalizeTier(b.tier);
+    if(nt==='ai_training'||nt==='ai_search_index'||nt==='ai_user_fetch'){
       const egGB=b.totalBytes/(1024*1024*1024);
-      aiMatrix[k]={...b,egGB,bandCost:egGB*(cfg?.cdnEgress||DEFAULT_COSTS.cdnEgress)};
+      aiMatrix[k]={...b,tier:nt,egGB,bandCost:egGB*(cfg?.cdnEgress||DEFAULT_COSTS.cdnEgress)};
     }
   }
   adv('Analyzing traffic patterns and velocity...');
@@ -651,7 +675,8 @@ function analyze(records,cfg,onProgress){
 }
 
 /* ==== M: RENDER HELPERS ==== */
-const TL={search_engine:'Search Engine',ai_citation:'AI Search-Index (legacy alias)',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'};
+// ai_citation keys below exist ONLY to render pre-v1.3 exports; new code uses ai_search_index.
+const TL={search_engine:'Search Engine',ai_citation:'AI Search-Index (legacy → search-index)',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'};
 const TC={search_engine:'b-green',ai_citation:'b-cyan',ai_search_index:'b-cyan',ai_user_fetch:'b-blue',ai_training:'b-red',seo_tool:'b-purple',monitoring:'b-blue',human:'b-green',social:'b-amber',unknown_bot:'b-amber',suspicious:'b-red',unclassified:'b-gray',unknown:'b-gray'};
 
 function mkTable(headers,rows){let h='<div class="tbl-wrap"><table class="dt"><thead><tr>';for(const th of headers)h+=th;h+='</tr></thead><tbody>';for(const row of rows)h+=row;h+='</tbody></table></div>';return h}
@@ -666,7 +691,7 @@ function td(t,cls=''){return `<td${cls?' class="'+cls+'"':''}>${t}</td>`}
    Each module highlights CRITICAL ISSUES wasting your money.
 */
 
-function tierLabel(t){return ({search_engine:'Search Engine',ai_citation:'AI Search-Index (legacy alias)',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'})[t]||t}
+function tierLabel(t){if(t==='ai_citation')t='ai_search_index';return ({search_engine:'Search Engine',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'})[t]||t}
 
 function critIssue(title,detail,impact,fix){
   return '<div class="rec red"><span class="badge b-red" style="margin-right:6px;font-size:10px">CRITICAL</span><strong>'+title+'</strong><p style="margin-top:6px">'+detail+'</p>'+(impact?'<div style="margin-top:6px;font-size:12px;color:var(--red)"><strong>Money Wasted:</strong> '+impact+'</div>':'')+(fix?'<div style="margin-top:4px;font-size:12px;color:var(--green)"><strong>Fix:</strong> '+fix+'</div>':'')+'</div>';
@@ -707,7 +732,8 @@ function renderTab1(A){
   const mT=Math.max(...Object.values(tiers).map(t=>t.count),1);
   for(const[tier,td] of Object.entries(tiers).sort((a,b)=>b[1].count-a[1].count)){
     const pct=td.count/s.totalRecords*100;
-    const cc=tier==='search_engine'||tier==='human'?'green':tier==='ai_citation'?'cyan':tier==='ai_training'?'red':tier==='social'?'amber':'blue';
+    const _nt2=normalizeTier(tier);
+    const cc=tier==='search_engine'||tier==='human'?'green':_nt2==='ai_search_index'?'cyan':_nt2==='ai_training'?'red':tier==='social'?'amber':'blue';
     h+='<div class="bar-r"><div class="bar-l">'+tierLabel(tier)+' ('+td.bots.length+' bots)</div><div class="bar-t"><div class="bar-f '+cc+'" style="width:'+Math.max(td.count/mT*100,2)+'%"></div></div><div class="bar-v">'+fmtN(td.count)+' ('+fmtP(pct)+')</div></div>';
   }
   h+='</div></div>';
@@ -845,11 +871,12 @@ function renderTab5(A){
     h+=mkTable([th('AI Bot'),th('Category'),th('Requests','n'),th('Bandwidth','n'),th('Egress Cost','n'),th('Cost/Request','n'),th('Recommendation')],
       entries.map(([name,b])=>{
         const cpReq=b.count>0?fmtC(b.bandCost/b.count):'$0.00';
-        const pol=RATE_POLICY[b.tier]||RATE_POLICY.ai_citation;
-        const rec=(b.tier==='ai_search_index'||b.tier==='ai_citation')?'ALLOW @ '+(pol.limit||'120/min')+' — check referrals':b.tier==='ai_user_fetch'?'DO NOT BLOCK — user-triggered':'Consider blocking — zero referral value';
-        return '<tr><td><strong>'+esc(name)+'</strong></td><td><span class="badge '+(b.tier==='ai_citation'?'b-cyan':'b-red')+'">'+tierLabel(b.tier)+'</span></td>'+
+        const nt=normalizeTier(b.tier);
+        const pol=RATE_POLICY[nt]||RATE_POLICY.ai_search_index;
+        const rec=nt==='ai_search_index'?'ALLOW @ '+(pol.limit||'120/min')+' — check referrals':nt==='ai_user_fetch'?'DO NOT BLOCK — user-triggered':'Consider blocking — zero referral value';
+        return '<tr><td><strong>'+esc(name)+'</strong></td><td><span class="badge '+(nt==='ai_search_index'?'b-cyan':nt==='ai_user_fetch'?'b-blue':'b-red')+'">'+tierLabel(nt)+'</span></td>'+
           td(fmtN(b.count),'n')+td(fmtB(b.totalBytes),'n')+td(fmtC(b.bandCost),'n')+td(cpReq,'n')+
-          '<td><span class="badge '+((b.tier==='ai_search_index'||b.tier==='ai_citation')?'b-cyan':b.tier==='ai_user_fetch'?'b-blue':'b-red')+'">'+rec+'</span></td></tr>';
+          '<td><span class="badge '+(nt==='ai_search_index'?'b-cyan':nt==='ai_user_fetch'?'b-blue':'b-red')+'">'+rec+'</span></td></tr>';
       }));
     h+='</div>';
   }else h+='<div class="card"><p>No AI scraper bots detected.</p></div>';
@@ -1184,7 +1211,8 @@ async function readGzRecords(file,onProgress){
   // Systematic 1-in-N sample AFTER full decompression (stride known only now)
   const stride=Math.max(1,Math.ceil(lineIdx/ANALYZE_CAP));
   const kept=stride===1?records:records.filter((_,i)=>(i+1)%stride===0);
-  return{records:kept,totalLines:lineIdx,stride,format:(ctx.format==='unknown'?'gzip:'+ctx.format:ctx.format)||'gzip',lowConfidence:ctx.lowConfidenceFormats};
+  const inner=(ctx.format&&ctx.format!=='unknown')?ctx.format:'ndjson';
+  return{records:kept,totalLines:lineIdx,stride,format:'gzip:'+inner,lowConfidence:ctx.lowConfidenceFormats};
 }
 /* Streaming file reader: 8MB slices, never holds the whole file as one string,
  * so 500MB-1GB uploads don't die in FileReader.readAsText. Returns analyzed records
@@ -1449,10 +1477,10 @@ function renderAbout(){
 <h2>Why it exists</h2>
 <p>Modern servers drown in automated traffic: search crawlers, SEO tools, and — since 2024 — AI bots that train models on your content for zero return. Incumbent answers are a desktop app with manual regex lists, or cloud platforms that require uploading sensitive logs to someone else's server. This tool is the third option: drop the log in your browser, get the GPTBot-vs-OAI-SearchBot cost split and copy-paste edge rules, with <strong>no log ever leaving your machine</strong> (safe for DPDP/RBI-sensitive data).</p>
 <h2>The 2026 bot split (training vs search-index vs user-triggered)</h2>
-<p>Senior SEOs interview on exactly this distinction, and the analyzer enforces it end to end (Bot DB v2026.09.02, 67 signatures):</p>
+<p>Senior SEOs interview on exactly this distinction, and the analyzer enforces it end to end (Bot DB v2026.09.13, 75 signatures):</p>
 <ul><li><strong>Training</strong> (GPTBot, ClaudeBot, CCBot, Bytespider, cohere-ai, AI2Bot, GoogleOther, ImageSiftBot, Google-Extended robots token): throttle/block freely at 60 req/min (20 aggressive). Zero live citation loss.</li><li><strong>Search-index</strong> (OAI-SearchBot, PerplexityBot, Claude-SearchBot, DuckAssistBot): ALLOW at 120 req/min (60 aggressive), 429 + Retry-After, never hard block — citation share drops in 1–2 weeks if blocked.</li><li><strong>User-triggered</strong> (ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent): do NOT throttle (300/min abuse ceiling only). A 429 here means a missing live answer; robots.txt may not even apply.</li></ul>
 <h2>How the 10 modules work</h2>
-<ul><li><strong>1 · Bot Classification:</strong> bot-signature matching takes precedence over browser fingerprints (documented bot-first order, longest-pattern-first) across 67 signatures + 18 browser patterns. OAI-AdsBot is allow-listed (revenue checks), GoogleOther/ImageSiftBot are training.</li><li><strong>2 · Verification (4 layers):</strong> vendor IP JSON (dated 2026-09-01) first with IPv6 + CIDR matching; /16-or-longer cloud prefixes are low-confidence heuristics only (single-octet /8s removed). rDNS checklist exporter included. Anthropic publishes no IP list — robots.txt only. Signals, not proof.</li><li><strong>3 · Crawl Budget:</strong> per-crawler efficiency, parameterized-URL ratios, 13 trap patterns incl. gclid/fbclid, currency/locale and /filter/ segments.</li><li><strong>4 · Cost:</strong> measured bytes × your CDN preset (CloudFront/Cloudflare/Fastly/GCS). Origin-compute is opt-in (OFF by default — logs can't tell SSR vs static). Blockable = training + suspicious only. Crawl-to-referral table: OAI 85:1, Perplexity 210:1, Claude ~5,143:1.</li><li><strong>5 · AI Matrix:</strong> red = training, cyan = search-index, blue = user-triggered, each with its 2026 rate policy.</li><li><strong>6 · Edge Rules + robots.txt:</strong> Cloudflare/Fastly/AWS rules with copy buttons, training-vs-search robots.txt generator (Google-Extended is a token, not a UA), Cloudflare AI Crawl Control mapping + JSON exporter, llms.txt generator, 402 pay-per-crawl example, rDNS checklist. Rate control uses 429/503 + Retry-After — never tarpitting.</li><li><strong>7 · Performance:</strong> TTFB by category, status/method distributions.</li><li><strong>8 · Traffic Patterns:</strong> hourly spikes (mean + 2σ), day-of-week, top IPs/URLs/referrers.</li><li><strong>9 · Security:</strong> traversal, credential (.git/HEAD, .aws/credentials), actuator probes, velocity anomalies.</li><li><strong>10 · CFO/FinOps:</strong> measured totals, blockable waste, projections, CSV + print-to-PDF 1-pager export, logs.csv BigQuery/DuckDB bridge, GEO prompt-test list.</li></ul>
+<ul><li><strong>1 · Bot Classification:</strong> bot-signature matching takes precedence over browser fingerprints (documented bot-first order, longest-pattern-first) across 75 signatures + 18 browser patterns. OAI-AdsBot + PetalBot allow-listed; GoogleOther/DeepSeekBot/QwenBot/Timpibot/Sidetiq/Firecrawl/BrightData/ImageSiftBot are training.</li><li><strong>2 · Verification (4 layers):</strong> vendor IP JSON (dated 2026-09-13, full CIDRs + IPv6 preserved) first with IPv6 + CIDR matching; /16-or-longer cloud prefixes are low-confidence heuristics only (single-octet /8s removed). rDNS checklist exporter included. Anthropic publishes no IP list — robots.txt only. Signals, not proof.</li><li><strong>3 · Crawl Budget:</strong> per-crawler efficiency, parameterized-URL ratios, 16 trap patterns incl. gclid/fbclid, currency/locale, /filter/ segments, cart/variant combos, /_next/data/ routes and price-slider facets.</li><li><strong>4 · Cost:</strong> measured bytes × your CDN preset (CloudFront/Cloudflare/Fastly/GCS). Origin-compute is opt-in (OFF by default — logs can't tell SSR vs static). Blockable = training + suspicious only. Crawl-to-referral table: OAI 85:1, Perplexity 210:1, Claude ~5,143:1.</li><li><strong>5 · AI Matrix:</strong> red = training, cyan = search-index, blue = user-triggered, each with its 2026 rate policy.</li><li><strong>6 · Edge Rules + robots.txt:</strong> Cloudflare/Fastly/AWS rules with copy buttons, training-vs-search robots.txt generator (Google-Extended is a token, not a UA), Cloudflare AI Crawl Control mapping + JSON exporter, llms.txt generator, 402 pay-per-crawl example, rDNS checklist. Rate control uses 429/503 + Retry-After — never tarpitting.</li><li><strong>7 · Performance:</strong> TTFB by category, status/method distributions.</li><li><strong>8 · Traffic Patterns:</strong> hourly spikes (mean + 2σ), day-of-week, top IPs/URLs/referrers.</li><li><strong>9 · Security:</strong> traversal, credential (.git/HEAD, .aws/credentials), actuator + Spring/env probes, .well-known/.svn/vendor exposure, GraphQL/debug consoles, cloud-metadata SSRF probes, velocity anomalies.</li><li><strong>10 · CFO/FinOps:</strong> measured totals, blockable waste, projections, CSV + print-to-PDF 1-pager export, logs.csv BigQuery/DuckDB bridge, GEO prompt-test list.</li></ul>
 <h2>Privacy architecture</h2>
 <ul><li>Parsing, analysis and rendering run in your browser (Web Worker for 20k+ rows). The only network request the app itself makes is loading the deterministic 10k demo file when you click it.</li><li>No cookies, no telemetry, no external dependencies at runtime. Open source for audit.</li></ul>
 <h2>Honest limitations</h2>
@@ -1512,7 +1540,7 @@ function processRecords(records,file,meta){
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
           const w=new Worker('js/worker.js?v=1.2.1');
-          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;currentAnalysis._urlSet=new Set();document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
+          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
           w.postMessage({records,cfg:currentCfg});
           // fallback timeout: if worker fails silently, run on main thread
@@ -1569,6 +1597,10 @@ async function processFiles(files){
     const list=(files||[]).filter(Boolean);
     if(!list.length)throw new Error('No file selected.');
     const totalSize=list.reduce((s,f)=>s+(f.size||0),0);
+    try{
+      const isMobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||'')||(window.matchMedia&&matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<820);
+      if(isMobile&&totalSize>50*1024*1024&&!confirm('Mobile detected: '+fmtB(totalSize)+' exceeds the 50MB mobile guard (phones OOM on large parses). Continue anyway, or use the CLI on desktop: npm run gen-logs / node streaming parse. Continue in browser?')){throw{cancelled:true}}
+    }catch(e){if(e&&e.cancelled)throw e;}
     if(totalSize>500*1024*1024&&!confirm('These files total '+fmtB(totalSize)+'. The browser will stream them (progress below) and analyze a systematic sample capped at '+fmtN(ANALYZE_CAP)+' records. For exact full-file totals use the CLI instead. Continue in browser?')){throw{cancelled:true}}
     const t0=Date.now();
     const{records,totalLines,stride,format,lowConfidence}=await readFilesRecords(list,(frac,cur)=>{
@@ -1586,7 +1618,7 @@ async function processFiles(files){
     if(!err||!err.cancelled)alert('Error: '+(err&&err.message||err));
   }
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION};}
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION,BOT_IP_JSON_DATE};}
 
 function wireExportButtons(){
   const add=(id,label,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=label||id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};
@@ -1598,15 +1630,27 @@ function wireExportButtons(){
   const ib=document.getElementById('info-bar');
   if(ib&&!document.getElementById('export-csv-btn')){const b1=document.createElement('button');b1.id='export-csv-btn';b1.className='btn-sm';b1.textContent='Download CSV';b1.onclick=()=>currentAnalysis&&exportBotCSV(currentAnalysis);ib.appendChild(b1);const b2=document.createElement('button');b2.id='export-cfo-btn';b2.className='btn-sm';b2.textContent='CFO 1-pager';b2.onclick=()=>currentAnalysis&&exportCFOPDF(currentAnalysis);ib.appendChild(b2);}
 }
-let liveTimer=null,lastRecords=null;
+let liveTimer=null,lastRecords=null,lastLiveSig='';
 function setLive(on){
   const s=document.getElementById('live-status');
+  const dot=document.querySelector('#live-monitor-bar .live-dot');
   if(on){if(!lastRecords){alert('Upload a log file first — Live re-analyzes the last upload on an interval (no backend polling).');return}
     const iv=parseInt(document.getElementById('live-interval')?.value||'30',10)*1000;
     document.getElementById('live-start-btn')?.classList.add('hidden');document.getElementById('live-stop-btn')?.classList.remove('hidden');
+    if(dot)dot.classList.add('active'); // pulse ONLY while actually running
     if(s)s.textContent='Monitoring (re-analyzing last upload every '+iv/1000+'s)';
-    liveTimer=setInterval(()=>{if(lastRecords){processRecords(lastRecords,null);document.getElementById('live-last-update').textContent='Last update: '+new Date().toLocaleTimeString();}},iv);
-  }else{clearInterval(liveTimer);liveTimer=null;document.getElementById('live-start-btn')?.classList.remove('hidden');document.getElementById('live-stop-btn')?.classList.add('hidden');if(s)s.textContent='Stopped';}
+    lastLiveSig=lastRecords.length+'|'+(currentAnalysis?currentAnalysis.summary.totalRecords:0);
+    liveTimer=setInterval(()=>{
+      if(lastRecords){
+        const before=lastLiveSig;
+        processRecords(lastRecords,null);
+        const after=lastRecords.length+'|'+(currentAnalysis?currentAnalysis.summary.totalRecords:0);
+        const diff=before===after?'0 new (static snapshot — re-analyzed '+lastRecords.length+' records)':'changed: '+before+' → '+after;
+        lastLiveSig=after;
+        document.getElementById('live-last-update').textContent='Last update: '+new Date().toLocaleTimeString()+' — '+diff;
+      }
+    },iv);
+  }else{clearInterval(liveTimer);liveTimer=null;document.getElementById('live-start-btn')?.classList.remove('hidden');document.getElementById('live-stop-btn')?.classList.add('hidden');if(s)s.textContent='Stopped';if(dot)dot.classList.remove('active');}
 }
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',function(){
   renderAbout();renderHowto();

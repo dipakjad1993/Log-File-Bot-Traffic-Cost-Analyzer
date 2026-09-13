@@ -17,17 +17,30 @@ function get(url) {
   });
 }
 
+function isIPv4(s){return /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(s);}
+function isIPv6(s){return /^[0-9a-f:]+(\/\d{1,3})?$/i.test(s)&&s.includes(':');}
 function prefixesOf(jsonText) {
+  // P0 fix (v1.3.0): keep FULL CIDRs (/24 detail + IPv6), never truncate to /16.
+  // Old code did split('.').slice(0,2) which threw away /24 detail and broke
+  // verification precision. Vendor JSON already ships CIDRs — preserve them.
   try {
     const j = JSON.parse(jsonText);
     const out = [];
     const walk = (v) => {
-      if (typeof v === 'string' && /^\d{1,3}\.\d{1,3}\./.test(v)) out.push(v.replace(/\/\d+$/, '').split('.').slice(0, 2).join('.') + '.');
+      if (typeof v === 'string'){
+        const s=v.trim();
+        if(isIPv4(s)){out.push(s.includes('/')?s:s+'/32');}
+        else if(isIPv6(s)){out.push(s);}
+        else if(/^\d{1,3}\.\d{1,3}\./.test(s)){
+          // bare prefix without mask (legacy vendor format) — keep as prefix hint
+          out.push(s.replace(/\/\d+$/,''));
+        }
+      }
       else if (Array.isArray(v)) v.forEach(walk);
       else if (v && typeof v === 'object') Object.values(v).forEach(walk);
     };
     walk(j);
-    return [...new Set(out)].slice(0, 40);
+    return [...new Set(out)].slice(0, 200);
   } catch (e) { return []; }
 }
 

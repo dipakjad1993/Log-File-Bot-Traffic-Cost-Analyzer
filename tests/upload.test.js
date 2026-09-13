@@ -93,6 +93,18 @@ test('norm extracts path from full request-line `request` field', () => {
   assert.equal(r2.uri, '/plain-path');
 });
 
+test('.gz decompresses in-reader when DecompressionStream exists', async () => {
+  if (typeof DecompressionStream === 'undefined') return; // old Node/browser — reader throws honestly
+  const zlib = require('node:zlib');
+  const line = '{"ClientIP":"40.88.220.5","Timestamp":"2026-07-25T10:00:00Z","RequestURI":"/","HttpStatus":200,"Bytes":100,"UserAgent":"GPTBot/1.0"}\n';
+  const gz = zlib.gzipSync(line.repeat(10));
+  const blob = new Blob([gz]);
+  blob.name = 'access.log.1.gz';
+  const out = await A.readFileRecords(blob, () => {});
+  assert.equal(out.records.length, 10);
+  assert.match(out.format, /gzip/);
+});
+
 test('readFileRecords: pretty JSON array + empty file', async () => {
   const arr = await A.readFileRecords(new Blob(['[\n{"a":1},\n{"a":2}\n]']), () => {});
   assert.equal(arr.format, 'json-array');

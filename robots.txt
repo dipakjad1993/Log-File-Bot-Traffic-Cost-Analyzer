@@ -32,5 +32,9 @@ Allow: /
 User-agent: Claude-SearchBot
 Allow: /
 
+# NOTE: 'User-agent: * Allow: /' below does NOT override the specific
+# Disallows above. Per RFC 9309 the most-specific matching group wins, so
+# GPTBot/CCBot/etc. stay blocked while everything else is allowed.
+# Junior pitfall: deleting the specific groups and keeping only '*' opens training crawlers.
 User-agent: *
 Allow: /

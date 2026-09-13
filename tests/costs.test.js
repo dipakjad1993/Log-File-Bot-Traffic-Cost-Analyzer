@@ -34,8 +34,6 @@ test('origin compute is opt-in: default 0, explicit value still honored', () => 
   assert.ok(Math.abs(on.byBot.GPTBot.ss - 0.0005) < 1e-9, 'opt-in compute honored when set');
 });
 
-test('edge rules: 2026 rate table (training block, search 120/min, user allow)', () => {
-
 test('llms.txt + CF JSON + 402 + prompt list generators exist', () => {
   const llms = A.genLlmsTxt(null);
   assert.match(llms, /llms\.txt/);
@@ -46,6 +44,8 @@ test('llms.txt + CF JSON + 402 + prompt list generators exist', () => {
   const pl = A.genPromptList({ tp: { topURLs: [['/pricing', 10]] } });
   assert.match(pl, /\/pricing/);
 });
+
+test('edge rules: 2026 rate table (training block, search 120/min, user allow)', () => {
   const mk = (tier, count) => ({ tier, count, totalBytes: 1000, topUAList: [[tier + '-ua', count]] });
   const r = A.genEdgeRules({ GPTBot: mk('ai_training', 3), 'OAI-SearchBot': mk('ai_search_index', 3), 'ChatGPT-User': mk('ai_user_fetch', 1) }, { hvIPs: [] });
   assert.ok(r.cloudflare.some((x) => x.act === 'BLOCK' && /GPTBot/.test(x.name)), 'training blocked');
@@ -53,6 +53,15 @@ test('llms.txt + CF JSON + 402 + prompt list generators exist', () => {
   assert.ok(r.cloudflare.some((x) => /ALLOW/.test(x.act) && /ChatGPT-User/.test(x.name)), 'user allowed');
   assert.ok(r.robots.includes('Google-Extended'), 'robots covers token');
   assert.ok(r.cfAICrawl.includes('AI Crawl Control'), 'CF mapping present');
+});
+
+test('blockable never includes search-index or user-fetch (asserted)', () => {
+  const botData = {
+    'OAI-SearchBot': { tier: 'ai_search_index', count: 500, totalBytes: 5e8, s2xx: 500 },
+    'ChatGPT-User': { tier: 'ai_user_fetch', count: 500, totalBytes: 5e8, s2xx: 500 },
+  };
+  const c = A.calcCosts(botData, { cdnEgress: 0.09, request10K: 0.0075 });
+  assert.equal(c.savings.botBlocking, 0, 'search + user alone must block $0');
 });
 
 test('full analyze() on teaching sample keeps tiers separate', () => {

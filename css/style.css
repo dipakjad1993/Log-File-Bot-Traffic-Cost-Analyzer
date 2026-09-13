@@ -295,6 +295,17 @@ body.dark code{background:#0b0e1c}
 table.dt{min-width:640px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* ---- Accessibility: reduced motion + focus ---- */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+  .live-dot.active{animation:none !important}
+  .progress-fill{transition:none}
+  .bar-f{transition:none}
+}
+@media(prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+}
+
 /* ---- Responsive ---- */
 @media(max-width:900px){
   .sidebar{display:none}.main-wrap{margin-left:0;padding:14px}

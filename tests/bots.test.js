@@ -23,13 +23,21 @@ const EXPECTED = {
   'GoogleOther/1.0': 'ai_training',
   'GoogleOther-Image/1.0': 'ai_training',
   'ImageSiftBot/1.0': 'ai_training',
+  'DeepSeekBot/1.0': 'ai_training',
+  'QwenBot/1.0': 'ai_training',
+  'Timpibot/1.0': 'ai_training',
+  'Sidetiq/1.0': 'ai_training',
+  'Firecrawl/1.0': 'ai_training',
+  'BrightData/1.0': 'ai_training',
+  'MistralAI-Search/1.0': 'ai_search_index',
+  'PetalBot/1.0': 'search_engine',
   'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)': 'search_engine',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36': 'human',
 };
 
 test('bot DB version pinned', () => {
-  assert.equal(A.BOT_DB_VERSION, '2026.09.02');
-  assert.ok(A.BOTS.length >= 65, `want 65+ signatures, got ${A.BOTS.length}`);
+  assert.equal(A.BOT_DB_VERSION, '2026.09.13');
+  assert.ok(A.BOTS.length >= 75, `want 75+ signatures, got ${A.BOTS.length}`);
 });
 
 for (const [ua, tier] of Object.entries(EXPECTED)) {
@@ -98,4 +106,29 @@ test('combined-log line parses', () => {
   const r = A.parseCombinedLine('127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /a.gif HTTP/1.0" 200 2326 "-" "Mozilla/5.0"');
   assert.equal(r.request_uri, '/a.gif');
   assert.equal(r.status, '200');
+});
+
+test('OAI-SearchBot vs GPTBot independence (no prefix shadowing)', () => {
+  const s = A.classifyBot('OAI-SearchBot/1.0 (+https://openai.com/searchbot)');
+  const g = A.classifyBot('GPTBot/1.0 (+https://openai.com/gptbot)');
+  assert.equal(s.tier, 'ai_search_index');
+  assert.equal(g.tier, 'ai_training');
+  assert.notEqual(s.name, g.name);
+});
+
+test('ai_citation legacy tier normalizes to ai_search_index', () => {
+  assert.equal(A.normalizeTier('ai_citation'), 'ai_search_index');
+  assert.equal(A.normalizeTier('ai_training'), 'ai_training');
+  assert.ok(!A.RATE_POLICY.ai_citation, 'legacy alias removed from RATE_POLICY');
+});
+
+test('IPv6 + full-CIDR verification (no /16 truncation)', () => {
+  assert.ok(A.ipInCidr('40.88.220.5', '40.88.220.0/24'));
+  assert.ok(!A.ipInCidr('40.88.221.5', '40.88.220.0/24'));
+  assert.ok(A.ipInCidr('2603:1030:1::5', '2603:1030:'));
+  const db = [{ prefixes: ['40.88.220.0/24'], bots: ['gptbot'], date: '2026-09-13', source: 'openai.com/gptbot.json' }];
+  const v = A.verifyBot({ ip: '40.88.220.5', uri: '/', tls: '', cache: '' }, { name: 'GPTBot', tier: 'ai_training' }, db);
+  assert.equal(v.dns.s, 'verified');
+  const v2 = A.verifyBot({ ip: '40.88.221.5', uri: '/', tls: '', cache: '' }, { name: 'GPTBot', tier: 'ai_training' }, db);
+  assert.notEqual(v2.dns.s, 'verified');
 });

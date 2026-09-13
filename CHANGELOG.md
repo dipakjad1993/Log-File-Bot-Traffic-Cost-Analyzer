@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.3.0 — 2026-09-13
+
+Bot DB v2026.09.13 (75 signatures) + verification precision + 2026 trap/threat coverage.
+
+### Added
+- 8 new 2026 signatures: DeepSeekBot, QwenBot (Alibaba), Timpibot, Sidetiq, Firecrawl, Bright Data (all `ai_training`, block freely), MistralAI-Search (`ai_search_index`, ALLOW @120/min), PetalBot/Huawei (`search_engine`, allow).
+- 3 crawl traps (16 total): cart/variant combos (`add-to-cart`, `variant=`), Next.js `/_next/data/` routes, price-slider facets (`price_min/max`, `facet=`).
+- 5 threat patterns (14 total): `.well-known`/`.svn` VCS probes, `/vendor/phpunit` + Laravel exposure, Spring `/env` endpoints, GraphQL/debug consoles, cloud-metadata SSRF (`169.254.169.254`).
+- `normalizeTier()`: `ai_citation` legacy alias consolidated into `ai_search_index` everywhere (RATE_POLICY, crawlBudget, aiMatrix, edge rules, CF JSON, badges). Old exports still render.
+- SEO: canonical, `og:url`/`twitter:image`/`theme-color`, FAQPage JSON-LD, repo-root `llms.txt`.
+- Hiring docs: `BIGQUERY.md` (logs.csv + DuckDB/BigQuery SQL), `EXPERIMENTS.md` (hypothesis → rule → diff), `LOOM.md` (90-sec script).
+- A11y: `prefers-reduced-motion` disables pulse/transitions; live dot pulses ONLY while monitoring + shows last diff (`0 new (static snapshot)` vs changed).
+- Mobile 50MB upload guard with CLI hint (sample-gen cap already existed).
+
+### Fixed
+- `tools/fetch-bot-ips.js`: `prefixesOf()` no longer truncates to `/16` via `split('.').slice(0,2)` — keeps full CIDRs (`40.88.220.0/24`) + IPv6 (`2603:1030::/36`), up to 200 entries.
+- `data/bot-ips.json`: refreshed to 2026-09-13 in full-CIDR form; `verifyBot()` prints `source||url` + CIDR count instead of `undefined`.
+- `tests/costs.test.js`: fixed nested-test structure (llms test was declared inside the edge-rules callback).
+- Worker path: no longer wipes `_urlSet` with an empty Set (GSC join broke on 20k+ files); preserves full deduped URL set + shows W3C guess warning on worker path too.
+- `robots.txt` + generated robots: trailing `User-agent: * Allow: /` now carries an RFC 9309 most-specific-wins comment so juniors don't misread it.
+- Version consistency: package 1.3.0, sidebar v1.3.0, analyzer `?v=1.3.0`, worker `v=1.3.0`, BOT_DB v2026.09.13, IP JSON 2026-09-13 everywhere.
+
 ## v1.2.1 — 2026-09-13
 
 - Fix: 1GB upload `Maximum call stack size exceeded` — the multi-file merge used `all.push(...r.records)`, spreading ~320k records as function arguments. Replaced with a plain loop + 300k-line regression test (`tests/upload.test.js`).

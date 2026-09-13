@@ -3,9 +3,9 @@
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 [![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
-[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.02-orange)](data/bot-ips.json)
+[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.13-orange)](data/bot-ips.json)
 [![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
-[![v1.2.0](https://img.shields.io/badge/Version-1.2.0-informational)](CHANGELOG.md)
+[![v1.3.0](https://img.shields.io/badge/Version-1.3.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
@@ -14,11 +14,18 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 **[Try Live](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer-1.onrender.com/?sample=10k) · [1GB proof test](#1-proven-on-a-real-102-gb--32m-line-log-file)**
 
 > [!NOTE]
-> `main` branch. v1.2.0 · Bot DB v2026.09.02 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
+> `main` branch. v1.3.0 · Bot DB v2026.09.13 (75 signatures) · IP JSON 2026-09-13 (full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md).
 
 ![Upload screen](assets/screenshots/01-hero-upload.png)
 
 ---
+
+## What's new in v1.3.0 (Bot DB v2026.09.13, 75 signatures)
+
+- **8 new 2026 bots:** DeepSeekBot, QwenBot, Timpibot, Sidetiq, Firecrawl, Bright Data (training — block freely), MistralAI-Search (search-index, ALLOW @120/min), PetalBot (search-engine, allow). `ai_citation` legacy tier consolidated into `ai_search_index`.
+- **Trap + threat coverage:** 16 traps (+cart/variant, `/_next/data/`, price sliders), 14 threats (+`.well-known`/`.svn`, `/vendor/phpunit`, Spring `/env`, GraphQL consoles, cloud-metadata SSRF).
+- **Verification precision:** `fetch-bot-ips` keeps full CIDRs (`40.88.220.0/24`) + IPv6, never truncates to `/16`; worker path preserves the GSC URL set; `* Allow` robots lines carry the RFC 9309 most-specific-wins comment.
+- **SEO + hiring docs:** canonical, FAQ schema, repo-root `llms.txt`, `BIGQUERY.md`, `EXPERIMENTS.md`, `LOOM.md`; `prefers-reduced-motion`; live dot pulses only while running with last-diff label; mobile 50MB upload guard.
 
 ## What's new in v1.2.0 (Bot DB v2026.09.02, 67 signatures)
 
@@ -72,7 +79,7 @@ The banner the tool shows on huge files (screenshot 08) states the sampling hone
 
 ## 3. The 2026 distinction: training vs search-index vs user-triggered
 
-Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions (Bot DB v2026.09.02, 67 signatures):
+Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions (Bot DB v2026.09.13, 75 signatures):
 
 | Class | Examples | Action | Why |
 |-------|----------|--------|-----|
@@ -90,7 +97,7 @@ Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages f
 ## 4. The 10 analysis modules (all screenshotted from the 1GB run)
 
 ### Module 1 — Bot Classification
-Bot-first signature order (bots beat browser fingerprints, documented against spoofing) over 67 signatures + 18 browser patterns, full per-category table with bandwidth, IPs, TTFB, status splits.
+Bot-first signature order (bots beat browser fingerprints, documented against spoofing) over 75 signatures + 18 browser patterns, full per-category table with bandwidth, IPs, TTFB, status splits.
 
 ![Bot Classification](assets/screenshots/09-tab1-classification.png)
 
@@ -101,7 +108,7 @@ Vendor IP JSON first, TLS fingerprint, cloud-host heuristics, behavioral analysi
 ![Verification close-up](assets/screenshots/26-verification-viewport.png)
 
 ### Module 3 — Crawl Budget & traps
-Per-crawler efficiency, parameterized-URL ratios, 13 trap patterns including `gclid`/`fbclid`/`srsltid`, currency/locale variants and `/filter/` segments.
+Per-crawler efficiency, parameterized-URL ratios, 16 trap patterns including `gclid`/`fbclid`/`srsltid`, currency/locale variants, `/filter/` segments, cart/variant combos, `/_next/data/` routes and price-slider facets.
 
 ![Crawl Budget](assets/screenshots/11-tab3-crawl-budget.png)
 
@@ -128,7 +135,7 @@ Hourly spikes at mean + 2σ, day-of-week, top IPs/URLs/referrers.
 ![Traffic Patterns](assets/screenshots/16-tab8-traffic.png)
 
 ### Module 9 — Security
-Traversal, `.git/HEAD`, `.aws/credentials`, actuator probes, velocity anomalies. 19,272 threats surfaced in the 1GB run.
+Traversal, `.git/HEAD`, `.aws/credentials`, actuator + Spring/env probes, `.well-known`/`.svn`/vendor exposure, GraphQL consoles, cloud-metadata SSRF, velocity anomalies. 19,272 threats surfaced in the 1GB run.
 
 ![Security](assets/screenshots/17-tab9-security.png)
 
@@ -171,11 +178,13 @@ Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fi
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 53 asserts: bots, traps, costs, streaming samples, upload parsing
+npm test          # 70+ asserts: bots, traps, costs, streaming samples, upload parsing, .gz, CIDR/IPv6
 npm run lint      # node --check across engine/worker/server/tools
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
-npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints
+npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
 ```
+
+Hiring docs: [BIGQUERY.md](BIGQUERY.md) (logs.csv + SQL) · [EXPERIMENTS.md](EXPERIMENTS.md) (hypothesis → rule → diff) · [LOOM.md](LOOM.md) (90-sec script).
 
 ---
 
@@ -184,21 +193,23 @@ npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints
 - **Cost = measured bytes × configured pricing.** No assumed traffic. Proven by perturbation test: +1 GiB on one record moves the total exactly +$0.09.
 - **Origin-compute is opt-in (OFF by default).** No log distinguishes SSR from static, so the engine adds $0 unless you enable it in Pricing.
 - **Blockable = training + suspicious/unknown only.** Search-index and user-fetch are never blockable (asserted in tests).
-- **Verification = vendor IP JSON first** (IPv6 + CIDR aware), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic stays robots.txt-only).
+- **Verification = vendor IP JSON first** (IPv6 + full-CIDR aware, `normalizeTier` consolidates the `ai_citation` legacy alias into `ai_search_index`), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic stays robots.txt-only).
 - **Sampling is disclosed** on-screen with stride, counts and timing — verification counts are scaled to the full set and labeled, never silent.
 - **Reproducibility:** `sample-data/EXPECTED.md` pins exact expected counts for the deterministic 10k fixture; CI re-verifies on every push.
 
 ## 9. Architecture
 
 ```
-index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets)
+index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets, canonical + FAQ schema)
 server.js                   # static server: gzip, CSP/nosniff/DENY, traversal guard
-js/analyzer.js              # engine: 67-signature DB, 4-layer verify, 14-step analyze, 10 renderers
+js/analyzer.js              # engine: 75-signature DB, 4-layer verify, 14-step analyze, 10 renderers
 js/worker.js                # off-main-thread analyze() for 20k+ rows
-data/bot-ips.json           # dated vendor IP JSON snapshot (refresh: npm run fetch-ips)
+data/bot-ips.json           # dated vendor IP JSON snapshot, full CIDRs + IPv6 (refresh: npm run fetch-ips)
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 53 asserts (bots/traps/costs/samples/upload)
+tests/                      # 70+ asserts (bots/traps/costs/samples/upload/.gz/CIDR)
+llms.txt                    # repo-root AI-use policy (generated per-site in Module 6)
+BIGQUERY.md / EXPERIMENTS.md / LOOM.md  # hiring docs: SQL, experimentation, demo script
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
 ```
 
@@ -208,7 +219,7 @@ See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). Measured r
 
 ## Resume bullet
 
-> Log-File Analyzer (JS, 10 tabs, 67 bot signatures) — client-side 1GB streaming uploads, training vs search vs user split, Cloudflare/Fastly rule export. Proven on 3.2M-line log. Live: log-file-bot-traffic-cost-analyzer-1.onrender.com
+> Log-File Analyzer (JS, 10 tabs, 75 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export. Proven on 3.2M-line log. Live: log-file-bot-traffic-cost-analyzer-1.onrender.com
 
 ## Contributing / Security / License
 

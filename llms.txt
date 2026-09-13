@@ -1,0 +1,17 @@
+# llms.txt — Log File Bot Traffic Cost Analyzer
+# Publish at /llms.txt next to robots.txt. Advisory only — robots.txt + edge rules enforce.
+
+## Allowed (AI search-index + user-fetch may use)
+- /
+- /pricing
+- /blog/seo-guide-2026
+- /docs/getting-started
+
+## Disallowed (training crawlers: GPTBot, ClaudeBot, CCBot, Bytespider, cohere-ai, AI2Bot, Google-Extended, Meta-ExternalAgent, Applebot-Extended, ImageSiftBot, GoogleOther, DeepSeekBot, QwenBot, Timpibot, Sidetiq, Firecrawl)
+# Mirror these in robots.txt (Module 6) — llms.txt is advisory, robots.txt + edge rules enforce.
+Disallow: /api/
+Disallow: /internal/
+Disallow: /calendar/
+
+# Contact for Pay Per Crawl / licensing (402 beta):
+# Contact: you@example.com  Price: $0.002/request  Endpoint: https://tollbit.example.com/price
