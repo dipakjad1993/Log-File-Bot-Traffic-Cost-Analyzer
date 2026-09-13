@@ -1541,7 +1541,10 @@ async function readFilesRecords(files,onProgress){
       const span=(typeof frac==='number'?frac*0.9:0.05)/list.length;
       onProgress&&onProgress(Math.min(0.99,base+span),f.name);
     });
-    all.push(...r.records);totalLines+=r.totalLines;maxStride=Math.max(maxStride,r.stride);
+    // NOTE: plain loop, NOT all.push(...r.records) — spreading 300k+ args
+    // throws "Maximum call stack size exceeded" on 1GB uploads.
+    for(const rec of r.records)all.push(rec);
+    totalLines+=r.totalLines;maxStride=Math.max(maxStride,r.stride);
     formats.push((f.name||('file'+(i+1)))+':'+r.format);
     Object.assign(lowConfidence,r.lowConfidence||{});
   }

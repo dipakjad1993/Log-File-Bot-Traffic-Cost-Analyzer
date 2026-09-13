@@ -61,6 +61,16 @@ test('real GSC join: clicks parsed, orphans priced with measured $/req', () => {
   assert.equal(j.uncrawled[0].url, '/blog/x', 'indexed-never-crawled surfaces GSC-only URL');
 });
 
+test('readFilesRecords merges large files without stack overflow (1GB path)', async () => {
+  // Regression: all.push(...r.records) threw "Maximum call stack size exceeded"
+  // on ~320k-record uploads. 150k lines is enough to blow the old spread path.
+  const line = '{"ClientIP":"1.1.1.1","Timestamp":"2026-07-25T10:00:00Z","RequestURI":"/","HttpStatus":200,"Bytes":100,"UserAgent":"GPTBot/1.0"}';
+  const big = new Array(150000).fill(line).join('\n');
+  const out = await A.readFilesRecords([new Blob([big]), new Blob([big])], () => {});
+  assert.equal(out.totalLines, 300000);
+  assert.ok(out.records.length > 0 && out.records.length <= 300000);
+});
+
 test('readFileRecords: NDJSON blob streams with progress', async () => {
   const lines = [
     '{"ClientIP":"1.1.1.1","Timestamp":"2026-07-25T10:00:00Z","RequestURI":"/","HttpStatus":200,"Bytes":100,"UserAgent":"GPTBot/1.0"}',
