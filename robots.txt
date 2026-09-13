@@ -14,7 +14,16 @@ Disallow: /
 User-agent: Google-Extended
 Disallow: /
 
+User-agent: GoogleOther
+Disallow: /
+
+User-agent: ImageSiftBot
+Disallow: /
+
 User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: OAI-AdsBot
 Allow: /
 
 User-agent: PerplexityBot

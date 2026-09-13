@@ -23,7 +23,29 @@ test('calcCosts measures from bytes; training is blockable, search-index is not'
   assert.ok(!c.savings.byTier.ai_user_fetch, 'user-fetch must NOT be blockable');
 });
 
+test('origin compute is opt-in: default 0, explicit value still honored', () => {
+  const botData = {
+    GPTBot: { tier: 'ai_training', count: 100, totalBytes: 1073741824, s2xx: 100 },
+  };
+  const off = A.calcCosts(botData, { cdnEgress: 0.09, request10K: 0.0075 });
+  assert.equal(off.total.ssr, 0, 'compute OFF by default');
+  assert.equal(A.DEFAULT_COSTS.ssr1K, 0, 'engine default OFF');
+  const on = A.calcCosts(botData, { cdnEgress: 0.09, request10K: 0.0075, ssr1K: 0.005 });
+  assert.ok(Math.abs(on.byBot.GPTBot.ss - 0.0005) < 1e-9, 'opt-in compute honored when set');
+});
+
 test('edge rules: 2026 rate table (training block, search 120/min, user allow)', () => {
+
+test('llms.txt + CF JSON + 402 + prompt list generators exist', () => {
+  const llms = A.genLlmsTxt(null);
+  assert.match(llms, /llms\.txt/);
+  assert.match(llms, /Disallow: \/api\//);
+  const cf = JSON.parse(A.genCfAICrawlJSON({ GPTBot: { tier: 'ai_training', count: 3, topUAList: [['GPTBot/1.0', 3]] } }));
+  assert.equal(cf.training.action, 'block');
+  assert.match(A.gen402Example(), /402/);
+  const pl = A.genPromptList({ tp: { topURLs: [['/pricing', 10]] } });
+  assert.match(pl, /\/pricing/);
+});
   const mk = (tier, count) => ({ tier, count, totalBytes: 1000, topUAList: [[tier + '-ua', count]] });
   const r = A.genEdgeRules({ GPTBot: mk('ai_training', 3), 'OAI-SearchBot': mk('ai_search_index', 3), 'ChatGPT-User': mk('ai_user_fetch', 1) }, { hvIPs: [] });
   assert.ok(r.cloudflare.some((x) => x.act === 'BLOCK' && /GPTBot/.test(x.name)), 'training blocked');

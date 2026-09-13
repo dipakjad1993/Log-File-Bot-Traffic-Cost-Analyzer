@@ -11,6 +11,21 @@ test('sampleTargetRecords scales with size', () => {
   assert.ok(big / 20000 < 2000, 'batch count sane');
 });
 
+test('seeded generator is deterministic: same seed => identical bytes', async () => {
+  async function run(seed) {
+    const chunks = [];
+    await new Promise((resolve, reject) => {
+      A.genSampleStream(1, (chunk) => chunks.push(chunk), () => resolve(), reject, seed);
+    });
+    return chunks.join('');
+  }
+  const a = await run(7);
+  const b = await run(7);
+  const c = await run(8);
+  assert.equal(a, b, 'same seed identical');
+  assert.notEqual(a, c, 'different seed differs');
+});
+
 test('genSampleStream yields valid NDJSON in order, no giant string', async () => {
   const chunks = [];
   let doneTotal = 0;

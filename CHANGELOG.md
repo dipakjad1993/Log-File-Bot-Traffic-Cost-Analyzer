@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.2.0 — 2026-09-13
+
+Bot DB v2026.09.02 (67 signatures) + enterprise log plumbing + honest-cost fixes.
+
+### Added
+- New 2026 signatures: OAI-AdsBot (allow-listed — ChatGPT shopping revenue checks, never block on ecommerce), GoogleOther (+Image/Video, training), ImageSiftBot (training).
+- Longest-pattern-first classification (Applebot-Extended now beats Applebot; whole class of prefix-shadowing bugs closed).
+- IPv6 + CIDR matcher (`normalizeIP`/`ipInCidr`/`ipMatchesAny`): `40.88.0.0/16` ranges and `2600:` addresses verify correctly; vendor-IP-JSON checks use CIDR.
+- Reverse-DNS checklist exporter (`dig -x` + forward-confirm commands for every claimed search/AI-search IP).
+- `.gz` in-browser decompression (DecompressionStream, line-streamed) + multi-file rotation (`access.log + access.log.1 + access.log.2.gz` merge with re-striding).
+- AWS ALB space-delimited parser + Cloudflare Logpush / ALB JSON field maps in `norm()`.
+- `llms.txt` generator, Cloudflare AI Crawl Control JSON exporter, 402 Payment-Required / pay-per-crawl example (training pays, search/user bypass).
+- Real GSC join: Pages CSV with Clicks/Impressions parsed, orphans priced with measured $/req, uncrawled sorted by clicks.
+- GEO add-on: top-50 prompt-test list exporter (closes crawl-vs-citation gap).
+- BigQuery/DuckDB bridge: `logs.csv` export (100k rows, bot+tier labeled) + sample SQL.
+- 2026 crawl-to-referral table (OAI 85:1, Perplexity 210:1, Claude ~5,143:1 improved from 20,583:1).
+- Deterministic in-browser sample generator (seeded mulberry32, default seed 20260901 — same bytes every run).
+- Mobile 50MB sample cap with CLI hint; `aria-live` progress; `.gz` MIME in server.js.
+
+### Fixed
+- Removed single-octet `/8` cloud prefixes (`3.`/`34.`/`35.`/`18.`/`52.`/`54.`) — only `/16`-or-longer kept, still labeled low-confidence heuristics.
+- Origin-compute cost is now opt-in (default $0, OFF): no log tells SSR vs static. Old `$0.005/1K` lives on as the "CloudFront + Lambda@Edge SSR (opt-in)" preset. 10k fixture: $0.08→$0.04 total.
+- Verification counts on >50k files are scaled to the full set and labeled with the sampled base (no more 10k-reported-as-global).
+- `_urlSet` is now the full deduped log-URL set (100k cap), built in `analyze()` — the GSC join never silently runs on a 20k slice.
+- W3C without `#Fields` parses in flagged low-confidence guess mode with an on-screen warning (fail closed, not silent).
+- Deleted tarpitting / poison-pill advice (DoS liability) — replaced with 429/503 + Retry-After + allowlist pattern.
+- "50+ signatures" copy now renders the real count; sidebar badge v1.1.0→v1.2.0; OG image points at a real screenshot; `ai_citation` marked legacy alias.
+
 ## v1.1.1 — 2026-09-11
 
 - Asset cache-bust (`analyzer.js?v=1.1.1`, worker + importScripts) so browsers fetch the streaming-upload code instead of a cached pre-fix bundle.

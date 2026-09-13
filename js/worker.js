@@ -1,5 +1,5 @@
 /* Web Worker: off-main-thread analyze() for 20k+ row logs. Falls back to main thread on error. */
-importScripts('analyzer.js?v=1.1.1');
+importScripts('analyzer.js?v=1.2.0');
 
 self.onmessage = function (ev) {
   try {
@@ -11,9 +11,8 @@ self.onmessage = function (ev) {
     const result = analyze(records, cfg || {}, (pct, msg) => {
       self.postMessage({ type: 'progress', pct, msg });
     });
-    // _urlSet / _records are stripped for structured-clone safety; UI rebuilds as needed
+    // _records is stripped for structured-clone safety; _urlSet (plain array) is kept for the GSC join
     try { delete result._records; } catch (e) {}
-    try { result._urlSet = []; } catch (e) {}
     self.postMessage({ type: 'done', result });
   } catch (err) {
     self.postMessage({ type: 'error', error: String((err && err.message) || err) });

@@ -6,7 +6,8 @@ Regenerate: `node tools/gen-logs.js --lines 10000 --bots 0.3 --seed 42 --out sam
 - Bytes: 349.42 MB
 - Human: 69.6% | Bot: 30.4%
 - Tiers: human=6960, ai_training=1022, ai_user_fetch=503, seo_tool=258, search_engine=477, ai_search_index=780
-- Total cost (CloudFront defaults): $0.08 | Blockable: $0.01
+- Total cost (CloudFront defaults, compute OFF): $0.04 | Blockable: $0.00 ($0.0039)
+- (v1.1.x pinned $0.08 / $0.01 with the old invented SSR $0.005/1K; v1.2.0 removed it — origin-compute is opt-in, OFF by default. Egress+request math unchanged.)
 - Edge rules: 9 cloudflare / 4 fastly / 4 aws
 - Threats: 558 | Traps: 8
 

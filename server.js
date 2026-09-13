@@ -16,6 +16,8 @@ const MIME = {
   '.log': 'text/plain; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   '.csv': 'text/csv; charset=utf-8',
+  '.gz': 'application/gzip',
+  '.tgz': 'application/gzip',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',

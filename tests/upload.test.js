@@ -39,6 +39,28 @@ test('parseLine: W3C with #Fields header', () => {
   assert.ok(A.parseTime(r.rec.time_local) instanceof Date);
 });
 
+test('parseLine: ALB space-delimited + W3C guess fail-closed', () => {
+  const alb = A.parseLine('http 2026-09-01T10:00:00.000Z app/lb/abc 192.168.1.1:2817 10.0.0.1:80 0.001 0.002 0.003 200 200 0 57 "GET http://www.example.com:80/pricing HTTP/1.1" "curl/7.46.0" - - -', {});
+  assert.equal(alb.fmt, 'alb');
+  assert.equal(alb.rec.remote_addr, '192.168.1.1');
+  assert.equal(alb.rec.request_uri, '/pricing');
+  const ctx = {};
+  const guess = A.parseLine('2026-09-01 10:00:00 1.2.3.4 GET /x - 200 100 "Mozilla/5.0"', ctx);
+  assert.equal(guess.fmt, 'w3c-guess');
+  assert.equal(guess.lowConfidence, true);
+});
+
+test('real GSC join: clicks parsed, orphans priced with measured $/req', () => {
+  const gsc = A.parseGscCsv('Page,Clicks,Impressions\n/pricing,100,1000\n/blog/x,5,50');
+  assert.equal(gsc.length, 2);
+  assert.equal(gsc[0].clicks, 100);
+  const fake = { _urlSet: ['/pricing', '/orphan-page'], costs: { total: { all: 1 } }, summary: { totalRecords: 100 }, botData: { X: 1 } };
+  const j = A.joinCrawlGsc(fake, [], gsc);
+  assert.ok(j.orphanCrawled.includes('/orphan-page'), 'orphan found');
+  assert.ok(j.wasteUSD > 0, 'waste priced');
+  assert.equal(j.uncrawled[0].url, '/blog/x', 'indexed-never-crawled surfaces GSC-only URL');
+});
+
 test('readFileRecords: NDJSON blob streams with progress', async () => {
   const lines = [
     '{"ClientIP":"1.1.1.1","Timestamp":"2026-07-25T10:00:00Z","RequestURI":"/","HttpStatus":200,"Bytes":100,"UserAgent":"GPTBot/1.0"}',

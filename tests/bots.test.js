@@ -19,13 +19,17 @@ const EXPECTED = {
   'Claude-User/1.0': 'ai_user_fetch',
   'MistralAI-User/1.0': 'ai_user_fetch',
   'Google-Agent/1.0': 'ai_user_fetch',
+  'OAI-AdsBot/1.0': 'search_engine',
+  'GoogleOther/1.0': 'ai_training',
+  'GoogleOther-Image/1.0': 'ai_training',
+  'ImageSiftBot/1.0': 'ai_training',
   'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)': 'search_engine',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36': 'human',
 };
 
 test('bot DB version pinned', () => {
-  assert.equal(A.BOT_DB_VERSION, '2026.09.01');
-  assert.ok(A.BOTS.length >= 60, `want 60+ signatures, got ${A.BOTS.length}`);
+  assert.equal(A.BOT_DB_VERSION, '2026.09.02');
+  assert.ok(A.BOTS.length >= 65, `want 65+ signatures, got ${A.BOTS.length}`);
 });
 
 for (const [ua, tier] of Object.entries(EXPECTED)) {
@@ -47,13 +51,38 @@ test('search-index bots carry 120/min policy', () => {
   assert.match(A.classifyBot('OAI-SearchBot/1.0').rateLimit, /120\/min/);
 });
 
+test('longest-pattern-first: Applebot-Extended beats Applebot', () => {
+  const c = A.classifyBot('Mozilla/5.0 (compatible; Applebot-Extended/1.0; +https://www.apple.com/go/applebot-extended)');
+  assert.equal(c.tier, 'ai_training');
+});
+
+test('OAI-AdsBot is allow-listed, never blocked', () => {
+  const c = A.classifyBot('OAI-AdsBot/1.0 (+https://openai.com/adsbot)');
+  assert.equal(c.tier, 'search_engine');
+  assert.match(c.note || c.rateLimit || 'allow ceiling', /do not block|allow|ceiling/i);
+});
+
+test('IPv4 CIDR matcher: 40.88.0.1 in 40.88.0.0/16, outside 40.89.0.0/16', () => {
+  assert.ok(A.ipInCidr('40.88.0.1', '40.88.0.0/16'));
+  assert.ok(!A.ipInCidr('40.89.0.1', '40.88.0.0/16'));
+  assert.ok(A.ipInCidr('40.88.5.5', '40.88.'));
+  assert.equal(A.normalizeIP('[2600:1400:1::1]'), '2600:1400:1::1');
+  assert.ok(A.ipMatchesAny('2600:1400:1::1', ['2600:1400:']));
+});
+
+test('vendor IP JSON verifies via CIDR, not just prefix', () => {
+  const db = [{ prefixes: ['40.88.0.0/16'], bots: ['gptbot'], date: '2026-09-01', source: 'test' }];
+  const v = A.verifyBot({ ip: '40.88.123.45', uri: '/', tls: '', cache: '' }, { name: 'GPTBot', tier: 'ai_training' }, db);
+  assert.equal(v.dns.s, 'verified');
+});
+
 test('bot-first order: spoofed browser UA still classified as bot', () => {
   const c = A.classifyBot('Mozilla/5.0 (Windows NT 10.0) Chrome/126.0 GPTBot/1.0');
   assert.equal(c.tier, 'ai_training');
 });
 
 test('short-prefix IPs are heuristic-only, not verified', () => {
-  const v = A.verifyBot({ ip: '34.1.2.3', uri: '/', tls: '', cache: '' }, { name: 'Googlebot', tier: 'search_engine' });
+  const v = A.verifyBot({ ip: '104.16.9.9', uri: '/', tls: '', cache: '' }, { name: 'Googlebot', tier: 'search_engine' });
   assert.notEqual(v.asn.s, 'verified');
   assert.match(v.asn.d, /low confidence/i);
 });

@@ -3,9 +3,9 @@
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 [![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
-[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.01-orange)](data/bot-ips.json)
+[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.02-orange)](data/bot-ips.json)
 [![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
-[![v1.1.1](https://img.shields.io/badge/Version-1.1.1-informational)](CHANGELOG.md)
+[![v1.2.0](https://img.shields.io/badge/Version-1.2.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
@@ -14,9 +14,19 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 **[Try Live](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer-1.onrender.com/?sample=10k) · [1GB proof test](#1-proven-on-a-real-102-gb--32m-line-log-file)**
 
 > [!NOTE]
-> `main` branch. v1.1.1 · Bot DB v2026.09.01 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
+> `main` branch. v1.2.0 · Bot DB v2026.09.02 · IP JSON 2026-09-01. See [CHANGELOG.md](CHANGELOG.md).
 
 ![Upload screen](assets/screenshots/01-hero-upload.png)
+
+---
+
+## What's new in v1.2.0 (Bot DB v2026.09.02, 67 signatures)
+
+- **New 2026 bots:** OAI-AdsBot (allow-listed — blocking it breaks ChatGPT shopping revenue checks), GoogleOther (+Image/Video), ImageSiftBot. Crawl-to-referral table updated: OAI 85:1, Perplexity 210:1, Claude ~5,143:1 (was 20,583:1).
+- **Enterprise log plumbing:** `.gz` decompresses in-browser, multi-file rotation (`access.log + access.log.1 + access.log.2.gz`) merges in one drop, AWS ALB + Cloudflare Logpush fields mapped natively, IPv6 + CIDR verification, reverse-DNS checklist exporter.
+- **Honest costs:** origin-compute is now **opt-in (OFF by default)** — no log tells SSR vs static. 10k fixture: $0.08 → **$0.04** total, all counts/tiers/threats byte-identical (see `sample-data/EXPECTED.md`).
+- **New exports:** `llms.txt` generator, Cloudflare AI Crawl Control JSON, 402 pay-per-crawl example, real GSC join (Clicks/Impressions → orphan $ waste), GEO prompt-test list, `logs.csv` BigQuery/DuckDB bridge + SQL.
+- **Trust fixes:** `/8` cloud prefixes removed, verification counts scaled + labeled on large files, W3C guess-mode flagged low-confidence, tarpitting advice replaced with 429/503 + Retry-After, deterministic seeded samples, mobile 50MB guard.
 
 ---
 
@@ -62,7 +72,7 @@ The banner the tool shows on huge files (screenshot 08) states the sampling hone
 
 ## 3. The 2026 distinction: training vs search-index vs user-triggered
 
-Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions (Bot DB v2026.09.01, 64 signatures):
+Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions (Bot DB v2026.09.02, 67 signatures):
 
 | Class | Examples | Action | Why |
 |-------|----------|--------|-----|
@@ -80,7 +90,7 @@ Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages f
 ## 4. The 10 analysis modules (all screenshotted from the 1GB run)
 
 ### Module 1 — Bot Classification
-Bot-first signature order (bots beat browser fingerprints, documented against spoofing) over 64 signatures + 18 browser patterns, full per-category table with bandwidth, IPs, TTFB, status splits.
+Bot-first signature order (bots beat browser fingerprints, documented against spoofing) over 67 signatures + 18 browser patterns, full per-category table with bandwidth, IPs, TTFB, status splits.
 
 ![Bot Classification](assets/screenshots/09-tab1-classification.png)
 
@@ -157,11 +167,11 @@ node server.js   # http://localhost:8080 (gzip + security headers, ?v= cache-bus
 # or: docker build -t log-analyzer . && docker run -p 8080:8080 log-analyzer
 ```
 
-Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fields), Nginx default, W3C Extended (real `#Fields` parsing), Cloudflare text — auto-detected per line, mixed files OK.
+Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fields), Nginx default, W3C Extended (real `#Fields` parsing, guess-mode flagged), AWS ALB, Cloudflare Logpush, **.gz** — auto-detected per line, mixed files OK, multi-select for rotations.
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 40 asserts: bots, traps, costs, streaming samples, upload parsing
+npm test          # 53 asserts: bots, traps, costs, streaming samples, upload parsing
 npm run lint      # node --check across engine/worker/server/tools
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints
@@ -172,9 +182,10 @@ npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints
 ## 8. Method (so a hiring manager trusts the numbers)
 
 - **Cost = measured bytes × configured pricing.** No assumed traffic. Proven by perturbation test: +1 GiB on one record moves the total exactly +$0.09.
+- **Origin-compute is opt-in (OFF by default).** No log distinguishes SSR from static, so the engine adds $0 unless you enable it in Pricing.
 - **Blockable = training + suspicious/unknown only.** Search-index and user-fetch are never blockable (asserted in tests).
-- **Verification = vendor IP JSON first**, prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic stays robots.txt-only).
-- **Sampling is disclosed** on-screen with stride, counts and timing — never silent.
+- **Verification = vendor IP JSON first** (IPv6 + CIDR aware), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic stays robots.txt-only).
+- **Sampling is disclosed** on-screen with stride, counts and timing — verification counts are scaled to the full set and labeled, never silent.
 - **Reproducibility:** `sample-data/EXPECTED.md` pins exact expected counts for the deterministic 10k fixture; CI re-verifies on every push.
 
 ## 9. Architecture
@@ -182,12 +193,12 @@ npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints
 ```
 index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets)
 server.js                   # static server: gzip, CSP/nosniff/DENY, traversal guard
-js/analyzer.js              # engine: 64-signature DB, 4-layer verify, 14-step analyze, 10 renderers
+js/analyzer.js              # engine: 67-signature DB, 4-layer verify, 14-step analyze, 10 renderers
 js/worker.js                # off-main-thread analyze() for 20k+ rows
 data/bot-ips.json           # dated vendor IP JSON snapshot (refresh: npm run fetch-ips)
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 40 asserts (bots/traps/costs/samples/upload)
+tests/                      # 53 asserts (bots/traps/costs/samples/upload)
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
 ```
 
@@ -197,7 +208,7 @@ See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). Measured r
 
 ## Resume bullet
 
-> Log-File Analyzer (JS, 10 tabs, 64 bot signatures) — client-side 1GB streaming uploads, training vs search vs user split, Cloudflare/Fastly rule export. Proven on 3.2M-line log. Live: log-file-bot-traffic-cost-analyzer-1.onrender.com
+> Log-File Analyzer (JS, 10 tabs, 67 bot signatures) — client-side 1GB streaming uploads, training vs search vs user split, Cloudflare/Fastly rule export. Proven on 3.2M-line log. Live: log-file-bot-traffic-cost-analyzer-1.onrender.com
 
 ## Contributing / Security / License
 

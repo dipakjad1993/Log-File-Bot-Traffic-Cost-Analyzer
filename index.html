@@ -8,7 +8,7 @@
 <meta property="og:title" content="Log File Bot Traffic Cost Analyzer — Free, Private, Client-Side">
 <meta property="og:description" content="GPTBot vs OAI-SearchBot cost split + copy-paste Cloudflare edge rules. No log leaves your machine.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="assets/og-kpi.png">
+<meta property="og:image" content="assets/screenshots/06-kpi-strip.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="css/style.css">
 <script type="application/ld+json">
@@ -19,14 +19,14 @@
 
 <nav class="sidebar" id="sidebar" aria-label="Main navigation">
   <div class="sidebar-brand">LOG &amp; BOT TRAFFIC ANALYZER</div>
-  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis <span class="badge b-green">v1.1.0</span></div>
+  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis <span class="badge b-green">v1.2.0</span></div>
   <div class="sidebar-nav">
     <button class="sb-btn active" data-section="dashboard" aria-label="Open dashboard">Dashboard</button>
     <button class="sb-btn" data-section="about" aria-label="About this tool">About</button>
     <button class="sb-btn" data-section="howto" aria-label="How to use">How To Use</button>
   </div>
   <button class="btn-sm" id="dark-toggle" aria-label="Toggle dark mode">Dark mode</button>
-  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.01 · IP JSON 2026-09-01</div>
+  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.02 · IP JSON 2026-09-01</div>
 </nav>
 
 <div class="main-wrap">
@@ -47,6 +47,7 @@
           <option value="Cloudflare">Cloudflare ($0.02-0.05/GB)</option>
           <option value="Fastly">Fastly</option>
           <option value="GCS / GCE">GCS / GCE</option>
+          <option value="CloudFront + Lambda@Edge SSR (opt-in)">CloudFront + Lambda@Edge SSR (opt-in compute)</option>
         </select>
       </div>
       <div class="pricing-grid">
@@ -61,9 +62,9 @@
           <span class="pricing-hint">AWS CloudFront: $0.0075-0.01/10K. Cloudflare Pro: free. Fastly: $0.009/10K.</span>
         </div>
         <div class="pricing-field">
-          <label for="cfg-ssr1K">SSR Compute ($/1K requests)</label>
-          <input type="number" id="cfg-ssr1K" value="0.005" step="0.001" min="0">
-          <span class="pricing-hint">Estimated based on Lambda@Edge or CloudFront Functions compute cost for dynamic rendering.</span>
+          <label for="cfg-ssr1K">Origin Compute ($/1K 2xx) — opt-in estimate</label>
+          <input type="number" id="cfg-ssr1K" value="0" step="0.001" min="0">
+          <span class="pricing-hint">OFF by default (logs can't tell SSR vs static). Enable only if you serve SSR/ISR from Lambda@Edge / Workers and know your $/1K.</span>
         </div>
       </div>
       <div class="pricing-actions">
@@ -87,8 +88,8 @@
       <div class="drop-title">Drop your log file here</div>
       <div class="drop-sub">or</div>
       <button class="btn-primary" id="browse-btn">Browse Files</button>
-      <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log,.txt,.csv" hidden aria-label="Log file input">
-      <div class="drop-formats">Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, Cloudflare text. Files &gt;50&nbsp;MB warn; 500&nbsp;MB+ use CLI.</div>
+      <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log,.txt,.csv,.gz" multiple hidden aria-label="Log file input (multiple files + .gz supported)">
+      <div class="drop-formats">Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, AWS ALB, Cloudflare Logpush, <strong>.gz</strong>. Multi-select for rotations (access.log + access.log.1 + access.log.2.gz). Files &gt;50&nbsp;MB warn; 500&nbsp;MB+ use CLI.</div>
     </div>
     <div class="upload-extras">
       <span class="divider-text">no log file?</span>
@@ -143,7 +144,7 @@
   </div>
 
   <!-- Progress -->
-  <div class="progress-wrap hidden" id="progress-wrap" role="status" aria-label="Analysis progress">
+  <div class="progress-wrap hidden" id="progress-wrap" role="status" aria-label="Analysis progress" aria-live="polite">
     <div class="progress-header">
       <div class="progress-label" id="progress-label">Analyzing...</div>
       <div class="progress-pct" id="progress-pct">0%</div>
@@ -186,10 +187,10 @@
       <div class="tp" id="tab10" role="tabpanel"></div>
     </div>
 
-    <!-- Crawl + GSC join MVP -->
+    <!-- Crawl + GSC join -->
     <div class="card" id="join-card">
-      <h3>Crawl + GSC Join (MVP) — orphan &amp; uncrawled URLs</h3>
-      <p>Paste one URL path per line (or CSV with URL in column 1). Beats manual Frog joins: finds <strong>crawled-but-never-indexed</strong> (orphan) and <strong>indexed-but-never-crawled</strong> in this window.</p>
+      <h3>Crawl + GSC Join — orphan &amp; uncrawled URLs + $ waste</h3>
+      <p><strong>Crawl URLs:</strong> one path per line (or CSV, URL in column 1) — leave empty to use log URLs. <strong>GSC:</strong> paste a GSC Pages export with <code>Page,Clicks,Impressions</code> header for click-weighted output. Finds <strong>crawled-but-never-indexed</strong> (orphan, with measured $ waste) and <strong>indexed-but-never-crawled</strong> (sorted by clicks).</p>
       <div class="cols2">
         <div><label for="crawl-csv"><strong>crawl.csv URLs</strong></label><br><textarea id="crawl-csv" rows="6" cols="40" placeholder="/products/widget-pro&#10;/blog/seo-guide-2026" aria-label="Crawl URLs"></textarea></div>
         <div><label for="gsc-csv"><strong>gsc.csv URLs (clicks)</strong></label><br><textarea id="gsc-csv" rows="6" cols="40" placeholder="/products/widget-pro&#10;/pricing" aria-label="GSC URLs"></textarea></div>
@@ -212,6 +213,6 @@
 
 </div>
 
-<script src="js/analyzer.js?v=1.1.1"></script>
+<script src="js/analyzer.js?v=1.2.0"></script>
 </body>
 </html>
