@@ -5,7 +5,7 @@
 [![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.17-orange)](data/bot-ips.json)
 [![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
-[![v2.0.0](https://img.shields.io/badge/Version-2.0.0-informational)](CHANGELOG.md)
+[![v2.2.0](https://img.shields.io/badge/Version-2.2.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
@@ -16,11 +16,20 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
 
 > [!NOTE]
-> `main` branch. v2.0.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (14 sources incl. BotBase taxonomy, full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
+> `main` branch. v2.2.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (14 sources incl. BotBase taxonomy, full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
 
 ![Upload screen](assets/screenshots/01-hero-upload.png)
 
 ---
+
+## What's new in v2.2.0 (P0 credibility pass + realistic fixture)
+
+- **Edge-rule threshold fix (was silently dropping training blocks):** `genEdgeRules` now fires on `count>=2 OR ≥0.5 req/min/IP` — GPTBot 1810 + Bytespider 1511 req windows correctly emit all 4 training BLOCKs; suspicious challenges at ≥2; search stays 429-only, user-fetch allow-only. The old `count>=10` gate failed the asserted `count=3 → BLOCK` contract — caught by `npm test`, pinned by new `tests/p0verdict.test.js`.
+- **OAI-AdsBot revenue guard:** engine strips any accidental block/challenge rule for OAI-AdsBot (breaks ChatGPT shopping ads otherwise); Module 6 shows a green guard card whenever AdsBot appears in your logs; `checkPolicyConsistency` raises REVENUE RISK on Disallow.
+- **Freshness red at >14d (was 21d):** pill + Module 2 + CI now agree — green <7d, amber 7–14d, red stale with last-good fallback pin.
+- **KPI ingest card:** origin-undercount warning lives in the KPI strip with the Logpush→R2 pull link (Module 6 keeps the origin/edge toggle). "Start Monitoring" renamed to "Re-analyze locally" — no fake live-tail implication.
+- **Realistic 10k fixture (v2.1 generator):** diurnal ~3x peak, weekend −30%, Pareto IPs, GET 92.8% / HEAD 4.1% / POST 2.1%, Chrome Win 65% of humans, 5% real `66.249.66.x` Googlebot (VERIFIED path demos), scattered TTFB. `sample-data/EXPECTED.md` re-pinned from measured engine output (10,000 records, 357.35 MB, $0.04 total, 9/4/4 edge rules); `gen-logs --seed 42 --days 30` reproduces it byte-identically (SHA256-verified).
+- **111 asserts** (`npm test`): +6 P0-verdict (training ≥2 fires ×4, search/user/suspicious policy, AdsBot guard, anomaly no-`Hour #167`/no-fake-z + `n>30` floor, freshness 14d red).
 
 ## What's new in v2.0.0 (enterprise-ready: P0/P1 + removals)
 
@@ -43,7 +52,7 @@ No upload — files never leave your machine. Verified: no XHR/WebSocket in audi
 - **BigQuery/Snowflake native:** partitioned DDL + 7 waste queries + Download .sql (Module 6). Parquet via DuckDB `COPY TO parquet` (see BIGQUERY.md).
 - **Origin vs Edge toggle (Module 6):** origin logs UNDERCOUNT when CDN filters at edge. Labeled ESTIMATE, never mixed into measured. Logpush/S3/R2/ALB pull guide.
 - **Sitemap + GSC + logs triple join:** the Botify money view — crawled-never-indexed ($ waste) + indexed-never-crawled (by clicks) + in-sitemap-never-crawled (discovery gap).
-- **Trust UX:** header freshness pill (green <7d / amber <21d / red stale), SOC2-irrelevant-by-design language, keyboard 1–0 tabs, focus-trapped Pricing, lazy-render tabs 2–10, sticky dropzone + pre-drop 50MB mobile guard, white-label CFO 1-pager (logo, date range, sampled-vs-exact badge).
+- **Trust UX:** header freshness pill (green <7d / amber 7–14d / red stale >14d), SOC2-irrelevant-by-design language, keyboard 1–0 tabs, focus-trapped Pricing, lazy-render tabs 2–10, sticky dropzone + pre-drop 50MB mobile guard, white-label CFO 1-pager (logo, date range, sampled-vs-exact badge).
 - **Verification 2026:** 11 endpoints (OpenAI x3, Perplexity x3, Anthropic `claude.com/crawling/bots.json` robots-first, Google x2, Bing) + ETag/fetched-date/fallback. `bot-ips.json` 13 sources dated 2026-09-17.
 - **95 asserts** (`npm test`): freshness (fails if >14d stale), spoof (Chrome-UA fixtures), js-shell, anomaly/diff/edge/BQ/triple-join + 20.5k worker-parity test.
 
@@ -217,9 +226,9 @@ Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fi
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 105 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness+fallback, spoof, js-shell, anomaly/diff/edge/BQ + 10 v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, MCP, guards)
+npm test          # 111 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness+fallback, spoof, js-shell, anomaly/diff/edge/BQ + 10 v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, MCP, guards) + 6 P0-verdict (edge ≥2, AdsBot guard, anomaly, 14d red)
 npm run lint      # node --check across engine/worker/dev-server/tools (incl. mcp-server)
-npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
+npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --days 30 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
 ```
 
@@ -266,7 +275,7 @@ BOTS.md                     # open bot DB: training vs search-index vs user-trig
 METHOD.md                   # sampling/cost/verify/limits — read before quoting numbers
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 105 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness+fallback/spoof/js-shell/anomaly/v2)
+tests/                      # 111 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness+fallback/spoof/js-shell/anomaly/v2/p0verdict)
 llms.txt / llms-full.txt    # repo-root AI-use policy + full 127-sig grounding dump (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)

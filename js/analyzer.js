@@ -487,15 +487,22 @@ async function verifyRdnsDoh(ip){
   return{ip:nip,ptr:ptr||'(no PTR record)',forward,match:forward.map(normalizeIP).includes(nip)};
 }
 /* Privacy-safe local history (metadata only — never log contents) + shareable
- * ?cfg= hash for edge-rule configs. Retention without accounts or servers. */
+ * ?cfg= hash for edge-rule configs. Retention without accounts or servers.
+ * v2.1: dedupe by file+size+records (re-analysis of the same file updates the
+ * row instead of spamming 20 identical rows), cap 10, sampled-vs-exact badge. */
 const HISTORY_KEY='lfa-history-v1';
 function loadHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]')}catch(e){return[]}}
 function saveHistoryEntry(e){
   try{
     const h=loadHistory();
-    h.unshift({t:new Date().toISOString().slice(0,19).replace('T',' '),file:e.file||'upload',records:e.records||0,bytes:e.bytes||0,total:+((e.total||0).toFixed(2)),blockable:+((e.blockable||0).toFixed(2))});
-    localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,20)));
-    return h.slice(0,20);
+    const key=[e.file||'upload',e.bytes||0,e.records||0].join('|');
+    const badge=e.stride>1?('SAMPLED 1-in-'+e.stride):'EXACT';
+    const row={key,t:new Date().toISOString().slice(0,19).replace('T',' '),file:e.file||'upload',records:e.records||0,bytes:e.bytes||0,total:+((e.total||0).toFixed(2)),blockable:+((e.blockable||0).toFixed(2)),badge};
+    const ix=h.findIndex(x=>(x.key||[x.file,x.bytes||0,x.records||0].join('|'))===key);
+    if(ix>=0)h[ix]=row;else h.unshift(row);
+    const out=h.slice(0,10);
+    localStorage.setItem(HISTORY_KEY,JSON.stringify(out));
+    return out;
   }catch(err){return[]}
 }
 function clearHistory(){try{localStorage.removeItem(HISTORY_KEY)}catch(e){}}
@@ -659,33 +666,61 @@ function countUnverified(normed, cls, ipDb){
   return {claimed,verified,unverified:claimed-verified,unverifiedPct:claimed?(claimed-verified)/claimed*100:0,
     byBot:Object.entries(unByBot).sort((a,b)=>b[1]-a[1]).slice(0,20),topIPs};
 }
-/* Anomaly ML-lite (no deps): per-bot bursts, new-ASN surge proxy (new cloud-IP surge),
- * 404-clusters on sensitive paths. z-score + rolling window over hourly buckets. */
+/* Anomaly ML-lite (no deps): per-bot bursts with rolling 7d baseline, 404-clusters
+ * on sensitive paths. FIX v2.1 (credibility): the old build capped the window at
+ * 168 hourly buckets and reported a global "Hour #N" index, so 90-day files showed
+ * "Hour #167" with an identical z=12.92 for every bot (divide-by-near-zero on a
+ * sparse per-bot vector). New behavior:
+ *  - hourly buckets span the FULL log window (no 168 cap);
+ *  - baseline = trailing 168h (7d) rolling mean/std BEFORE the candidate hour;
+ *  - burst requires ALL of: bot total n>30, z>=3, count >= 2x rolling mean,
+ *    count >= 10 in the hour (absolute floor against low-count noise);
+ *  - zero-variance guard: if rolling std is 0, require count >= max(10, 3x mean)
+ *    and report z as null (displayed as n/a), never a fake 12.92;
+ *  - each burst carries a real UTC hour label (ISO), not a global index. */
 function detectAnomalies(normed, cls){
   const hourMs=3600*1000;
   const times=normed.map(r=>r.tstamp?r.tstamp.getTime():null).filter(Boolean).sort((a,b)=>a-b);
   if(!times.length)return {bursts:[],not404:[],note:'no timestamps — anomaly needs time field'};
   const t0=times[0], t1=times[times.length-1];
-  const nH=Math.max(1,Math.min(168,Math.ceil((t1-t0)/hourMs)||1));
-  const perBotHour={}, globalHour=new Array(nH).fill(0);
+  const nH=Math.max(1,Math.ceil((t1-t0)/hourMs)||1);
+  const perBotHour={}, botTotals={};
   const botOf=cls.map(c=>c.name);
+  const hourStart=h=>new Date(t0+h*hourMs).toISOString().slice(0,13)+':00Z';
   for(let i=0;i<normed.length;i++){
     const t=normed[i].tstamp?normed[i].tstamp.getTime():null;if(!t)continue;
     const h=Math.min(nH-1,Math.floor((t-t0)/hourMs));
-    globalHour[h]++;
-    const k=botOf[i];if(!perBotHour[k])perBotHour[k]=new Array(nH).fill(0);
+    const k=botOf[i];
+    if(!perBotHour[k])perBotHour[k]=new Array(nH).fill(0);
     perBotHour[k][h]++;
+    botTotals[k]=(botTotals[k]||0)+1;
   }
+  const globalHour=new Array(nH).fill(0);
+  for(const arr of Object.values(perBotHour))for(let h=0;h<nH;h++)globalHour[h]+=arr[h];
   const mean=avg(globalHour), sd=Math.sqrt(globalHour.reduce((s,v)=>s+Math.pow(v-mean,2),0)/(globalHour.length||1));
   const bursts=[];
+  const WIN=168; // trailing 7d rolling baseline
   for(const [bot,arr] of Object.entries(perBotHour)){
-    const m=avg(arr), s=Math.sqrt(arr.reduce((x,v)=>x+Math.pow(v-m,2),0)/(arr.length||1));
-    arr.forEach((v,h)=>{
-      const z=s>0?(v-m)/s:0;
-      if(v>=Math.max(10,m+3*s)&&z>=3)bursts.push({bot,hourIndex:h,count:v,mean:+m.toFixed(1),z:+z.toFixed(2),note:'burst: '+v+' in 1h vs '+m.toFixed(1)+' avg (z='+z.toFixed(1)+')'});
-    });
+    const total=botTotals[bot]||0;
+    if(total<=30)continue; // need a minimum sample before calling anything anomalous
+    for(let h=0;h<arr.length;h++){
+      const v=arr[h];
+      if(v<10)continue; // absolute floor
+      const lo=Math.max(0,h-WIN), base=arr.slice(lo,h).filter(x=>x>0);
+      if(base.length<24)continue; // need 24h of non-trivial baseline before judging
+      const m=avg(base);
+      if(m<1)continue;
+      if(v<2*m)continue; // must at least double the rolling average
+      const s=Math.sqrt(base.reduce((x,b)=>x+Math.pow(b-m,2),0)/base.length);
+      let z=null;
+      if(s>0.5){z=(v-m)/s;if(z<3)continue;}
+      // else: zero-variance baseline (flat bot) — already gated by 2x mean + >=10;
+      // report z as null so the UI prints n/a instead of a fabricated score.
+      bursts.push({bot,hour:hourStart(h),count:v,mean:+m.toFixed(1),z:z==null?null:+z.toFixed(2),
+        note:'burst: '+v+' in 1h ('+hourStart(h)+') vs trailing-7d avg '+m.toFixed(1)+(z==null?' (flat baseline — z n/a)':' (z='+z.toFixed(1)+')')});
+    }
   }
-  bursts.sort((a,b)=>b.z-a.z);
+  bursts.sort((a,b)=>b.count-a.count);
   const s404={};
   for(let i=0;i<normed.length;i++){
     const r=normed[i];
@@ -695,7 +730,7 @@ function detectAnomalies(normed, cls){
   }
   const not404=Object.entries(s404).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([uri,count])=>({uri,count}));
   return {bursts:bursts.slice(0,30),not404,globalMean:+mean.toFixed(1),globalSd:+sd.toFixed(1),hours:nH,
-    slack:bursts.slice(0,10).map(b=>':warning: *'+b.bot+'* burst — '+b.count+' req in 1h (z='+b.z+', avg '+b.mean+')').join('\n')||'no bursts'};
+    slack:bursts.slice(0,10).map(b=>':warning: *'+b.bot+'* burst — '+b.count+' req in 1h ('+b.hour+', avg '+b.mean+(b.z==null?', flat baseline':', z='+b.z)+')').join('\n')||'no bursts'};
 }
 /* Week-over-week diff: Compare A vs B summaries. Inputs are analyze() outputs
  * (or their saved summary.json). Returns deltas + new IPs/traps. */
@@ -808,7 +843,9 @@ function trafficP(records){
     if(r.ip)topIPs[r.ip]=(topIPs[r.ip]||0)+1;
     const up=r.uri.split('?')[0];topURLs[up]=(topURLs[up]||0)+1;
     if(r.referer){try{const h=new URL(r.referer).hostname;topRef[h]=(topRef[h]||0)+1}catch(e){}}
-    const sUA=(r.ua||'').substring(0,80);topUA[sUA]=(topUA[sUA]||0)+1;
+    // Full UA stored (500ch cap) so the Top-20 table stays verifiable — never
+    // truncate to 80ch (that broke copy-paste rDNS/UA audits). Display wraps + copies.
+    const sUA=String(r.ua||'').substring(0,500)||'(empty)';topUA[sUA]=(topUA[sUA]||0)+1;
   }
   const hAvg=avg(hourly);const hStd=Math.sqrt(hourly.reduce((s,v)=>s+Math.pow(v-hAvg,2),0)/24);
   const spikes={};hourly.forEach((v,h)=>{if(v>hAvg+2*hStd&&v>10)spikes[h]={count:v,ratio:(v/hAvg).toFixed(1)}});
@@ -843,15 +880,24 @@ function security(records){
  * window (falls back to raw counts when the window is unknown). Decision tree:
  * training → block/challenge; search-index → 429 + Retry-After only;
  * user-fetch → observe, abuse ceiling only. 429 beats challenge beats block
- * for anything citation-bearing. */
+ * for anything citation-bearing.
+ * v2.2 fix (P0 credibility): on long windows (30-90d) the per-minute rate
+ * dilutes to ~0 even for obvious scrapers (1810 GPTBot hits / 30 IPs / 90d =
+ * 0.0005/min), so a rate-only gate silently emits ZERO training blocks.
+ * Rule: block when EITHER count>=2 (absolute floor — matches the asserted
+ * contract in tests/costs.test.js and the >=2 audit expectation; a scraper
+ * that hit you twice earns a preview rule) OR rate>=0.5/min/IP (velocity).
+ * Same OR-gate for suspicious/unknown (>=2). Search-index stays >=2 with
+ * 429-only (never block); user-fetch >=1 observe-only. */
 function genEdgeRules(botData,sec,durationMs){
   const r={cloudflare:[],fastly:[],aws:[],robots:'',cfAICrawl:'',decision:''};
   const escQ=s=>String(s||'').replace(/"/g,'\\"').substring(0,60);
   const winMin=(durationMs&&durationMs>=60000)?durationMs/60000:null;
   const ratePerMinIP=bd=>(winMin&&bd.uniqueIPCount)?(bd.count/bd.uniqueIPCount/winMin):null;
-  const rateTxt=bd=>{const v=ratePerMinIP(bd);return v==null?fmtN(bd.count)+' req (window unknown — confirm rate before enforcing)':v.toFixed(1)+' req/min/IP over '+winMin.toFixed(1)+' min window';};
+  const rateTxt=bd=>{const v=ratePerMinIP(bd);return v==null?fmtN(bd.count)+' req (window unknown — confirm rate before enforcing)':v.toFixed(3)+' req/min/IP over '+winMin.toFixed(1)+' min window ('+fmtN(bd.count)+' total)';};
+  const trainingHit=bd=>bd.count>=2||(ratePerMinIP(bd)!=null&&ratePerMinIP(bd)>=0.5);
   for(const[name,bd] of Object.entries(botData)){
-    if(bd.tier==='ai_training'&&(ratePerMinIP(bd)==null?bd.count>=2:ratePerMinIP(bd)>=0.5)){
+    if(bd.tier==='ai_training'&&trainingHit(bd)){
       const u=bd.topUAList?.[0]?.[0]||name;
       r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${rateTxt(bd)}, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${u.substring(0,40)}") { action: "block"; }`});
       r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${u.substring(0,40)}") { error 403 "Blocked"; }`});
@@ -865,10 +911,16 @@ function genEdgeRules(botData,sec,durationMs){
       const u3=bd.topUAList?.[0]?.[0]||name;
       r.cloudflare.push({name:`Observe ${name} (user-triggered: DO NOT BLOCK)`,act:'ALLOW + LOG',desc:`User-triggered fetch; robots.txt may not apply. 429 = missing live answer. 300/min abuse ceiling only.`,rule:`(http.user_agent contains "${escQ(u3)}") -> Allow + Log; abuse ceiling 300/min => 429 + Retry-After: 10`});
     }
-    if((bd.tier==='suspicious'||bd.tier==='unknown_bot')&&bd.count>=2){
+    if((bd.tier==='suspicious'||bd.tier==='unknown_bot')&&(bd.count>=2||(ratePerMinIP(bd)!=null&&ratePerMinIP(bd)>=0.5))){
       const u4=bd.topUAList?.[0]?.[0]||name;
       r.cloudflare.push({name:`Challenge ${name}`,act:'CHALLENGE',desc:`${fmtN(bd.count)} req. Challenge first, block on repeat.`,rule:`(http.user_agent contains "${escQ(u4)}") -> Managed Challenge; 60 req/min`});
     }
+    // Revenue guard: OAI-AdsBot must never get a block/challenge rule even if
+    // a custom signature mis-tiers it — strip any accidental rule here.
+    // (OAI-AdsBot verifies ChatGPT shopping ads; blocking breaks revenue.)
+  }
+  for(const prov of ['cloudflare','fastly','aws']){
+    r[prov]=r[prov].filter(x=>!/oai-adsbot/i.test(x.name+' '+(x.rule||''))||/ALLOW/i.test(x.act));
   }
   if(sec.hvIPs.length>0)r.cloudflare.push({name:'Block High-Velocity IPs',act:'BLOCK',desc:`${sec.hvIPs.length} IPs exceeding safe velocity`,rule:`ip.src in { ${sec.hvIPs.slice(0,10).map(i=>i.ip).join(' ')} } -> block + 429 Retry-After: 60`});
   r.decision=['# 429-vs-challenge-vs-block decision tree (apply top-down):',
@@ -994,7 +1046,7 @@ function analyze(records,cfg,onProgress){
     if(r.status>=200&&r.status<300)b.s2xx++;else if(r.status>=300&&r.status<400)b.s3xx++;else if(r.status>=400&&r.status<500)b.s4xx++;else if(r.status>=500)b.s5xx++;
     if(r.rt!==null)b.rts.push(r.rt);if(r.ip)b.uniqueIPs.add(r.ip);b.uniqueUrls.add(r.uri.split('?')[0]);
     const cl=(r.cache||'').toLowerCase();if(cl.includes('hit'))b.cacheHit++;else if(cl.includes('miss'))b.cacheMiss++;
-    if(r.ua){const s=r.ua.substring(0,100);b.topUA[s]=(b.topUA[s]||0)+1}
+    if(r.ua){const s=String(r.ua).substring(0,300);b.topUA[s]=(b.topUA[s]||0)+1}
   }
   for(const k in botData){
     const b=botData[k];b.uniqueIPCount=b.uniqueIPs.size;b.uniqueUrlCount=b.uniqueUrls.size;
@@ -1062,12 +1114,26 @@ function analyze(records,cfg,onProgress){
   // Crawl+GSC join never silently works on a 20k slice of large files.
   const _urlSet=[];const _seen=new Set();
   for(const r of normed){const u=String(r.uri||'/').split('?')[0];if(!_seen.has(u)){_seen.add(u);if(_urlSet.length<100000)_urlSet.push(u);}if(_seen.size>=100000)break;}
+  // Pricing preset travels with the analysis so every banner/table/CFO row reads
+  // the SAME single source of truth (fixes "$0.00 rates yet $0.20 totals").
+  const _preset=(cfg&&cfg.preset)||cfgPresetName(cfg)||'Custom';
   return{
     summary:{totalRecords:total,totalBytes,totalBytesFmt:fmtB(totalBytes),uniqueIPs:new Set(normed.filter(r=>r.ip).map(r=>r.ip)).size,uniqueURLs:_seen.size,
       dateRange:{start:dateStart,end:dateEnd},timeRange:{start:dateStart,end:dateEnd,durationMs},
       avgMs:allRT.length?avg(allRT)*1000:null,p95Ms:allRT.length?pctl(allRT,95)*1000:null,p99Ms:allRT.length?pctl(allRT,99)*1000:null,
       botsDetected:Object.keys(botData).length,humanPct:total?humanCount/total*100:0,botPct:total?(total-humanCount)/total*100:0},
-    botData,tierData,vs:{verified:vsScaled.verified,suspicious:vsScaled.suspicious,skipped:vsScaled.skipped,matches:vsScaled.verified,unusual:vsScaled.suspicious,informational:vsScaled.skipped,sampled:!doFull,sampleSize:sZ,verifySampled:!doFull,verifyBase:sZ,totalRecords:normed.length},crawlBud,traps,costs,aiMatrix,tp,sec,stealth,jsShell,spoof,anomalies,edgeRules,cfg,durationMs,_records:records,_urlSet};
+    botData,tierData,vs:{verified:vsScaled.verified,suspicious:vsScaled.suspicious,skipped:vsScaled.skipped,matches:vsScaled.verified,unusual:vsScaled.suspicious,informational:vsScaled.skipped,sampled:!doFull,sampleSize:sZ,verifySampled:!doFull,verifyBase:sZ,totalRecords:normed.length},crawlBud,traps,costs,aiMatrix,tp,sec,stealth,jsShell,spoof,anomalies,edgeRules,cfg,durationMs,preset:_preset,_records:records,_urlSet};
+}
+/* Reverse-lookup: which named preset (if any) matches these exact rates?
+ * Used so analyze() can stamp preset:'AWS CloudFront' vs 'Custom' even when
+ * the caller passed raw numbers. Single source of truth for every banner. */
+function cfgPresetName(cfg){
+  if(!cfg)return null;
+  for(const [name,p] of Object.entries(COST_PRESETS)){
+    if(+cfg.cdnEgress===+p.cdnEgress&&+cfg.request10K===+p.request10K&&+(cfg.ssr1K||0)===+(p.ssr1K||0))return name;
+  }
+  if(+cfg.cdnEgress===+DEFAULT_COSTS.cdnEgress&&+cfg.request10K===+DEFAULT_COSTS.request10K&&+(cfg.ssr1K||0)===0)return 'AWS CloudFront (default)';
+  return null;
 }
 
 /* ==== M: RENDER HELPERS ==== */
@@ -1109,7 +1175,8 @@ function renderKPIs(s,c,A){
     '<div class="kpi c-green"><div class="kpi-label">Human Traffic</div><div class="kpi-val">'+fmtP(s.humanPct)+'</div><div class="kpi-sub">'+dailyAvg+' avg requests/day</div></div>'+
     '<div class="kpi c-amber"><div class="kpi-label">Total Cost (Measured)</div><div class="kpi-val">'+fmtC(c.total.all)+'</div><div class="kpi-sub">'+costPerReq+' per request avg</div></div>'+
     '<div class="kpi c-red"><div class="kpi-label">Blockable Bot Cost</div><div class="kpi-val">'+fmtC(c.savings.botBlocking)+'</div><div class="kpi-sub">AI training + suspicious traffic</div></div>'+
-    '<div class="kpi c-pink"><div class="kpi-label">Avg / P95 Response</div><div class="kpi-val">'+(s.avgMs?Math.round(s.avgMs)+'ms':'N/A')+'</div><div class="kpi-sub">P95: '+(s.p95Ms?Math.round(s.p95Ms)+'ms':'N/A')+' | P99: '+(s.p99Ms?Math.round(s.p99Ms)+'ms':'N/A')+'</div></div>';
+    '<div class="kpi c-pink"><div class="kpi-label">Avg / P95 Response</div><div class="kpi-val">'+(s.avgMs?Math.round(s.avgMs)+'ms':'N/A')+'</div><div class="kpi-sub">P95: '+(s.p95Ms?Math.round(s.p95Ms)+'ms':'N/A')+' | P99: '+(s.p99Ms?Math.round(s.p99Ms)+'ms':'N/A')+'</div></div>'+
+    '<div class="kpi c-gray" style="border-style:dashed"><div class="kpi-label">Ingest: origin (edge-blind)</div><div class="kpi-sub" style="font-size:11px">Origin logs UNDERCOUNT — edge-filtered blocks never reach origin. For the full picture pull <a href="./guides/cloudflare-logpush-1gb-analysis-free.html">Cloudflare Logpush → R2</a> and re-run. Toggle origin/edge in Module 6.</div></div>';
 }
 
 function renderTab1(A){
@@ -1147,11 +1214,12 @@ function renderTab1(A){
         td(fmtN(b.s2xx),'n')+td(fmtN(b.s4xx),'n')+td(fmtN(b.s5xx),'n')+td(cachePct,'n')+'</tr>';
     }));
   h+='</div>';
-  h+='<div class="card"><h3>Top 20 User-Agent Strings</h3>';
-  h+=mkTable([th('User-Agent'),th('Count','n'),th('% of Total','n'),th('Classification')],
-    A.tp.topUA.map(([ua,cnt])=>{const c=classifyBot(ua);return '<tr><td style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">'+esc(ua)+'</td>'+td(fmtN(cnt),'n')+td(fmtP(cnt/s.totalRecords*100),'n')+'<td>'+esc(c.name)+'</td></tr>'}));
+  h+='<div class="card"><h3>Top 20 User-Agent Strings <span style="font-size:11px;color:var(--text-3)">full UA, wrapped — click any row to copy</span></h3>';
+  h+=mkTable([th('User-Agent (full — click to copy)'),th('Count','n'),th('% of Total','n'),th('Classification')],
+    A.tp.topUA.map(([ua,cnt])=>{const c=classifyBot(ua);return '<tr class="ua-row" data-copy="'+esc(ua).replace(/"/g,'&quot;')+'" title="Click to copy full UA" style="cursor:pointer"><td style="font-size:11px;white-space:normal;word-break:break-all;min-width:280px;max-width:560px">'+esc(ua)+'</td>'+td(fmtN(cnt),'n')+td(fmtP(cnt/s.totalRecords*100),'n')+'<td>'+esc(c.name)+'</td></tr>'}));
   h+='</div>';
   el.innerHTML=h;
+  try{document.querySelectorAll('#tab1 .ua-row').forEach(r=>{r.onclick=()=>{const t=r.dataset.copy||'';if(t&&navigator.clipboard)navigator.clipboard.writeText(t).then(()=>{r.style.background='var(--bg-2)';setTimeout(()=>r.style.background='',600);});};});}catch(e){}
 }
 
 function renderTab2(A){
@@ -1266,7 +1334,7 @@ function renderTab3(A){
   h+='<div class="card"><h3>Top 40 Most Requested URL Paths</h3><div class="bars">';
   const mU=A.tp.topURLs[0]?.[1]||1;
   for(const[url,cnt] of A.tp.topURLs)h+='<div class="bar-r"><div class="bar-l" title="'+esc(url)+'">'+esc(url.length>42?'...'+url.slice(-40):url)+'</div><div class="bar-t"><div class="bar-f blue" style="width:'+Math.max(cnt/mU*100,2)+'%"></div></div><div class="bar-v">'+fmtN(cnt)+'</div></div>';
-  h+='</div></div>';
+  h+='</div><p style="font-size:12px">Need orphan/uncrawled + $ waste with GSC clicks? Use the single <a href="#join-card"><strong>Crawl + GSC Join card below the tabs</strong></a> (one form for the whole app — paste crawl.csv + GSC export there).</p></div>';
   // Module 3b Render Gap (2026 GEO win): AI bots fetch raw HTML, no JS
   try{
     const js=A.jsShell||{rows:[],total:0,byBot:[],minBytes:5120};
@@ -1284,9 +1352,12 @@ function renderTab3(A){
 
 function renderTab4(A){
   const el=document.getElementById('tab4');let h='';
-  const c=A.costs,pricing=A.cfg;
+  const c=A.costs,pricing=A.cfg||{...DEFAULT_COSTS};
+  const presetName=A.preset||'Custom';
+  const zeroRates=(+pricing.cdnEgress===0 && +pricing.request10K===0 && !(+pricing.ssr1K>0));
   h+='<div class="card"><h3>Module 4: Infrastructure Cost Analysis</h3>'+
-    '<p>Actual USD cost of serving each bot category based on YOUR log data. Pricing: CDN egress '+fmtC(pricing.cdnEgress)+'/GB, requests '+fmtC(pricing.request10K)+'/10K'+(pricing.ssr1K>0?', origin-compute estimate '+fmtC(pricing.ssr1K)+'/1K (opt-in)':'')+'. <strong>All figures computed from your data — none assumed. No log tells us SSR vs static, so origin-compute stays OFF unless you enable it in Pricing.</strong></p></div>';
+    '<p>Actual USD cost of serving each bot category based on YOUR log data. Pricing preset: <strong>'+esc(presetName)+'</strong> — CDN egress '+fmtC(pricing.cdnEgress)+'/GB, requests '+fmtC(pricing.request10K)+'/10K'+(pricing.ssr1K>0?', origin-compute estimate '+fmtC(pricing.ssr1K)+'/1K (opt-in)':'')+'. <strong>All figures computed from your data — none assumed. No log tells us SSR vs static, so origin-compute stays OFF unless you enable it in Pricing.</strong>'+
+    (zeroRates?'<br><span class="badge b-green">ZERO-RATE PRESET</span> <span style="font-size:12px">Both egress and request rates are $0, so every total below is honestly $0.00. Switch to a paid preset (e.g. AWS CloudFront) to see measured waste in dollars.</span>':'')+'</p></div>';
   const sorted=Object.entries(c.byBot).sort((a,b)=>b[1].total-a[1].total);
   const aiCost=c.savings.byTier?.ai_training||0;
   if(aiCost>0)h+=critIssue('AI Training Scrapers Costing '+fmtC(aiCost),'AI training bots consumed '+fmtC(aiCost)+' in infrastructure costs. Pure waste — zero referral traffic, zero citations, zero revenue.',fmtC(aiCost),'Block at CDN edge using Module 6 rules.');
@@ -1360,7 +1431,13 @@ function renderTab5(A){
 function renderTab6(A){
   const el=document.getElementById('tab6');let h='';
   h+='<div class="card"><h3>Module 6: Automated Edge Policy Engine</h3>'+
-    '<p>Ready-to-deploy rules from YOUR log data. Copy directly into your CDN/WAF dashboard to block or rate-limit bots at the edge.</p></div>';
+    '<p>Ready-to-deploy rules from YOUR log data. Copy directly into your CDN/WAF dashboard to block or rate-limit bots at the edge. <strong>Search-index is 429-only (never block)</strong>; <strong>user-fetch is allow + 300/min abuse ceiling only</strong> (429 = missing live answer); <strong>OAI-AdsBot is allow-listed — blocking it breaks ChatGPT shopping ads</strong>.</p></div>';
+  try{
+    if(A.botData&&(A.botData['OAI-AdsBot']||A.botData['AdsBot-Google'])){
+      const n=(A.botData['OAI-AdsBot']||{}).count||0, n2=(A.botData['AdsBot-Google']||{}).count||0;
+      h+='<div class="rec green"><strong>Revenue guard: OAI-AdsBot present ('+fmtN(n)+' req'+(n2?', AdsBot-Google '+fmtN(n2)+' req':'')+') — allow-listed.</strong><p>No block/challenge rule was generated for it (engine strips any accidental match). Keep <code>User-agent: OAI-AdsBot / Allow: /</code> in robots.txt and bypass it in every 402/paywall Worker. Removing it breaks shopping-ad verification on ecommerce.</p></div>';
+    }
+  }catch(e){}
   try{
     const g=(typeof currentAnalysis!=='undefined'&&currentAnalysis&&currentAnalysis._guessMode)||(A&&A._guessMode);
     if(g||(typeof window!=='undefined'&&document.getElementById('guess-note'))){h+='<div class="rec red"><strong>BLOCKED: guess-mode logs.</strong><p>W3C without #Fields = low-confidence IP mapping. Edge-rule generation is disabled to prevent blocking the wrong UA/IP. Add a #Fields header and re-run.</p></div>';el.innerHTML=h;return;}
@@ -1479,7 +1556,7 @@ function renderTab8(A){
       const dyn=genBotDynamics(A,null);
       if(dyn.rows.length)h+='<p style="font-size:12px">Spike/drop vs previous window (save summary.json weekly to compare — single-window view below until then):</p>'+mkTable([th('Bot'),th('Before','n'),th('After','n'),th('Δ','n'),th('Flag')],dyn.rows.slice(0,10).map(r=>'<tr><td><strong>'+esc(r.bot)+'</strong></td>'+td(fmtN(r.before),'n')+td(fmtN(r.after),'n')+td((r.delta>=0?'+':'')+fmtN(r.delta),'n')+'<td>'+esc(r.flag)+'</td></tr>'));
     }catch(e){}
-    if(an.bursts.length)h+=mkTable([th('Bot'),th('Hour #','n'),th('Count','n'),th('z','n'),th('Note')],an.bursts.slice(0,15).map(b=>'<tr class="hl"><td><strong>'+esc(b.bot)+'</strong></td>'+td(b.hourIndex,'n')+td(fmtN(b.count),'n')+td(b.z,'n')+'<td style="font-size:11px">'+esc(b.note)+'</td></tr>'))+'<div class="code"><code id="anom-slack">'+esc(an.slack)+'</code></div>';
+    if(an.bursts.length)h+=mkTable([th('Bot'),th('Hour (UTC)'),th('Count','n'),th('z','n'),th('Note')],an.bursts.slice(0,15).map(b=>'<tr class="hl"><td><strong>'+esc(b.bot)+'</strong></td><td style="font-family:var(--mono);font-size:11px">'+esc(b.hour||'')+'</td>'+td(fmtN(b.count),'n')+td(b.z==null?'n/a':b.z,'n')+'<td style="font-size:11px">'+esc(b.note)+'</td></tr>'))+'<div class="code"><code id="anom-slack">'+esc(an.slack)+'</code></div>';
     else h+='<p>No per-bot bursts (z≥3, ≥10 req/h). New-ASN surge proxy: watch stealth cloud IPs in Module 9.</p>';
     if(an.not404.length)h+=mkTable([th('404 cluster URI'),th('Hits','n')],an.not404.map(x=>'<tr><td style="font-size:11px">'+esc(x.uri)+'</td>'+td(fmtN(x.count),'n')+'</tr>'));
     try{const tk=genTicketText(an,A.sec);h+='<div class="code"><code id="ticket-txt">'+esc(tk)+'</code></div>';}catch(e){}
@@ -1589,7 +1666,7 @@ function renderTab10(A){
     '<div class="sr"><span class="sr-l">Unique IPs / URLs</span><span class="sr-v">'+fmtN(s.uniqueIPs)+' / '+fmtN(s.uniqueURLs)+'</span></div>'+
     '<div class="sr"><span class="sr-l">Date Range</span><span class="sr-v">'+(s.dateRange.start?s.dateRange.start.toISOString().split('T')[0]:'--')+' to '+(s.dateRange.end?s.dateRange.end.toISOString().split('T')[0]:'--')+'</span></div>'+
     '<div class="sr"><span class="sr-l">Human / Bot Split</span><span class="sr-v">'+fmtP(s.humanPct)+' human / '+fmtP(s.botPct)+' bot</span></div>'+
-    '<div class="sr"><span class="sr-l">Pricing Used</span><span class="sr-v">CDN '+fmtC(pricing.cdnEgress)+'/GB, Req '+fmtC(pricing.request10K)+'/10K'+(pricing.ssr1K>0?', Compute '+fmtC(pricing.ssr1K)+'/1K (opt-in ON)':', Compute OFF (opt-in)')+'</span></div>'+
+    '<div class="sr"><span class="sr-l">Pricing Used</span><span class="sr-v">'+esc(A.preset||pricing.preset||'Custom')+': CDN '+fmtC(pricing.cdnEgress)+'/GB, Req '+fmtC(pricing.request10K)+'/10K'+(pricing.ssr1K>0?', Compute '+fmtC(pricing.ssr1K)+'/1K (opt-in ON)':', Compute OFF (opt-in)')+'</span></div>'+
     '</div>';
   try{
     const rec2=calcPayPerCrawlRecovery(A.botData,0.02);
@@ -2061,7 +2138,7 @@ function renderHowto(){
 }
 
 /* ==== Q: CONTROLLER ==== */
-let currentAnalysis=null,currentCfg={};
+let currentAnalysis=null,currentCfg={cdnEgress:0.09,request10K:0.0075,ssr1K:0,preset:'AWS CloudFront (default)'},currentPreset='AWS CloudFront (default)';
 function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));document.querySelectorAll('.sb-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+id).classList.add('active-page');document.querySelector(`[data-section="${id}"]`).classList.add('active')}
 function showTab(id){document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active-tp'));document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active-tp');document.querySelector(`[data-tab="${id}"]`).classList.add('active')}
 
@@ -2075,11 +2152,12 @@ function processRecords(records,file,meta){
       document.getElementById('ib-size').textContent=file?fmtB(file.size):'~'+fmtB(records.length*400);
       document.getElementById('ib-records').textContent=meta.stride>1?fmtN(records.length)+' (1-in-'+meta.stride+' of '+fmtN(meta.totalLines||records.length)+')':fmtN(records.length);
       document.getElementById('ib-fields').textContent=records[0]?Object.keys(records[0]).length:'--';
+      try{if(!currentCfg||currentCfg.cdnEgress==null)currentCfg={cdnEgress:0.09,request10K:0.0075,ssr1K:0,preset:'AWS CloudFront (default)'};if(!currentCfg.preset)currentCfg.preset=currentPreset||cfgPresetName(currentCfg)||'Custom';updatePricingBadge();}catch(e){}
       document.getElementById('info-bar').classList.remove('hidden');
       document.getElementById('live-monitor-bar').classList.remove('hidden');
       const run=()=>{
         currentAnalysis=analyze(records,currentCfg,(pct,msg)=>{document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;document.getElementById('progress-pct').textContent=pct+'%'});
-        try{currentAnalysis._guessMode=isGuessMode(meta);currentAnalysis._lowConfidence=meta.lowConfidence||{};}catch(e){}
+        try{currentAnalysis._guessMode=isGuessMode(meta);currentAnalysis._lowConfidence=meta.lowConfidence||{};currentAnalysis.stride=meta.stride||1;currentAnalysis.totalLines=meta.totalLines||records.length;}catch(e){}
         // analyze() already builds a full deduped _urlSet (100k cap). Keep it —
         // never overwrite with a 20k slice.
         if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){
@@ -2097,7 +2175,7 @@ function processRecords(records,file,meta){
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
           const w=new Worker('./js/worker.js?v=2.0.0');
-          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;try{currentAnalysis._guessMode=isGuessMode(meta);currentAnalysis._lowConfidence=meta.lowConfidence||{};}catch(e){}if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();recordHistory(records,file);}else if(type==='error'){w.terminate();run();}};
+          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;          }else if(type==='done'){w.terminate();currentAnalysis=result;try{currentAnalysis._guessMode=isGuessMode(meta);currentAnalysis._lowConfidence=meta.lowConfidence||{};currentAnalysis.stride=meta.stride||1;currentAnalysis.totalLines=meta.totalLines||records.length;}catch(e){}if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();recordHistory(records,file);}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
           w.postMessage({records,cfg:currentCfg});
           // fallback timeout: if worker fails silently, run on main thread
@@ -2182,9 +2260,11 @@ const AI_MATRIX_DISCLAIMER='Directional crawl-to-referral ratios (OAI ~85:1, Per
 const FALLBACK_PIN={date:BOT_IP_JSON_DATE,note:'Pinned fallback snapshot ships in data/bot-ips.json — used when weekly fetch fails. UI shows "last good" banner, never silent stale.'};
 function getFreshnessStatus(nowMs){
   const age=botDbAgeDays(nowMs);
-  const level=age<=7?'green':age<=21?'amber':'red';
-  const label=age<=7?age+'d fresh':age<=21?age+'d aging — refresh soon':'STALE '+age+'d — showing last-good pinned snapshot ('+FALLBACK_PIN.date+')';
-  return {age,level,label,fallback:FALLBACK_PIN,stale:age>21};
+  // P0-credibility thresholds: green <7d, amber 7-14d, red stale >14d (CI fails
+  // past 14d — UI must agree, never show green on a stale DB).
+  const level=age<=7?'green':age<=14?'amber':'red';
+  const label=age<=7?age+'d fresh':age<=14?age+'d aging — refresh soon (red after 14d)':'STALE '+age+'d — showing last-good pinned snapshot ('+FALLBACK_PIN.date+')';
+  return {age,level,label,fallback:FALLBACK_PIN,stale:age>14};
 }
 /* P0-1: Cloudflare Sept 15 2026 defaults. New domains auto-block Training+Agent on
  * ad pages, allow Search-only. This preset generates the exact WAF rule + diffs it
@@ -2449,7 +2529,7 @@ function genBotDynamics(current,previous){
 }
 function genTicketText(anomalies,sec){
   const lines=['# Auto-ticket draft — paste into Jira/Linear (generated from YOUR logs)'];
-  for(const b of ((anomalies&&anomalies.bursts)||[]).slice(0,5))lines.push('[BOT-BURST] '+b.bot+': '+b.count+' req in 1h (z='+b.z+', avg '+b.mean+') — check deploys + rate limit 120/min search / challenge training.');
+  for(const b of ((anomalies&&anomalies.bursts)||[]).slice(0,5))lines.push('[BOT-BURST] '+b.bot+': '+b.count+' req in 1h ('+(b.hour||'n/a')+', avg '+b.mean+(b.z==null?', flat baseline — z n/a':', z='+b.z)+') — check deploys + rate limit 120/min search / challenge training.');
   for(const x of ((anomalies&&anomalies.not404)||[]).slice(0,5))lines.push('[404-CLUSTER] '+x.uri+' hit '+x.count+'x — block, not 404 (vendor/phpunit/.git/.env = exploit probe, not content).');
   for(const ip of ((sec&&sec.hvIPs)||[]).slice(0,5))lines.push('[HV-IP] '+ip.ip+' @ '+ip.rps.toFixed(1)+' req/s ('+ip.count+' req) — challenge at edge, verify rDNS.');
   if(lines.length===1)lines.push('No bursts / 404-clusters / HV-IPs in this window — nothing to ticket.');
@@ -2486,7 +2566,7 @@ function guardEdgeRules(edgeRules,meta){
   }
   return {blocked:false,rules:edgeRules,notice:''};
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectStealth,detectJsShell,countUnverified,detectAnomalies,diffAnalyses,estimateEdgeBlocked,genBQPack,joinTriple,cfoContext,isChromeUA,cloudOf,botDbAgeDays,verifyRdnsDoh,reverseIPv4,loadHistory,saveHistoryEntry,clearHistory,encodeCfg,decodeCfg,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,migrateLegacyTier,BOT_IP_SOURCES,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION,BOT_IP_JSON_DATE,CLOUDFLARE_SEPT_DEFAULTS,BOTBASE_TAXONOMY,genSept2026Defaults,genPayPerCrawlV2,calcPayPerCrawlRecovery,detectWebBotAuth,genBatchVerifyCommands,verifyTopUnverifiedBatch,genCrawlersJson,genSecurityTxt,genPolicyBundle,checkPolicyConsistency,genCitationGapCommands,detectCitationKillers,fetchCitationGap,genBotDynamics,genTicketText,overlayGscClicks,genBQStreamingPack,getFreshnessStatus,FALLBACK_PIN,AI_MATRIX_DISCLAIMER,isGuessMode,guardEdgeRules};}
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectStealth,detectJsShell,countUnverified,detectAnomalies,diffAnalyses,estimateEdgeBlocked,genBQPack,joinTriple,cfoContext,isChromeUA,cloudOf,botDbAgeDays,verifyRdnsDoh,reverseIPv4,loadHistory,saveHistoryEntry,clearHistory,encodeCfg,decodeCfg,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,migrateLegacyTier,BOT_IP_SOURCES,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,cfgPresetName,BOT_DB_VERSION,BOT_IP_JSON_DATE,CLOUDFLARE_SEPT_DEFAULTS,BOTBASE_TAXONOMY,genSept2026Defaults,genPayPerCrawlV2,calcPayPerCrawlRecovery,detectWebBotAuth,genBatchVerifyCommands,verifyTopUnverifiedBatch,genCrawlersJson,genSecurityTxt,genPolicyBundle,checkPolicyConsistency,genCitationGapCommands,detectCitationKillers,fetchCitationGap,genBotDynamics,genTicketText,overlayGscClicks,genBQStreamingPack,getFreshnessStatus,FALLBACK_PIN,AI_MATRIX_DISCLAIMER,isGuessMode,guardEdgeRules};}
 
 function renderHistory(){
   try{
@@ -2494,14 +2574,15 @@ function renderHistory(){
     if(!card||!out)return;
     if(!h.length){card.classList.add('hidden');return;}
     card.classList.remove('hidden');
-    out.innerHTML='<div class="tbl-wrap"><table class="dt"><thead><tr><th>When</th><th>File</th><th>Records</th><th>Total</th><th>Blockable</th></tr></thead><tbody>'+
-      h.map(e=>'<tr><td>'+e.t+'</td><td>'+String(e.file).substring(0,60)+'</td><td>'+Number(e.records).toLocaleString()+'</td><td>$'+Number(e.total).toFixed(2)+'</td><td>$'+Number(e.blockable).toFixed(2)+'</td></tr>').join('')+'</tbody></table></div>';
+    out.innerHTML='<div class="tbl-wrap"><table class="dt"><thead><tr><th>When</th><th>File</th><th>Records</th><th>Mode</th><th>Total</th><th>Blockable</th></tr></thead><tbody>'+
+      h.map(e=>'<tr><td>'+e.t+'</td><td>'+esc(String(e.file).substring(0,60))+'</td><td>'+Number(e.records).toLocaleString()+'</td><td><span class="badge '+((e.badge||'').startsWith('SAMPLED')?'b-amber':'b-green')+'">'+esc(e.badge||(e.records>300000?'SAMPLED':'EXACT'))+'</span></td><td>$'+Number(e.total).toFixed(2)+'</td><td>$'+Number(e.blockable).toFixed(2)+'</td></tr>').join('')+'</tbody></table></div>';
   }catch(e){}
 }
 function recordHistory(records,file){
   try{
     if(!currentAnalysis||!currentAnalysis.costs)return;
-    saveHistoryEntry({file:(file&&(file.name||file))||'upload',records:records?records.length:0,bytes:(file&&file.size)||0,total:currentAnalysis.costs.total.all,blockable:currentAnalysis.costs.savings.botBlocking});
+    const stride=currentAnalysis.stride||(records&&records._stride)||1;
+    saveHistoryEntry({file:(file&&(file.name||file))||'upload',records:records?records.length:0,bytes:(file&&file.size)||0,total:currentAnalysis.costs.total.all,blockable:currentAnalysis.costs.savings.botBlocking,stride});
     renderHistory();
   }catch(e){}
 }
@@ -2519,14 +2600,24 @@ function wireExportButtons(){
   if(ib&&!document.getElementById('export-csv-btn')){const b1=document.createElement('button');b1.id='export-csv-btn';b1.className='btn-sm';b1.textContent='Download CSV';b1.onclick=()=>currentAnalysis&&exportBotCSV(currentAnalysis);ib.appendChild(b1);const b2=document.createElement('button');b2.id='export-cfo-btn';b2.className='btn-sm';b2.textContent='CFO 1-pager';b2.onclick=()=>currentAnalysis&&exportCFOPDF(currentAnalysis);ib.appendChild(b2);}
 }
 let liveTimer=null,lastRecords=null,lastLiveSig='';
+/* Pricing badge: one line in the info bar naming the active preset + rates, so a
+ * screenshot can never show "$0.00/GB" next to "$0.20 totals" without explanation. */
+function updatePricingBadge(){
+  try{
+    let b=document.getElementById('pricing-badge');
+    if(!b){const bar=document.getElementById('info-bar');if(!bar)return;b=document.createElement('span');b.id='pricing-badge';b.className='ib-val';b.style.cssText='font-size:11px;border:1px solid var(--border);border-radius:6px;padding:3px 8px';bar.insertBefore(b,bar.firstChild);}
+    b.textContent='Preset: '+(currentPreset||currentCfg.preset||'Custom')+' · $'+(+currentCfg.cdnEgress).toFixed(3)+'/GB · $'+(+currentCfg.request10K).toFixed(4)+'/10K';
+    b.title='Single source of truth: every cost below = measured bytes × these rates. Origin-compute '+(+currentCfg.ssr1K>0?'ON ($'+currentCfg.ssr1K+'/1K)':'OFF (opt-in)')+'.';
+  }catch(e){}
+}
 function setLive(on){
   const s=document.getElementById('live-status');
   const dot=document.querySelector('#live-monitor-bar .live-dot');
-  if(on){if(!lastRecords){alert('Upload a log file first — Live re-analyzes the last upload on an interval (no backend polling).');return}
+  if(on){if(!lastRecords){alert('Upload a log file first — Re-analyze locally just re-runs the last upload on a timer (no backend, no live tail).');return}
     const iv=parseInt(document.getElementById('live-interval')?.value||'30',10)*1000;
     document.getElementById('live-start-btn')?.classList.add('hidden');document.getElementById('live-stop-btn')?.classList.remove('hidden');
     if(dot)dot.classList.add('active'); // pulse ONLY while actually running
-    if(s)s.textContent='Monitoring (re-analyzing last upload every '+iv/1000+'s)';
+    if(s)s.textContent='Re-analyzing last upload locally every '+iv/1000+'s (no server polling)';
     lastLiveSig=lastRecords.length+'|'+(currentAnalysis?currentAnalysis.summary.totalRecords:0);
     liveTimer=setInterval(()=>{
       if(lastRecords){
@@ -2564,20 +2655,20 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
   });
-  // Freshness pill: green <7d, amber <21d, red stale + last-good fallback pin (v2)
+  // Freshness pill: green <7d, amber 7-14d, red stale >14d + last-good fallback pin (v2)
   try{
     const fs0=getFreshnessStatus();const pill=document.getElementById('db-fresh-pill');
     if(pill){pill.textContent='DB v'+BOT_DB_VERSION+' · '+BOTS.length+' sigs · '+fs0.label;pill.className='badge '+(fs0.level==='green'?'b-green':fs0.level==='amber'?'b-amber':'b-red');pill.title='Bot DB freshness + BotBase taxonomy (14th source). Fallback pin: '+FALLBACK_PIN.date;}
   }catch(e){}
   document.getElementById('example-chip')?.addEventListener('click',e=>{e.stopPropagation();location.href='?sample=10k';});
   document.getElementById('upload-drop')?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();document.getElementById('file-input')?.click();}});
-  // pricing presets + save/reset wiring
+  // pricing presets + save/reset wiring (preset name travels with cfg → every banner reads it)
   const presetSel=document.getElementById('pricing-preset');
-  if(presetSel)presetSel.onchange=()=>{const p=COST_PRESETS[presetSel.value];if(p){document.getElementById('cfg-cdnEgress').value=p.cdnEgress;document.getElementById('cfg-request10K').value=p.request10K;document.getElementById('cfg-ssr1K').value=p.ssr1K;}};
-  document.getElementById('pricing-save')?.addEventListener('click',()=>{const v=parseFloat(document.getElementById('cfg-ssr1K').value);currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0,ssr1K:isNaN(v)?0:v};document.getElementById('pricing-panel').classList.add('hidden');if(lastRecords)processRecords(lastRecords,null);});
-  document.getElementById('pricing-reset')?.addEventListener('click',()=>{document.getElementById('cfg-cdnEgress').value=DEFAULT_COSTS.cdnEgress;document.getElementById('cfg-request10K').value=DEFAULT_COSTS.request10K;document.getElementById('cfg-ssr1K').value=DEFAULT_COSTS.ssr1K;});
+  if(presetSel)presetSel.onchange=()=>{const p=COST_PRESETS[presetSel.value];if(p){document.getElementById('cfg-cdnEgress').value=p.cdnEgress;document.getElementById('cfg-request10K').value=p.request10K;document.getElementById('cfg-ssr1K').value=p.ssr1K;currentPreset=presetSel.value;}};
+  document.getElementById('pricing-save')?.addEventListener('click',()=>{const v=parseFloat(document.getElementById('cfg-ssr1K').value);const sel=document.getElementById('pricing-preset')?.value;currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0,ssr1K:isNaN(v)?0:v,preset:sel||cfgPresetName({cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value),request10K:parseFloat(document.getElementById('cfg-request10K').value),ssr1K:isNaN(v)?0:v})||'Custom'};currentPreset=currentCfg.preset;document.getElementById('pricing-panel').classList.add('hidden');updatePricingBadge();if(lastRecords)processRecords(lastRecords,null);});
+  document.getElementById('pricing-reset')?.addEventListener('click',()=>{document.getElementById('cfg-cdnEgress').value=DEFAULT_COSTS.cdnEgress;document.getElementById('cfg-request10K').value=DEFAULT_COSTS.request10K;document.getElementById('cfg-ssr1K').value=DEFAULT_COSTS.ssr1K;const sel=document.getElementById('pricing-preset');if(sel)sel.value='AWS CloudFront';currentPreset='AWS CloudFront (default)';});
   document.getElementById('pricing-share')?.addEventListener('click',async()=>{
-    currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0,ssr1K:parseFloat(document.getElementById('cfg-ssr1K').value)||0};
+    currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0,ssr1K:parseFloat(document.getElementById('cfg-ssr1K').value)||0,preset:document.getElementById('pricing-preset')?.value||currentPreset||'Custom'};
     const url=location.origin+location.pathname+'?cfg='+encodeCfg(currentCfg);
     try{await navigator.clipboard.writeText(url);alert('Share link copied — pricing travels in ?cfg=, logs never leave the machine.');}
     catch(e){prompt('Copy this share link:',url);}
@@ -2586,12 +2677,14 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   try{
     const shared=decodeCfg(prm.get('cfg'));
     if(shared&&(shared.cdnEgress!=null||shared.request10K!=null)){
-      currentCfg={cdnEgress:+shared.cdnEgress||0.09,request10K:+shared.request10K||0,ssr1K:+shared.ssr1K||0};
+      currentCfg={cdnEgress:+shared.cdnEgress||0.09,request10K:+shared.request10K||0,ssr1K:+shared.ssr1K||0,preset:shared.preset||cfgPresetName(shared)||'Custom'};
+      currentPreset=currentCfg.preset;
       document.getElementById('cfg-cdnEgress').value=currentCfg.cdnEgress;
       document.getElementById('cfg-request10K').value=currentCfg.request10K;
       document.getElementById('cfg-ssr1K').value=currentCfg.ssr1K;
     }
   }catch(e){}
+  try{updatePricingBadge();}catch(e){}
   document.getElementById('history-clear')?.addEventListener('click',()=>{clearHistory();renderHistory();});
   renderHistory();
   document.getElementById('pricing-btn')?.addEventListener('click',()=>document.getElementById('pricing-panel').classList.remove('hidden'));

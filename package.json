@@ -1,11 +1,11 @@
 {
   "name": "log-file-bot-traffic-cost-analyzer",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Free, private, client-side log file analyzer: GPTBot vs SearchBot cost split + Cloudflare Sept-2026 defaults + Pay Per Crawl v2 + Web Bot Auth batch verify + policy bundle + MCP. Training vs search-index vs user-triggered AI split (2026). 127 signatures, 16 traps, IPv6+CIDR verify, .gz/multi-file, CLI exact mode.",
   "main": "dev-server.js",
   "scripts": {
     "start": "node dev-server.js",
-    "test": "node --test tests/bots.test.js tests/traps.test.js tests/costs.test.js tests/sample.test.js tests/upload.test.js tests/enterprise.test.js tests/freshness.test.js tests/spoof.test.js tests/jsshell.test.js tests/anomaly.test.js tests/v2.test.js",
+    "test": "node --test tests/bots.test.js tests/traps.test.js tests/costs.test.js tests/sample.test.js tests/upload.test.js tests/enterprise.test.js tests/freshness.test.js tests/spoof.test.js tests/jsshell.test.js tests/anomaly.test.js tests/v2.test.js tests/p0verdict.test.js",
     "lint": "node --check js/analyzer.js && node --check js/worker.js && node --check dev-server.js && node --check tools/gen-logs.js && node --check tools/fetch-bot-ips.js && node --check tools/gen-bots-page.js && node --check tools/cli.js && node --check tools/mcp-server.js",
     "gen-logs": "node tools/gen-logs.js",
     "gen-bots-page": "node tools/gen-bots-page.js",

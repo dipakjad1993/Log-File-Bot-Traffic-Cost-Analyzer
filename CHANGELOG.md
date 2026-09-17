@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.2.0 — 2026-09-17
+
+P0 credibility pass: edge-rule threshold fix, AdsBot revenue guard, freshness 14d red, realistic fixture re-pin.
+
+### Fixed (P0)
+- `genEdgeRules` threshold `count>=10` → `count>=2 OR ≥0.5 req/min/IP` (training + suspicious). The old gate silently emitted ZERO training blocks on long windows and failed the asserted `count=3 → BLOCK` contract in `tests/costs.test.js`. GPTBot 1810 + Bytespider 1511 req windows now emit all 4 training BLOCKs; search stays 429-only, user-fetch allow-only.
+- Freshness red at >14d (was 21d): pill + Module 2 + CI agree — green <7d, amber 7–14d, red stale with last-good fallback pin.
+- "Start Monitoring / Interval" → "Re-analyze locally / Re-analyze locally every" (no fake live-tail implication).
+
+### Added
+- OAI-AdsBot revenue guard: engine strips accidental block/challenge rules for OAI-AdsBot; Module 6 green guard card when AdsBot is in-window; `checkPolicyConsistency` REVENUE RISK on Disallow.
+- KPI strip ingest card: origin-undercount warning + Logpush→R2 link (Module 6 keeps the origin/edge toggle).
+- `tests/p0verdict.test.js`: 6 regression tests (training ≥2 fires ×4, search/user/suspicious policy, AdsBot guard, anomaly no-`Hour #167`/no-fake-z + `n>30` floor, freshness 14d red). Suite: 105 → 111 asserts, all green.
+- v2.1 realistic fixture shipped: `tools/gen-logs.js` (diurnal ~3x, weekend −30%, Pareto IPs, GET 92.8%, Chrome Win 65%, 5% real 66.249.66.x Googlebot, scattered TTFB); `sample-data/sample-10k.jsonl` regenerated + `EXPECTED.md` re-pinned from measured output (10,000 records, 357.35 MB, $0.04 total, 9/4/4 rules; `--seed 42 --days 30` byte-identical, SHA256-verified).
+
 ## v2.0.0 — 2026-09-17
 
 Enterprise-ready: all P0/P1 from the 2026 competitive review + removals.
