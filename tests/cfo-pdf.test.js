@@ -74,6 +74,26 @@ test('cfo-pdf: data model annualizes + labels pricing + badge', () => {
   assert.ok(d.method.includes('Blockable ='));
 });
 
+test('cfo-pdf: finance-facing labels, trimmed tables, actionable steps', () => {
+  assert.equal(CFO.tierLabel('ai_training'), 'AI Training');
+  assert.equal(CFO.tierLabel('ai_search_index'), 'AI Search-Index');
+  assert.equal(CFO.tierLabel('search_engine'), 'Search Engine');
+  assert.equal(CFO.tierLabel('human'), 'Human');
+  const rs = [];
+  for (let i = 0; i < 150; i++) rs.push(rec('10.0.0.' + (i % 10 + 1), 'GPTBot/1.0', '/p' + (i % 20) + '?page=' + (i % 5), 200, 60000, '2026-06-03T10:00:00Z'));
+  const out = A.analyze(rs, { cdnEgress: 0.09, request10K: 0.0075, ssr1K: 0, preset: 'AWS CloudFront' }, () => {});
+  const d = CFO.buildCFOData(out, {});
+  assert.ok(d.topBots.length <= 6, 'top-bots table trimmed, len=' + d.topBots.length);
+  const steps = CFO.nextSteps(d);
+  assert.ok(steps.length >= 3 && steps.length <= 4, 'actionable steps, len=' + steps.length);
+  assert.ok(/Owner:/.test(steps[0]), 'steps carry owners');
+  const res = CFO.generateCFOPDFBytes(out, {});
+  const body = Buffer.from(res.bytes).toString('latin1');
+  assert.ok(!body.includes('ai_training'), 'no snake_case tiers in PDF');
+  assert.ok(body.includes('AI Training'), 'pretty tier labels in PDF');
+  assert.ok(body.includes('Recommended next steps'), 'steps section in PDF');
+});
+
 test('P0 safety: no 40-char generic Chrome BLOCK for Bytespider', () => {
   const bd = {
     Bytespider: { name: 'Bytespider', tier: 'ai_training', count: 50, totalBytes: 1000000, uniqueIPCount: 5, topUAList: [['Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36', 50]] }

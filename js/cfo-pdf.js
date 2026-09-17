@@ -71,6 +71,15 @@ function shortBot(name, max) {
   return cut + '...';
 }
 
+/* CFO-facing tier names — never snake_case in front of finance. */
+var TIER_LABEL = {
+  human: 'Human', ai_training: 'AI Training', ai_search_index: 'AI Search-Index',
+  ai_user_fetch: 'AI User Fetch', search_engine: 'Search Engine', seo_tool: 'SEO Tool',
+  monitoring: 'Monitoring', social: 'Social', unknown_bot: 'Unknown Bot',
+  suspicious: 'Suspicious', unclassified: 'Unclassified', unknown: 'Unknown'
+};
+function tierLabel(t) { return TIER_LABEL[t] || String(t || 'Unknown'); }
+
 /* ---------- enterprise data model (single source for PDF + tests) ---------- */
 function buildCFOData(A, opts) {
   opts = opts || {};
@@ -118,7 +127,7 @@ function buildCFOData(A, opts) {
   var topBots = Object.keys(c.byBot || {}).map(function (bn) {
     var v = c.byBot[bn];
     return { bot: bn, tier: (A.botData && A.botData[bn] && A.botData[bn].tier) || '', count: v.count || 0, bytes: v.totalBytes || 0, cost: v.total || 0 };
-  }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 8);
+  }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 6);
 
   var traps = [];
   try {
@@ -242,11 +251,11 @@ function stampChrome(doc, d) {
 }
 function h1(doc, d, y, t) {
   y = ensure(doc, d, y, 90);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.setTextColor(HDRF[0], HDRF[1], HDRF[2]);
   doc.text(san(t), M, y);
   y += 5;
-  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
+  doc.setDrawColor(ACC[0], ACC[1], ACC[2]); doc.setLineWidth(1.1);
   doc.line(M, y, PW - M, y);
   return y + 14;
 }
@@ -320,6 +329,34 @@ function autoTable(doc, d, y, head, body, colStyles) {
   }));
   return doc.lastAutoTable.finalY + 9;
 }
+/* Data-driven next steps (owners + payoff) — the box that turns a report
+ * into a decision. Plus a shaded callout for boxes that must stand out. */
+function nextSteps(d) {
+  var steps = [];
+  var trainers = d.actions.filter(function (a) { return /BLOCK/i.test(a.action); });
+  if (trainers.length) steps.push('Block ' + trainers.length + ' training crawler' + (trainers.length > 1 ? 's' : '') + ' at the edge (Module 6 copy-paste rules; est. ' + money(d.kpis.monthly) + '/mo recoverable). Owner: Eng. Effort: 30 min. Risk: none -- zero citation loss.');
+  else steps.push('No training volume above the enforcement floor -- nothing to block this period. Owner: SEO (re-check next window).');
+  if (d.traps.length) steps.push('Disallow "' + d.traps[0].name + '"' + (d.traps[1] ? ' + "' + d.traps[1].name + '"' : '') + ' in robots.txt and canonicalize faceted parameters (est. ' + money(d.traps[0].cost) + ' waste this period). Owner: Eng + SEO. Effort: half day.');
+  if (d.verify.unverified > 0) steps.push('Verify ' + num(d.verify.unverified) + ' UNVERIFIED fetches with server-side reverse DNS (dig -x) before enforcing blocks -- never block on UA alone. Owner: Eng. Effort: 1 hr (Module 2 batch).');
+  steps.push('Re-run after the next deploy and watch the 429 rate on search-index bots -- 429 there means lost citations, not savings. Owner: SEO. Effort: ongoing.');
+  return steps.slice(0, 4);
+}
+function callout(doc, d, y, title, body, tint) {
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  var lines = doc.splitTextToSize(san(body), CW - 20);
+  var h = 20 + lines.length * 10.5;
+  y = ensure(doc, d, y, h + 8);
+  doc.setFillColor(tint[0], tint[1], tint[2]);
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
+  doc.roundedRect(M, y, CW, h, 4, 4, 'FD');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
+  doc.text(san(title), M + 10, y + 13);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  for (var i = 0; i < lines.length; i++) doc.text(lines[i], M + 10, y + 25 + i * 10.5);
+  return y + h + 8;
+}
 function bars(doc, d, y) {
   if (!d.topBots.length) return y;
   y = h2(doc, d, y, 'Cost concentration (top bots)');
@@ -365,7 +402,7 @@ function generateCFOPDFBytes(A, opts) {
   y = h2(doc, d, y, 'Cost breakdown by tier');
   y = autoTable(doc, d, y,
     ['Tier', 'Requests', 'Bandwidth', 'Cost', 'Share'],
-    d.tierRows.map(function (r) { return [r.tier, num(r.reqs), bytesFmt(r.bytes), money(r.cost), pct(r.share)]; }),
+    d.tierRows.map(function (r) { return [tierLabel(r.tier), num(r.reqs), bytesFmt(r.bytes), money(r.cost), pct(r.share)]; }),
     { 0: { fontStyle: 'bold' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } });
   y = para(doc, d, y, 'Pricing: ' + d.meta.preset + ' @ $' + d.meta.cdnEgress.toFixed(3) + '/GB + $' + d.meta.req10k.toFixed(4) + '/10K. Origin-compute excluded unless opt-in. ' + d.meta.badge + ' analysis.' + (d.meta.scaledCapped ? ' Window <0.5d or >400d -- treat monthly/annual as directional, act on period savings.' : ''), 7);
 
@@ -373,7 +410,7 @@ function generateCFOPDFBytes(A, opts) {
   y = h2(doc, d, y, 'Top cost bots (measured)');
   y = autoTable(doc, d, y,
     ['Bot', 'Tier', 'Reqs', 'Bytes', 'Cost'],
-    d.topBots.map(function (b) { return [b.bot, b.tier, num(b.count), bytesFmt(b.bytes), money(b.cost)]; }),
+    d.topBots.map(function (b) { return [b.bot, tierLabel(b.tier), num(b.count), bytesFmt(b.bytes), money(b.cost)]; }),
     { 0: { fontStyle: 'bold' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', textColor: RED } });
   y = bars(doc, d, y);
   y = h2(doc, d, y, 'Crawl traps -> $ waste (fix owners: Eng/SEO)');
@@ -393,7 +430,10 @@ function generateCFOPDFBytes(A, opts) {
   } else y = para(doc, d, y, 'No training/suspicious volume above the >=2-request floor -- nothing to block. Re-run after a larger window.', 8);
   y = h2(doc, d, y, 'Do NOT block (revenue / citation protection)');
   for (var di = 0; di < d.doNotBlock.length; di++) y = para(doc, d, y, '- ' + d.doNotBlock[di], 7.5);
-  if (d.kpis.ppcMonthly > 0.5) y = para(doc, d, y, 'Pay Per Crawl upside (402 beta, $0.002/req on training hits): ~' + money(d.kpis.ppcMonthly) + '/mo recoverable instead of pure block.', 7.5);
+  if (d.kpis.ppcMonthly > 0.5) y = callout(doc, d, y, 'PAY PER CRAWL UPSIDE', '402 beta: $0.002 per training request = ~' + money(d.kpis.ppcMonthly) + '/mo recoverable instead of a pure block. Search-index + user-fetch always bypass the paywall.', [237, 255, 240]);
+  y = h2(doc, d, y, 'Recommended next steps');
+  var steps = nextSteps(d);
+  for (var si = 0; si < steps.length; si++) y = para(doc, d, y, (si + 1) + '. ' + steps[si], 7.5);
 
   y = h1(doc, d, y, '4 - Trust, method and sign-off');
   y = para(doc, d, y, 'Verification: ' + num(d.verify.verified) + ' checks match expected patterns; ' + num(d.verify.suspicious) + ' unusual. Claimed AI fetches: ' + num(d.verify.claimed) + ', unverified ' + num(d.verify.unverified) + ' (' + pct(d.verify.unverifiedPct) + '). Confirm blocks with vendor IP JSON + server-side reverse DNS (dig -x) before enforcing.', 7.5);
@@ -432,7 +472,7 @@ function downloadCFOPDF(A, opts) {
   return res;
 }
 
-var api = { buildCFOData: buildCFOData, generateCFOPDFBytes: generateCFOPDFBytes, downloadCFOPDF: downloadCFOPDF, san: san };
+var api = { buildCFOData: buildCFOData, generateCFOPDFBytes: generateCFOPDFBytes, downloadCFOPDF: downloadCFOPDF, san: san, tierLabel: tierLabel, nextSteps: nextSteps };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.CFOPDF = api;
 
