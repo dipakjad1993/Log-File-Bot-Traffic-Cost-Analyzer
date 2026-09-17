@@ -1,17 +1,17 @@
 # Log File Bot Traffic Cost Analyzer
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-bot-analyzer.pages.dev)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-bot-analyzer.pages.dev)
+[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.13-orange)](data/bot-ips.json)
-[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-bot-analyzer.pages.dev)
+[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![v1.3.0](https://img.shields.io/badge/Version-1.3.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
 Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log leaves your machine.
 
-**[Try Live](https://log-bot-analyzer.pages.dev) · [1-click 10k demo](https://log-bot-analyzer.pages.dev/?sample=10k) · [1GB proof test](#1-proven-on-a-real-102-gb--32m-line-log-file)**
+**[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof test](#1-proven-on-a-real-102-gb--32m-line-log-file)**
 
 No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
 
@@ -192,7 +192,7 @@ npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs 
 
 The app is 100% client-side, so it hosts as pure static files. `server.js` + `Dockerfile` are local-dev only and ignored by the hosts.
 
-**Primary — Cloudflare Pages (never sleeps, free SSL/Brotli):** Dash → Workers & Pages → Create → **Pages** (not Worker) → Connect to Git → select this repo. Framework preset `None`, build command empty, build output + root directory empty, production branch `main`. Live at `https://log-bot-analyzer.pages.dev`. Security/cache headers come from [`_headers`](_headers).
+**Primary — Cloudflare Pages (never sleeps, free SSL/Brotli):** Dash → Workers & Pages → Create → **Pages** (not Worker) → Connect to Git → select this repo. Framework preset `None`, build command empty, build output + root directory empty, production branch `main`. Live at `https://log-file-bot-traffic-cost-analyzer.pages.dev`. Security/cache headers come from [`_headers`](_headers).
 
 **Backup — GitHub Pages:** repo Settings → Pages → Deploy from branch → `main`, folder `/ (root)`. (Ignores `_headers`; fine for a backup.)
 
@@ -237,7 +237,7 @@ See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). Measured r
 
 ## Resume bullet
 
-> Log-File Analyzer (JS, 10 tabs, 75 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export. Proven on 3.2M-line log. Live: https://log-bot-analyzer.pages.dev
+> Log-File Analyzer (JS, 10 tabs, 75 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export. Proven on 3.2M-line log. Live: https://log-file-bot-traffic-cost-analyzer.pages.dev
 
 ## Contributing / Security / License
 

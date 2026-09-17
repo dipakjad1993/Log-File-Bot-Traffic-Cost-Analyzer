@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://log-bot-analyzer.pages.dev/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://log-bot-analyzer.pages.dev/bots/gptbot-vs-oai-searchbot.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://log-bot-analyzer.pages.dev/bots/perplexitybot-block-or-allow.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://log-bot-analyzer.pages.dev/bots/claudebot-no-ip-robots-only.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://log-bot-analyzer.pages.dev/guides/block-training-bots-cloudflare-without-losing-citations.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://log-bot-analyzer.pages.dev/guides/cloudflare-logpush-1gb-analysis-free.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://log-bot-analyzer.pages.dev/research/1gb-teardown.html</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/gptbot-vs-oai-searchbot.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/perplexitybot-block-or-allow.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/claudebot-no-ip-robots-only.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/block-training-bots-cloudflare-without-losing-citations.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/cloudflare-logpush-1gb-analysis-free.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://log-file-bot-traffic-cost-analyzer.pages.dev/research/1gb-teardown.html</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
 </urlset>
