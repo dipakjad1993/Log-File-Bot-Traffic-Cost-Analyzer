@@ -61,10 +61,16 @@ function prefixesOf(jsonText) {
     { bot: 'Googlebot', url: 'https://developers.google.com/search/apis/ipranges/googlebot.json', bots: ['googlebot'] },
     { bot: 'Google-Other / Special crawlers', url: 'https://developers.google.com/search/apis/ipranges/special-crawlers.json', bots: ['googleother'] },
     { bot: 'Bingbot', url: 'https://www.bing.com/toolbox/bingbot.json', bots: ['bingbot'] },
+    { bot: 'BotBase taxonomy (Cloudflare public DB)', url: 'https://developers.cloudflare.com/bots/concepts/bot-base/', bots: [], taxonomyOnly: true, note: 'Taxonomy-only: training vs search vs agent mapping, no IPs' },
   ];
   const sources = [];
   for (const d of defs) {
     const old = prevByUrl[d.url];
+    if (d.taxonomyOnly) {
+      sources.push({ ...d, prefixes: [], date: (old && old.date) || today, fetched: today, taxonomyOnly: true, note: d.note });
+      console.log(`ok ${d.bot}: taxonomy-only (no IPs, informs tier policy)`);
+      continue;
+    }
     try {
       const r = await get(d.url, old && old.etag);
       if (r.notModified) {
@@ -76,8 +82,8 @@ function prefixesOf(jsonText) {
         console.log(`ok ${d.bot}: ${pfx.length} prefixes${d.policyOnly ? ' (policy-only, no bare IPs)' : ''}`);
       }
     } catch (e) {
-      console.log(`WARN ${d.bot}: ${e.message} (fallback to shipped snapshot)`);
-      sources.push({ ...d, prefixes: (old && old.prefixes) || [], date: (old && old.date) || today, fetched: today, stale: true, error: String(e.message) });
+      console.log(`WARN ${d.bot}: ${e.message} (fallback to shipped snapshot — last-good pin kept)`);
+      sources.push({ ...d, prefixes: (old && old.prefixes) || [], date: (old && old.date) || today, fetched: today, stale: true, fallback: true, error: String(e.message) });
     }
   }
   sources.push({ bot: 'Applebot-Extended', url: null, prefixes: [], bots: ['applebot-extended'], date: today, note: 'Apple publishes no IP list — robots token only.' });

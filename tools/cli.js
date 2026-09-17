@@ -19,7 +19,7 @@ const A = require('../js/analyzer.js');
 
 function args() {
   const a = process.argv.slice(2);
-  const o = { in: [], exact: false, out: null, logsCsv: null, bqSql: null, verifyRdns: null, sampleCap: 300000 };
+  const o = { in: [], exact: false, out: null, logsCsv: null, bqSql: null, verifyRdns: null, sampleCap: 300000, verifyBatch: null, payPerCrawl: false, septDefaults: false, bundleDir: null, citationGap: null, bqStreaming: null, price: 0.02 };
   for (let i = 0; i < a.length; i++) {
     if (a[i] === '--in') o.in.push(a[++i]);
     else if (a[i] === '--exact') o.exact = true;
@@ -27,7 +27,14 @@ function args() {
     else if (a[i] === '--logs-csv') o.logsCsv = a[++i];
     else if (a[i] === '--bq-sql') o.bqSql = a[++i];
     else if (a[i] === '--verify-rdns') o.verifyRdns = a[++i];
+    else if (a[i] === '--verify-batch') o.verifyBatch = a[++i]; // comma-separated IPs
     else if (a[i] === '--sample-cap') o.sampleCap = parseInt(a[++i], 10);
+    else if (a[i] === '--pay-per-crawl') o.payPerCrawl = true;
+    else if (a[i] === '--sept-defaults') o.septDefaults = true;
+    else if (a[i] === '--bundle-dir') o.bundleDir = a[++i];
+    else if (a[i] === '--citation-gap') o.citationGap = a[++i];
+    else if (a[i] === '--bq-streaming') o.bqStreaming = a[++i];
+    else if (a[i] === '--price') o.price = parseFloat(a[++i]);
   }
   return o;
 }
@@ -55,9 +62,33 @@ function openLines(file) {
 async function main() {
   const o = args();
   if (o.verifyRdns) return verifyRdns(o.verifyRdns);
+  if (o.verifyBatch) {
+    // One-click batch: forward-DNS confirm top-N UNVERIFIED IPs server-side
+    const ips = String(o.verifyBatch).split(',').map(s=>s.trim()).filter(Boolean).slice(0,20);
+    const out = [];
+    for (const ip of ips) {
+      try {
+        const ptrs = await dns.reverse(ip).catch(()=>[]);
+        let fwd = [];
+        if (ptrs[0]) { try { fwd = await dns.resolve4(ptrs[0]).catch(()=>[]); } catch(e){} try { fwd = fwd.concat(await dns.resolve6(ptrs[0]).catch(()=>[])); } catch(e){} }
+        out.push({ ip, ptr: ptrs[0]||'(no PTR)', forward: fwd, match: fwd.includes(ip) });
+      } catch(e){ out.push({ ip, error: String(e.message||e) }); }
+    }
+    console.log(JSON.stringify(out, null, 2));
+    console.log(A.genBatchVerifyCommands(ips.map(ip=>[ip,1])));
+    return;
+  }
+  if (o.payPerCrawl) {
+    const v2 = A.genPayPerCrawlV2({});
+    console.log(v2.nginx + '\n\n' + v2.worker + '\n\n' + v2.discovery + '\n\n' + v2.harness);
+    return;
+  }
+  if (o.citationGap) { console.log(A.genCitationGapCommands(o.citationGap)); return; }
+  if (o.bqStreaming) { const p = A.genBQStreamingPack(); fs.writeFileSync(o.bqStreaming, p.ddl + '\n\n' + p.streaming); console.log('wrote ' + o.bqStreaming); return; }
   if (!o.in.length) {
     console.error('Usage: node tools/cli.js --in access.log [--in b.log.1] --exact --out summary.json [--logs-csv logs.csv --bq-sql bq-pack.sql]');
     console.error('Browser = <500MB triage (sampled). CLI --exact = 500MB-50GB streaming exact. 50GB+ = BigQuery.');
+    console.error('v2: --verify-batch ip1,ip2 --pay-per-crawl --citation-gap URL --bq-streaming out.sql --sept-defaults --bundle-dir out/ --price 0.02');
     process.exit(1);
   }
   // Streaming aggregation: constant memory — never hold all records.
@@ -111,6 +142,8 @@ async function main() {
   else console.log(JSON.stringify(summary, null, 2));
   if (o.logsCsv) { fs.writeFileSync(o.logsCsv, csvRows.join('\n')); console.log('wrote ' + o.logsCsv); }
   if (o.bqSql) { const p = A.genBQPack(); fs.writeFileSync(o.bqSql, p.ddl + '\n' + p.queries); console.log('wrote ' + o.bqSql); }
+  if (o.septDefaults) { const s = A.genSept2026Defaults(Object.fromEntries(Object.entries(botCounts).map(([k,c])=>{const bb=Object.entries(botBytes).find(([x])=>x===k);return [k,{name:k,tier:(Object.keys(tierCounts).includes('ai_training')?undefined:undefined)||'ai_training',count:c,totalBytes:botBytes[k]||0,topUAList:[[k,c]]}];}))); console.log(s.waf + '\n\n' + s.diff); }
+  if (o.bundleDir) { try{fs.mkdirSync(o.bundleDir,{recursive:true});}catch(e){} const b=A.genPolicyBundle({botData:{},tp:{topURLs:[]}},{}); fs.writeFileSync(path.join(o.bundleDir,'robots.txt'),b.robots); fs.writeFileSync(path.join(o.bundleDir,'llms.txt'),b.llms); fs.writeFileSync(path.join(o.bundleDir,'crawlers.json'),b.crawlers); fs.writeFileSync(path.join(o.bundleDir,'security.txt'),b.security); console.log('wrote bundle to '+o.bundleDir); }
   // Parquet note: Parquet is columnar — for native export use DuckDB:
   //   CREATE TABLE logs AS SELECT * FROM read_csv('logs.csv', header=true);
   //   COPY logs TO 'logs.parquet' (FORMAT PARQUET, PARTITION_BY (date));

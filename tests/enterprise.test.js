@@ -66,16 +66,12 @@ test('reverseIPv4 maps octets correctly, rejects v6', () => {
   assert.equal(A.reverseIPv4('999.1.1.1'), null);
 });
 
-test('ai_citation deprecation: warns once, still maps', () => {
-  let warns = 0;
-  const orig = console.warn;
-  console.warn = () => { warns++; };
-  try {
-    assert.equal(A.normalizeTier('ai_citation'), 'ai_search_index');
-    A.normalizeTier('ai_citation');
-    assert.equal(warns, 1);
-    assert.equal(A.normalizeTier('ai_search_index'), 'ai_search_index');
-  } finally { console.warn = orig; }
+test('v2: ai_citation deleted — migrateLegacyTier rewrites, normalizeTier is identity', () => {
+  assert.equal(A.normalizeTier('ai_citation'), 'ai_citation');
+  const o = { tier: 'ai_citation' };
+  A.migrateLegacyTier(o);
+  assert.equal(o.tier, 'ai_search_index');
+  assert.equal(A.normalizeTier('ai_search_index'), 'ai_search_index');
 });
 
 test('402 snippet: nginx + worker + bypass + harness', () => {

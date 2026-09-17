@@ -116,10 +116,14 @@ test('OAI-SearchBot vs GPTBot independence (no prefix shadowing)', () => {
   assert.notEqual(s.name, g.name);
 });
 
-test('ai_citation legacy tier normalizes to ai_search_index', () => {
-  assert.equal(A.normalizeTier('ai_citation'), 'ai_search_index');
+test('v2: ai_citation removed — normalizeTier is identity, migrateLegacyTier handles old exports', () => {
+  assert.equal(A.normalizeTier('ai_citation'), 'ai_citation');
   assert.equal(A.normalizeTier('ai_training'), 'ai_training');
   assert.ok(!A.RATE_POLICY.ai_citation, 'legacy alias removed from RATE_POLICY');
+  const old = { tier: 'ai_citation', nested: [{ tier: 'ai_citation' }] };
+  const r = A.migrateLegacyTier(old);
+  assert.equal(r.migrated, 2);
+  assert.equal(old.tier, 'ai_search_index');
 });
 
 test('IPv6 + full-CIDR verification (no /16 truncation)', () => {

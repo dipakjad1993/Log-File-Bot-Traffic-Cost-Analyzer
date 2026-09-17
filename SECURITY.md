@@ -7,5 +7,5 @@
 - Rate control uses 429/503 + Retry-After + allowlist. Delay-based defenses are a DoS liability — never shipped.
 - Stealth scores (0-100) are heuristics. Challenge at ≥70, never auto-block on score alone.
 - To report a vulnerability, open a GitHub issue with `[security]` prefix. Do not include real log data.
-- `server.js` is LOCAL DEV ONLY — never deploy to Pages. Sets `nosniff`, `DENY` framing, minimal CSP, gzip only for text. Pages serves repo root directly via `_headers`.
-- `npm run dev` (local server) vs `npm run preview:pages` (wrangler). Juniors: do NOT deploy `server.js` to prod.
+- `dev-server.js` is LOCAL DEV ONLY — NEVER deploy to Pages (Pages-only build). Sets `nosniff`, `DENY` framing, minimal CSP, gzip only for text. Pages serves repo root directly via `_headers`.
+- `npm run dev` (local dev-server) vs `npm run preview:pages` (wrangler). Juniors: do NOT deploy `dev-server.js` to prod.

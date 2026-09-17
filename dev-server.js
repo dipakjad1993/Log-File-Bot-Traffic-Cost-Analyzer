@@ -1,6 +1,10 @@
-/* LOCAL DEV ONLY — do NOT deploy this to Cloudflare Pages / any static host.
- * Pages serves the repo root directly (see _headers for CSP/cache).
- * Run: npm test, then `node server.js` (http://localhost:8080) for local gzip+headers parity. */
+/* ============================================================
+   LOCAL DEV ONLY — NEVER DEPLOY TO CLOUDFLARE PAGES / ANY STATIC HOST.
+   Pages serves the repo root directly (see _headers for CSP/cache).
+   This file exists ONLY for local gzip+headers parity:
+     npm run dev  ->  node dev-server.js (http://localhost:8080)
+   If you deploy this file to production, you are doing it wrong.
+   ============================================================ */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');

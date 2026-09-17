@@ -1,6 +1,6 @@
 # METHOD.md — how numbers are computed, and what they cannot prove
 
-v1.4.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17
+v2.0.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (14 sources incl. BotBase taxonomy)
 
 ## 1. Sampling math
 - Browser path streams in 8MB slices, never holds the whole file as one string.
@@ -17,11 +17,20 @@ v1.4.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17
 - Perturbation test: +1GiB on one record = +$0.09 exactly (CloudFront default).
 
 ## 3. Verification tiers
-- Authoritative: vendor IP JSON (11 endpoints, full CIDRs + IPv6, ETag + fetched-date + fallback). `VERIFIED via IP JSON` only on CIDR match.
+- Authoritative: vendor IP JSON (14 sources incl. BotBase taxonomy-only, full CIDRs + IPv6, ETag + fetched-date + last-good fallback pin). `VERIFIED via IP JSON` only on CIDR match.
 - Heuristic low-confidence: /16-or-longer cloud prefixes (`104.16.` etc). Single-octet /8 removed. Never a verdict.
 - Anthropic: crawling policy `claude.com/crawling/bots.json` (robots-first, no bare IPs) + forward-DNS confirm.
-- Spoof KPI: claimed AI/search minus verified = UNVERIFIED (top KPI). Confirm with `dig -x` + forward resolve (DoH in-browser opt-in, `node tools/cli.js --verify-rdns IP` server-side).
+- Spoof KPI: claimed AI/search minus verified = UNVERIFIED (top KPI). Confirm with `dig -x` + forward resolve (DoH batch "Verify top 20" in-browser opt-in, `node tools/cli.js --verify-batch ip1,ip2` / `--verify-rdns IP` server-side). Web Bot Auth header (`cf-web-bot-auth`, surfaced as `wba` by `norm()`) counts as strong positive alongside IP JSON.
 - Stealth score 0-100: Chrome-UA + cloud-ASN + velocity. Challenge at ≥70, never auto-block.
+
+## 8. v2 enterprise notes (Sept-2026)
+- Cloudflare Sept-15-2026 defaults: block training + agent on ad pages for new domains, allow search-only. Module 6 preset generates the exact WAF rule + diffs it against your logs. BotBase taxonomy is the 14th source (categories only, no IPs).
+- Pay Per Crawl v2: per-path pricing (/ free, /premium/* $0.05, /api/* $0.25), origin `Crawler-Price` header + Worker dynamic pricing + `cf-pay-per-crawl` handling + Discovery checklist. CFO recovery model: training hits × price (search/user never charged). Ratios are ranges, not guarantees (see AI_MATRIX_DISCLAIMER, also printed on the AI Matrix card for screenshots).
+- Policy bundle: robots.txt + llms.txt + /crawlers.json + /.well-known/security.txt with consistency checker (e.g. allow-in-robots vs block-at-edge, OAI-AdsBot revenue risk).
+- Citation-gap closer: `genCitationGapCommands(url)` curl harness (GPTBot vs browser byte diff) + `detectCitationKillers(html)` static checks. Browser fetch is CORS-limited by design — curl is truth.
+- MCP: `tools/mcp-server.js` (stdio JSON-RPC, no deps) exposes analyzeLogs / getBotPolicy / genEdgeRule; grounding via llms-full.txt.
+- Bot Dynamics: `genBotDynamics()` spike/drop vs previous summary.json + `genTicketText()` 404-cluster auto-tickets + GSC clicks overlay. BQ streaming: Logpush → R2 → Parquet via DuckDB `COPY TO` + scheduled daily UNVERIFIED % query.
+- v2 removals: `server.js` → `dev-server.js` (Pages-only, never deploy); `ai_citation` deleted (normalizeTier identity + migrateLegacyTier on load); Performance + Traffic merged, Security threats collapsed; guess-mode (W3C w/o #Fields) BLOCKS edge-rule generation.
 
 ## 4. Render Gap (JS-shell)
 - AI bots fetch raw HTML, no JS. 200 + <5KB on content templates = shell, zero citation chance.

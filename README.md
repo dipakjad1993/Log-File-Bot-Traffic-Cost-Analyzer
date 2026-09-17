@@ -5,7 +5,7 @@
 [![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.17-orange)](data/bot-ips.json)
 [![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
-[![v1.4.0](https://img.shields.io/badge/Version-1.4.0-informational)](CHANGELOG.md)
+[![v2.0.0](https://img.shields.io/badge/Version-2.0.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
@@ -16,11 +16,23 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
 
 > [!NOTE]
-> `main` branch. v1.4.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (13 sources, full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
+> `main` branch. v2.0.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (14 sources incl. BotBase taxonomy, full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
 
 ![Upload screen](assets/screenshots/01-hero-upload.png)
 
 ---
+
+## What's new in v2.0.0 (enterprise-ready: P0/P1 + removals)
+
+- **P0-1 Cloudflare Sept-15-2026 defaults:** one-click preset generates the exact WAF rule + diffs it against your logs (training hits that would 403 vs search kept). BotBase taxonomy synced as 14th source.
+- **P0-2 Pay Per Crawl v2:** per-path pricing (/ free, /premium/* $0.05, /api/* $0.25), origin `Crawler-Price` header + dynamic Worker + `cf-pay-per-crawl` handling + Discovery checklist. CFO tab models recoverable revenue (e.g. $0.02 × 180k GPTBot = $3,600/mo).
+- **P0-3 Web Bot Auth + batch verify:** `cf-web-bot-auth` surfaced as `wba`; one-click "Verify top 20 UNVERIFIED" via 1.1.1.1 DoH + `dig -x` bundle export. CLI: `--verify-batch ip1,ip2`.
+- **P0-4 Policy bundle:** robots.txt + llms.txt + `/crawlers.json` + `/.well-known/security.txt` with consistency checker (robots-vs-edge conflicts, OAI-AdsBot revenue risk). CLI: `--bundle-dir out/`.
+- **P0-5 Citation-gap closer:** paste URL → exact `curl -A` harness (GPTBot vs browser byte diff) + citation-killer checks. CORS-honest (curl is truth).
+- **P0-6 MCP server:** `tools/mcp-server.js` stdio JSON-RPC (`analyzeLogs`, `getBotPolicy`, `genEdgeRule`), grounded by `llms-full.txt`.
+- **P1-7 Bot Dynamics:** spike/drop vs previous window + 404-cluster auto-ticket text + GSC-clicks overlay. **P1-8 BQ streaming:** Logpush → R2 → Parquet `COPY TO` + scheduled daily UNVERIFIED % query.
+- **Removals:** `server.js` → `dev-server.js` (Pages-only); `ai_citation` deleted (`normalizeTier` identity + `migrateLegacyTier` on load); thinned tabs (Perf+Traffic merged, Security collapsed); Matrix disclaimer on-card; guess-mode blocks edge rules; freshness fallback pin.
+- **105 asserts** (`npm test`): +10 v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, MCP, guards).
 
 ## What's new in v1.4.0 (Bot DB v2026.09.17, 127 signatures)
 
@@ -195,7 +207,7 @@ Measured totals, blockable waste ($0.25 on the sample), projections, one-click C
 ```bash
 git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
 cd Log-File-Bot-Traffic-Cost-Analyzer
-node server.js   # LOCAL DEV ONLY — http://localhost:8080 (gzip + headers parity). Never deploy server.js to Pages.
+node dev-server.js   # LOCAL DEV ONLY — http://localhost:8080 (gzip + headers parity). Never deploy dev-server.js to Pages.
 # or: docker build -t log-analyzer . && docker run -p 8080:8080 log-analyzer
 ```
 
@@ -205,15 +217,15 @@ Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fi
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 95 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness, spoof, js-shell, anomaly/diff/edge/BQ
-npm run lint      # node --check across engine/worker/server/tools
+npm test          # 105 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness+fallback, spoof, js-shell, anomaly/diff/edge/BQ + 10 v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, MCP, guards)
+npm run lint      # node --check across engine/worker/dev-server/tools (incl. mcp-server)
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
 ```
 
 ## 7b. Deploy (free, static — no server needed)
 
-The app is 100% client-side, so it hosts as pure static files. `server.js` + `Dockerfile` are local-dev only and ignored by the hosts.
+The app is 100% client-side, so it hosts as pure static files. `dev-server.js` + `Dockerfile` are local-dev only and ignored by the hosts.
 
 **Primary — Cloudflare Pages (never sleeps, free SSL/Brotli):** Dash → Workers & Pages → Create → **Pages** (not Worker) → Connect to Git → select this repo. Framework preset `None`, build command empty, build output + root directory empty, production branch `main`. Live at `https://log-file-bot-traffic-cost-analyzer.pages.dev`. Security/cache headers come from [`_headers`](_headers).
 
@@ -232,20 +244,21 @@ Pages-only. No Render mirror — speed is trust (a sleeping mirror costs convers
 - **Cost = measured bytes × configured pricing.** No assumed traffic. Proven by perturbation test: +1 GiB on one record moves the total exactly +$0.09.
 - **Origin-compute is opt-in (OFF by default).** No log distinguishes SSR from static, so the engine adds $0 unless you enable it in Pricing.
 - **Blockable = training + suspicious/unknown only.** Search-index and user-fetch are never blockable (asserted in tests).
-- **Verification = vendor IP JSON first** (11 endpoints, IPv6 + full-CIDR aware, ETag + fetched-date + fallback; `normalizeTier` consolidates the `ai_citation` legacy alias into `ai_search_index`), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic = crawling policy robots-first + forward-DNS confirm; Apple/Meta/ByteDance = robots/ASN-only).
+- **Verification = vendor IP JSON first** (14 sources incl. BotBase taxonomy, IPv6 + full-CIDR aware, ETag + fetched-date + last-good fallback pin; `ai_citation` deleted in v2 — `migrateLegacyTier` on load), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic = crawling policy robots-first + forward-DNS confirm; Apple/Meta/ByteDance = robots/ASN-only).
 - **Sampling is disclosed** on-screen with stride, counts and timing — verification counts are scaled to the full set and labeled, never silent.
 - **Reproducibility:** `sample-data/EXPECTED.md` pins exact expected counts for the deterministic 10k fixture; CI re-verifies on every push.
 
 ## 9. Architecture
 
 ```
-index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets)
-_headers                    # Cloudflare Pages headers: CSP/nosniff/DENY + cache rules (replaces server.js headers)
-server.js                   # LOCAL DEV ONLY: static server with gzip + headers (Pages ignores it)
-js/analyzer.js              # engine: 127-signature DB, 4-layer verify, 14-step analyze, 10 renderers + Render Gap/spoof/anomaly/diff/edge/BQ/triple-join
+index.html                  # dashboard + 10 thinned tabs + join UI (?v= cache-busted assets)
+_headers                    # Cloudflare Pages headers: CSP/nosniff/DENY + cache rules (replaces dev-server.js headers)
+dev-server.js               # LOCAL DEV ONLY (NEVER deploy to Pages): static server with gzip + headers (Pages ignores it)
+js/analyzer.js              # engine: 127-signature DB, 4-layer verify, 14-step analyze, 10 renderers + Render Gap/spoof/anomaly/diff/edge/BQ/triple-join + v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, guards)
 js/worker.js                # off-main-thread analyze() for 20k+ rows
-tools/cli.js                # CLI exact mode: 500MB-50GB streaming exact + --logs-csv/--bq-sql/--verify-rdns (shipped v1.4)
-data/bot-ips.json           # dated vendor IP JSON snapshot, 13 sources, full CIDRs + IPv6 (refresh: npm run fetch-ips)
+tools/cli.js                # CLI exact mode: 500MB-50GB streaming exact + --logs-csv/--bq-sql/--verify-rdns/--verify-batch/--pay-per-crawl/--sept-defaults/--bundle-dir/--citation-gap/--bq-streaming
+tools/mcp-server.js         # MCP stdio server: analyzeLogs/getBotPolicy/genEdgeRule (Claude/ChatGPT agents)
+data/bot-ips.json           # dated vendor IP JSON snapshot, 14 sources incl. BotBase taxonomy, full CIDRs + IPv6 (refresh: npm run fetch-ips)
 .github/workflows/fetch-ips.yml  # free weekly Bot DB refresh (Mon 2am UTC) + test + auto-commit
 bots/ guides/ research/     # static SEO/docs pages, listed in sitemap.xml (bots/index.html regenerates via npm run gen-bots-page)
 tools/gen-bots-page.js      # builds the searchable bots/index.html from the live BOTS array (127 sigs)
@@ -253,7 +266,7 @@ BOTS.md                     # open bot DB: training vs search-index vs user-trig
 METHOD.md                   # sampling/cost/verify/limits — read before quoting numbers
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 95 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness/spoof/js-shell/anomaly)
+tests/                      # 105 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness+fallback/spoof/js-shell/anomaly/v2)
 llms.txt / llms-full.txt    # repo-root AI-use policy + full 127-sig grounding dump (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)

@@ -15,6 +15,7 @@
     { "bot": "Bingbot", "url": "https://www.bing.com/toolbox/bingbot.json", "prefixes": ["13.107.0.0/16", "204.79.0.0/16"], "bots": ["bingbot"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "www.bing.com/toolbox/bingbot.json" },
     { "bot": "Applebot-Extended", "url": null, "prefixes": [], "bots": ["applebot-extended"], "date": "2026-09-17", "note": "Apple publishes no IP list — robots token only." },
     { "bot": "Meta-ExternalAgent", "url": null, "prefixes": [], "bots": ["meta-externalagent"], "date": "2026-09-17", "note": "Meta publishes no stable agent list — ASN + rDNS confirm." },
-    { "bot": "Bytespider", "url": null, "prefixes": [], "bots": ["bytespider"], "date": "2026-09-17", "note": "ByteDance publishes no list — ASN + rDNS confirm." }
+    { "bot": "Bytespider", "url": null, "prefixes": [], "bots": ["bytespider"], "date": "2026-09-17", "note": "ByteDance publishes no list — ASN + rDNS confirm." },
+    { "bot": "BotBase taxonomy (Cloudflare public DB)", "url": "https://developers.cloudflare.com/bots/concepts/bot-base/", "prefixes": [], "bots": [], "date": "2026-09-17", "fetched": "2026-09-17", "taxonomyOnly": true, "note": "Taxonomy-only: training vs search vs agent mapping — no IPs, informs tier policy." }
   ]
 }

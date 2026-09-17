@@ -151,17 +151,34 @@ const BOTS=[
   {p:'node-fetch',n:'node-fetch',cat:'ai_training',tier:'ai_training',note:'Node fetch client at scale = automated. Review before blocking.'},
 ];
 // 2026 rate-limit policy table (single source of truth for edge rules + robots tab)
-// NOTE: ai_citation was a legacy alias of ai_search_index and is now consolidated.
-// Old logs/exports may still carry ai_citation — normalizeTier() maps it to
-// ai_search_index at read time. Do NOT add new ai_citation entries.
+// v2.0: ai_citation REMOVED everywhere (was pre-v1.3 alias of ai_search_index).
+// Use migrateLegacyTier() on load for old exports — normalizeTier() is now identity.
 const RATE_POLICY={
   ai_training:{label:'Training',action:'throttle/block freely',limit:'60 req/min/IP',aggressive:'20 req/min/IP',robots:'Disallow',cf:'Cloudflare AI Crawl Control → Block Training',risk:'none'},
   ai_search_index:{label:'Search-index',action:'allow with limits',limit:'120 req/min/IP',aggressive:'60 req/min/IP',robots:'Allow',cf:'Cloudflare AI Crawl Control → Allow Search',risk:'medium-high (citation loss in 1-2 wks if blocked)'},
   ai_user_fetch:{label:'User-triggered',action:'DO NOT throttle',limit:'no throttle (300/min abuse ceiling only)',aggressive:'429 = missing live answer',robots:'Allow (robots.txt may not apply)',cf:'Cloudflare AI Crawl Control → Allow Agent',risk:'critical (do not block)'},
   search_engine:{label:'Search engine',action:'allow',limit:'none',aggressive:'none',robots:'Allow',cf:'Allow',risk:'critical (organic visibility)'}
 };
-let _aiCitationWarned=false;
-function normalizeTier(t){if(t==='ai_citation'&&!_aiCitationWarned){_aiCitationWarned=true;try{if(typeof console!=='undefined')console.warn('[lfa] DEPRECATED tier "ai_citation" seen — mapped to "ai_search_index". Support ends in v2.0; migrate exports.')}catch(e){}}return t==='ai_citation'?'ai_search_index':t;}
+let _legacyMigrated=false;
+function normalizeTier(t){return t;}
+/* v2.0 migration: pre-v1.3 exports may carry tier "ai_citation".
+ * Call migrateLegacyTier(obj) once on load — rewrites to ai_search_index and logs.
+ * normalizeTier() itself is now pure identity (no hidden alias, no warn-once debt). */
+function migrateLegacyTier(obj){
+  let n=0;
+  const walk=(v)=>{
+    if(Array.isArray(v)){for(const x of v)walk(x);return;}
+    if(v&&typeof v==='object'){
+      for(const k of Object.keys(v)){
+        if(k==='tier'&&v[k]==='ai_citation'){v[k]='ai_search_index';n++;}
+        else walk(v[k]);
+      }
+    }
+  };
+  walk(obj);
+  if(n>0&&!_legacyMigrated){_legacyMigrated=true;try{if(typeof console!=='undefined')console.log('[lfa] migrated '+n+' legacy ai_citation tier(s) -> ai_search_index (v2 removal)');}catch(e){}}
+  return {migrated:n};
+}
 
 // Bot-first classification order documented: bot signatures take precedence over browser
 // fingerprints to prevent spoofed-UA bypass. python/curl-in-Chrome edge case handled explicitly.
@@ -245,8 +262,10 @@ function ipInCidr(ip,cidr){
 }
 function ipMatchesAny(ip,list){const s=normalizeIP(ip);if(!s)return false;return (list||[]).some(p=>ipInCidr(s,p));}
 // Vendor IP JSON registry — fetch at build time into data/bot-ips.json, show date badge in UI.
-// 2026-09-17: 11 endpoints. Anthropic now publishes claude.com/crawling/bots.json (crawling policy,
-// no bare IPs — still robots-first); Perplexity splits bot/user; OpenAI splits gptbot/searchbot/chatgpt-user.
+// v2.0: 14 sources (11 endpoints + 3 by-design + BotBase taxonomy). Anthropic
+// claude.com/crawling/bots.json is crawling policy (robots-first, no bare IPs);
+// Perplexity splits bot/user; OpenAI splits gptbot/searchbot/chatgpt-user.
+// BotBase (Cloudflare public DB) is taxonomy-only — maps categories to our tiers.
 const BOT_IP_SOURCES=[
   {bot:'GPTBot',url:'https://openai.com/gptbot.json'},
   {bot:'OAI-SearchBot',url:'https://openai.com/searchbot.json'},
@@ -260,7 +279,8 @@ const BOT_IP_SOURCES=[
   {bot:'Bingbot',url:'https://www.bing.com/toolbox/bingbot.json'},
   {bot:'Applebot-Extended',url:'(none — Apple publishes no IP list; robots token only)'},
   {bot:'Meta-ExternalAgent',url:'(none — Meta publishes no stable agent list; ASN + rDNS confirm)'},
-  {bot:'Bytespider',url:'(none — ByteDance publishes no list; ASN + rDNS confirm)'}
+  {bot:'Bytespider',url:'(none — ByteDance publishes no list; ASN + rDNS confirm)'},
+  {bot:'BotBase taxonomy (Cloudflare public DB)',url:'https://developers.cloudflare.com/bots/concepts/bot-base/',note:'Taxonomy-only: training vs search vs agent mapping — no IPs, informs tier policy'}
 ];
 
 const TRAPS=[
@@ -356,7 +376,8 @@ function norm(rec){
   const referer=pick(rec,'referer','referrer','http_referer','httpReferer','request_referer')||'';
   const tls=pick(rec,'tls_protocol','ssl_protocol','sslProtocol','TLSProtocol')||'';
   const cache=pick(rec,'cache_status','cacheStatus','CacheStatus','cf_cache_status','x_cache','X-Cache','CacheResponseStatus')||'';
-  return {raw:rec,ip,tstamp,method,uri,status,ua,bytes:isNaN(bytes)?0:bytes,rt:isNaN(rt)?null:rt,referer,tls,cache};
+  const wba=pick(rec,'cf_web_bot_auth','web_bot_auth','cf-web-bot-auth','web-bot-auth','wba','webBotAuth','cf_pay_per_crawl','crawler_price')||'';
+  return {raw:rec,ip,tstamp,method,uri,status,ua,bytes:isNaN(bytes)?0:bytes,rt:isNaN(rt)?null:rt,referer,tls,cache,wba};
 }
 
 /* ==== D: CLASSIFY (bot-first order; documented to prevent spoofing) ==== */
@@ -1050,7 +1071,7 @@ function analyze(records,cfg,onProgress){
 }
 
 /* ==== M: RENDER HELPERS ==== */
-// Single taxonomy: ai_search_index only. ai_citation is a code-level alias in normalizeTier() for pre-v1.3 exports — never shown in UI.
+// Single taxonomy: ai_search_index only. v2.0: ai_citation deleted (see migrateLegacyTier).
 const TL={search_engine:'Search Engine',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'};
 const TC={search_engine:'b-green',ai_search_index:'b-cyan',ai_user_fetch:'b-blue',ai_training:'b-red',seo_tool:'b-purple',monitoring:'b-blue',human:'b-green',social:'b-amber',unknown_bot:'b-amber',suspicious:'b-red',unclassified:'b-gray',unknown:'b-gray'};
 
@@ -1066,7 +1087,7 @@ function td(t,cls=''){return `<td${cls?' class="'+cls+'"':''}>${t}</td>`}
    Each module highlights CRITICAL ISSUES wasting your money.
 */
 
-function tierLabel(t){if(t==='ai_citation')t='ai_search_index';return ({search_engine:'Search Engine',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'})[t]||t}
+function tierLabel(t){return ({search_engine:'Search Engine',ai_search_index:'AI Search-Index (allow)',ai_user_fetch:'AI User-Triggered (do not block)',ai_training:'AI Training Scraper',seo_tool:'SEO Tool',monitoring:'Monitoring',human:'Human Browser',social:'Social Platform',unknown_bot:'Unknown Bot',suspicious:'Suspicious',unclassified:'Unclassified',unknown:'Unknown'})[t]||t}
 
 function critIssue(title,detail,impact,fix){
   return '<div class="rec red"><span class="badge b-red" style="margin-right:6px;font-size:10px">CRITICAL</span><strong>'+title+'</strong><p style="margin-top:6px">'+detail+'</p>'+(impact?'<div style="margin-top:6px;font-size:12px;color:var(--red)"><strong>Money Wasted:</strong> '+impact+'</div>':'')+(fix?'<div style="margin-top:4px;font-size:12px;color:var(--green)"><strong>Fix:</strong> '+fix+'</div>':'')+'</div>';
@@ -1167,8 +1188,16 @@ function renderTab2(A){
   h+='</div>';
   h+='<div class="card"><h3>Reverse-DNS Verifier (opt-in, in-browser DoH)</h3>'+
     '<p>Runs ONLY when you click — one DNS-over-HTTPS query to Cloudflare 1.1.1.1 per lookup. PTR + forward-confirm (A/AAAA must resolve back to the IP). IPv4 only. A match is strong evidence; anything else is a signal, not a verdict.</p>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="rdns-ip" placeholder="66.249.66.1" aria-label="IP to verify" style="font-family:var(--mono);padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);color:var(--text-1)"><button class="btn-primary" id="rdns-btn">Verify via DoH</button></div>'+
-    '<div id="rdns-out" aria-live="polite" style="margin-top:8px;font-size:12px"></div></div>';
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="rdns-ip" placeholder="66.249.66.1" aria-label="IP to verify" style="font-family:var(--mono);padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);color:var(--text-1)"><button class="btn-primary" id="rdns-btn">Verify via DoH</button> <button class="btn-outline" id="rdns-batch-btn">Verify top 20 UNVERIFIED (batch)</button> <button class="btn-outline" id="rdns-dig-btn">Export dig -x bundle</button></div>'+
+    '<div id="rdns-out" aria-live="polite" style="margin-top:8px;font-size:12px"></div><div id="rdns-batch-out" style="margin-top:8px;font-size:12px"></div></div>';
+  try{
+    const fs2=getFreshnessStatus();
+    h+='<div class="card"><h3>Freshness + fallback pin</h3><p><span class="badge '+(fs2.level==='green'?'b-green':fs2.level==='amber'?'b-amber':'b-red')+'">'+esc(fs2.label)+'</span> BotBase taxonomy synced as 14th source (categories only, no IPs). If weekly Actions fails, analysis keeps running on the last-good pinned snapshot ('+esc(FALLBACK_PIN.date)+') and this banner turns red — trust never silently dies.</p></div>';
+  }catch(e){}
+  try{
+    const sp2=(typeof A!=='undefined'&&A.spoof)?A.spoof:null;
+    if(sp2&&sp2.topIPs&&sp2.topIPs.length)h+='<div class="card"><h3>Web Bot Auth signal</h3><p style="font-size:12px">Cloudflare adds <code>cf-web-bot-auth</code> / signed-fetch headers at edge. If your Logpush export includes it, <code>norm()</code> surfaces it as <code>wba</code> and counts as a strong positive alongside IP JSON. No header in this window = enable the Logpush field, then re-run. Frog 7.0 verify-on-import parity: use batch verify above.</p></div>';
+  }catch(e){}
   el.innerHTML=h;
   const rb=document.getElementById('rdns-btn');
   if(rb)rb.onclick=async()=>{
@@ -1179,6 +1208,24 @@ function renderTab2(A){
       out.innerHTML='IP <b>'+esc(v.ip)+'</b> → PTR <b>'+esc(v.ptr)+'</b> → forward ['+esc(v.forward.join(', ')||'none')+'] → '+(v.match?'<span class="badge b-green">FORWARD-CONFIRMED</span>':'<span class="badge b-amber">NOT CONFIRMED — treat as signal</span>');
     }catch(e){out.innerHTML='<span class="badge b-red">ERROR</span> '+esc(e.message||String(e));}
   };
+  try{
+    const bb=document.getElementById('rdns-batch-btn');
+    if(bb)bb.onclick=async()=>{
+      const out=document.getElementById('rdns-batch-out');if(!out)return;
+      const tops=((typeof currentAnalysis!=='undefined'&&currentAnalysis&&currentAnalysis.spoof&&currentAnalysis.spoof.topIPs)||[]).slice(0,20);
+      if(!tops.length){out.textContent='No UNVERIFIED IPs in this window.';return;}
+      out.textContent='Verifying '+tops.length+' IPs via 1.1.1.1 (one click, sequential)…';
+      try{const res=await verifyTopUnverifiedBatch(tops,verifyRdnsDoh);out.innerHTML=res.map(v=>esc(v.ip||'?')+' → '+esc(v.ptr||v.error||'?')+' '+(v.match?'<span class="badge b-green">CONFIRMED</span>':'<span class="badge b-amber">signal</span>')).join('<br>');}catch(e){out.textContent='Batch failed: '+(e.message||e);}
+    };
+    const db2=document.getElementById('rdns-dig-btn');
+    if(db2)db2.onclick=()=>{
+      try{
+        const tops=((typeof currentAnalysis!=='undefined'&&currentAnalysis&&currentAnalysis.spoof&&currentAnalysis.spoof.topIPs)||[]).slice(0,20);
+        const cmd=genBatchVerifyCommands(tops);
+        (navigator.clipboard?navigator.clipboard.writeText(cmd):Promise.reject()).then(()=>{db2.textContent='Copied!';setTimeout(()=>db2.textContent='Export dig -x bundle',1200);}).catch(()=>{prompt('Copy dig bundle:',cmd);});
+      }catch(e){}
+    };
+  }catch(e){}
 }
 
 function renderTab3(A){
@@ -1298,14 +1345,26 @@ function renderTab5(A){
      ['PerplexityBot','search-index','210 : 1','ALLOW @120/min — best search ROI'],
      ['ClaudeBot (training)','training','~5,143 : 1','Block freely (was 20,583:1 — improved, still worst)'],
      ['GPTBot / CCBot / Bytespider','training','∞ (zero referrals)','Block freely — zero live citation loss']].map(([b,cl,ratio,pol])=>'<tr><td><strong>'+b+'</strong></td><td>'+cl+'</td>'+td(ratio,'n')+'<td style="font-size:11px">'+pol+'</td></tr>'))+
+    '<p style="font-size:11px;color:var(--text-3);margin-top:8px"><strong>Disclaimer (screenshot-safe):</strong> '+esc(AI_MATRIX_DISCLAIMER)+'</p>'+
     '</div>';
+  try{
+    h+='<div class="card"><h3>Citation-gap closer — bot vs browser</h3><p style="font-size:12px">Paste a URL to generate the exact <code>curl -A</code> harness (GPTBot vs browser byte diff) + citation-killer check. In-browser fetch is CORS-limited — curl is truth.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="gap-url" placeholder="https://example.com/page" style="flex:1;min-width:220px;font-family:var(--mono);padding:7px 10px;border:1px solid var(--border);border-radius:6px"><button class="btn-primary" id="gap-btn">Generate harness</button></div><div id="gap-out" style="margin-top:8px"></div></div>';
+  }catch(e){}
   el.innerHTML=h;
+  try{
+    const gb=document.getElementById('gap-btn');
+    if(gb)gb.onclick=()=>{const u=(document.getElementById('gap-url')||{}).value||'https://YOUR-DOMAIN/page';const o=document.getElementById('gap-out');if(o)o.innerHTML='<div class="code"><code>'+esc(genCitationGapCommands(u))+'</code></div><p style="font-size:11px">Citation killers to check after curling: content only in JS, prices in client fetch, blocked /_next/data/. Paste raw bot HTML into console: <code>detectCitationKillers(html)</code>.</p>';};
+  }catch(e){}
 }
 
 function renderTab6(A){
   const el=document.getElementById('tab6');let h='';
   h+='<div class="card"><h3>Module 6: Automated Edge Policy Engine</h3>'+
     '<p>Ready-to-deploy rules from YOUR log data. Copy directly into your CDN/WAF dashboard to block or rate-limit bots at the edge.</p></div>';
+  try{
+    const g=(typeof currentAnalysis!=='undefined'&&currentAnalysis&&currentAnalysis._guessMode)||(A&&A._guessMode);
+    if(g||(typeof window!=='undefined'&&document.getElementById('guess-note'))){h+='<div class="rec red"><strong>BLOCKED: guess-mode logs.</strong><p>W3C without #Fields = low-confidence IP mapping. Edge-rule generation is disabled to prevent blocking the wrong UA/IP. Add a #Fields header and re-run.</p></div>';el.innerHTML=h;return;}
+  }catch(e){}
   for(const provider of ['cloudflare','fastly','aws']){
     const ruleset=A.edgeRules[provider]||[];
     if(!ruleset.length)continue;
@@ -1321,13 +1380,26 @@ function renderTab6(A){
   h+='<div class="card"><h3>llms.txt Generator (IETF draft, 2026) <button class="btn-sm copy-btn" data-copy-id="llms-txt">Copy</button></h3><p style="font-size:12px">Publish at <code>/llms.txt</code> next to robots.txt. Advisory only — robots.txt + edge rules above do the enforcing.</p><div class="code"><code id="llms-txt">'+esc(genLlmsTxt(A))+'</code></div></div>';
   h+='<div class="card"><h3>Pay Per Crawl — 402 Payment Required Example <button class="btn-sm copy-btn" data-copy-id="p402">Copy</button></h3><p style="font-size:12px">5% of top-1000 sites already charge per crawl (Tollbit/402 beta). Training bots pay; search-index + user-fetch always bypass.</p><div class="code"><code id="p402">'+esc(gen402Example())+'</code></div></div>';
   try{
+    const v2=genPayPerCrawlV2({});
+    h+='<div class="card"><h3>Pay Per Crawl v2 — per-path pricing <button class="btn-sm copy-btn" data-copy-id="ppc-v2">Copy nginx</button> <button class="btn-sm copy-btn" data-copy-id="ppc-worker">Copy Worker</button></h3><p style="font-size:12px">/ free · /premium/* $0.05 · /api/* $0.25. Origin <code>Crawler-Price</code> header + Worker dynamic pricing + <code>cf-pay-per-crawl</code> handling + Discovery checklist. Search/user ALWAYS bypass.</p><div class="code"><code id="ppc-v2">'+esc(v2.nginx)+'</code></div><div class="code"><code id="ppc-worker">'+esc(v2.worker)+'</code></div><div class="code"><code>'+esc(v2.discovery+'\n'+v2.harness)+'</code></div></div>';
+  }catch(e){}
+  try{
+    const sept=genSept2026Defaults(A.botData);
+    h+='<div class="card"><h3>Cloudflare Sept-15-2026 defaults — one-click preset <button class="btn-sm copy-btn" data-copy-id="sept-waf">Copy WAF</button></h3><p style="font-size:12px">'+esc(sept.diff)+'</p><div class="code"><code id="sept-waf">'+esc(sept.waf)+'</code></div></div>';
+  }catch(e){}
+  try{
+    const bundle=genPolicyBundle(A,{});
+    const issues=checkPolicyConsistency({robotsAllows:['OAI-SearchBot','PerplexityBot'],robotsDisallows:['GPTBot','ClaudeBot'],cfBlocksTraining:true});
+    h+='<div class="card"><h3>Policy bundle — robots + llms + crawlers.json + security.txt <button class="btn-sm" id="bundle-dl">Download bundle</button></h3><p style="font-size:12px">Consistency: '+esc(issues.join(' | '))+'</p><div class="code"><code id="bundle-crawlers">'+esc(bundle.crawlers.slice(0,1200))+'…</code></div><div class="code"><code>'+esc(bundle.security)+'</code></div></div>';
+  }catch(e){}
+  try{
     const rdns=genRdnsChecklist(A.botData,A._records||[]);
     if(rdns)h+='<div class="card"><h3>Reverse-DNS Verification Checklist <button class="btn-sm copy-btn" data-copy-id="rdns">Copy</button></h3><p style="font-size:12px">Run server-side before blocking anything claiming to be Google/Bing. Forward-confirmed rDNS is the only real proof.</p><div class="code"><code id="rdns">'+esc(rdns)+'</code></div></div>';
   }catch(e){}
   if(!A.edgeRules.cloudflare.length&&!A.edgeRules.fastly.length&&!A.edgeRules.aws.length)h+=warnIssue('No Rules Generated','No bot met the rule threshold (training/search/suspicious: 2+ requests; user-triggered: 1+).','N/A','Upload a larger log file.');
   try{
     const bq=genBQPack();
-    h+='<div class="card"><h3>BigQuery / Snowflake native pack <button class="btn-sm copy-btn" data-copy-id="bq-ddl">Copy DDL</button> <button class="btn-sm" id="bq-dl-btn">Download .sql</button></h3><p style="font-size:12px">Partitioned DDL + top-5 waste queries. Load <code>logs.csv</code> (100k rows) then run. DuckDB one-liner included.</p><div class="code"><code id="bq-ddl">'+esc(bq.ddl+'\n'+bq.queries)+'</code></div></div>';
+    h+='<div class="card"><h3>BigQuery / Snowflake native pack <button class="btn-sm copy-btn" data-copy-id="bq-ddl">Copy DDL</button> <button class="btn-sm" id="bq-dl-btn">Download .sql</button> <button class="btn-sm copy-btn" data-copy-id="bq-stream">Copy streaming</button></h3><p style="font-size:12px">Partitioned DDL + top-5 waste queries. Load <code>logs.csv</code> (100k rows) then run. DuckDB one-liner included. Streaming: Logpush → R2 → Parquet via <code>COPY TO</code> + scheduled UNVERIFIED % query.</p><div class="code"><code id="bq-ddl">'+esc(bq.ddl+'\n'+bq.queries)+'</code></div><div class="code"><code id="bq-stream">'+esc(genBQStreamingPack().streaming)+'</code></div></div>';
   }catch(e){}
   h+='<div class="card"><h3>Origin vs Edge ingest</h3><p style="font-size:12px">Origin logs UNDERCOUNT when Cloudflare/Fastly filters at edge. Toggle your ingest mode:</p><div style="display:flex;gap:8px"><button class="btn-sm" id="ing-origin">Origin</button><button class="btn-sm" id="ing-edge">Edge / Logpush</button></div><div id="ing-out" style="font-size:12px;margin-top:8px"></div></div>';
   h+='<div class="card"><h3>Standards-Compliant Rate Control (429/503 + Retry-After)</h3>'+
@@ -1338,6 +1410,7 @@ function renderTab6(A){
   el.innerHTML=h;
   try{
     const bq=document.getElementById('bq-dl-btn');if(bq)bq.onclick=()=>exportBQPack();
+    const bd=document.getElementById('bundle-dl');if(bd)bd.onclick=()=>{try{const b=genPolicyBundle(A,{});downloadFile('robots.txt',b.robots,'text/plain');setTimeout(()=>downloadFile('llms.txt',b.llms,'text/plain'),300);setTimeout(()=>downloadFile('crawlers.json',b.crawlers,'application/json'),600);setTimeout(()=>downloadFile('security.txt',b.security,'text/plain'),900);}catch(e){}};
     const io=document.getElementById('ing-origin'),ie=document.getElementById('ing-edge'),oo=document.getElementById('ing-out');
     const show=m=>{try{const e=estimateEdgeBlocked(A,m);if(oo)oo.innerHTML='<strong>'+esc(e.mode)+'</strong> — '+esc(e.warning)+'<br><span style="color:var(--text-3)">'+esc(e.estimateNote)+'</span>';}catch(err){}};
     if(io)io.onclick=()=>show('origin');if(ie)ie.onclick=()=>show('edge');
@@ -1376,6 +1449,12 @@ function renderTab7(A){
   h+=mkTable([th('Method'),th('Count','n'),th('%','n'),th('Interpretation')],
     Object.entries(A.tp.methods).sort((a,b)=>b[1]-a[1]).map(([m,cnt])=>'<tr><td><strong>'+esc(m)+'</strong></td>'+td(fmtN(cnt),'n')+td(fmtP(cnt/tM*100),'n')+'<td>'+(m==='GET'?'Standard requests':m==='POST'?'Form submissions/API':m==='HEAD'?'Health checks':m+' request')+'</td></tr>'));
   h+='</div>';
+  try{
+    h+='<div class="card"><h3>Traffic Patterns (merged — hourly + top IPs)</h3><p style="font-size:12px">Merged here to thin the 10-tab monster. Full burst tables live in Tab 8 Dynamics.</p><div class="bars">';
+    const mH2=Math.max(...(A.tp.hourly||[1]));
+    (A.tp.hourly||[]).forEach((cnt,hr)=>{const sp=(A.tp.spikes||{})[hr];h+='<div class="bar-r"><div class="bar-l">'+String(hr).padStart(2,'0')+':00'+(sp?' *':'')+'</div><div class="bar-t"><div class="bar-f '+(sp?'red':'blue')+'" style="width:'+Math.max(cnt/mH2*100,2)+'%"></div></div><div class="bar-v">'+fmtN(cnt)+'</div></div>';});
+    h+='</div><details><summary>Top 25 IPs by volume ('+((A.tp.topIPs||[]).length)+') — show</summary>'+mkTable([th('IP'),th('Requests','n')],(A.tp.topIPs||[]).map(([ip,cnt])=>'<tr><td style="font-family:var(--mono)">'+esc(ip)+'</td>'+td(fmtN(cnt),'n')+'</tr>'))+'</details></div>';
+  }catch(e){}
   el.innerHTML=h;
 }
 
@@ -1395,11 +1474,16 @@ function renderTab8(A){
   h+='</div></div>';
   try{
     const an=A.anomalies||{bursts:[],not404:[],slack:'no bursts'};
-    h+='<div class="card"><h3>Anomaly ML-lite — bursts + 404 clusters + Slack digest <button class="btn-sm copy-btn" data-copy-id="anom-slack">Copy Slack</button></h3>';
+    h+='<div class="card"><h3>Bot Dynamics — WoW that execs understand <button class="btn-sm copy-btn" data-copy-id="anom-slack">Copy Slack</button> <button class="btn-sm copy-btn" data-copy-id="ticket-txt">Copy tickets</button></h3>';
+    try{
+      const dyn=genBotDynamics(A,null);
+      if(dyn.rows.length)h+='<p style="font-size:12px">Spike/drop vs previous window (save summary.json weekly to compare — single-window view below until then):</p>'+mkTable([th('Bot'),th('Before','n'),th('After','n'),th('Δ','n'),th('Flag')],dyn.rows.slice(0,10).map(r=>'<tr><td><strong>'+esc(r.bot)+'</strong></td>'+td(fmtN(r.before),'n')+td(fmtN(r.after),'n')+td((r.delta>=0?'+':'')+fmtN(r.delta),'n')+'<td>'+esc(r.flag)+'</td></tr>'));
+    }catch(e){}
     if(an.bursts.length)h+=mkTable([th('Bot'),th('Hour #','n'),th('Count','n'),th('z','n'),th('Note')],an.bursts.slice(0,15).map(b=>'<tr class="hl"><td><strong>'+esc(b.bot)+'</strong></td>'+td(b.hourIndex,'n')+td(fmtN(b.count),'n')+td(b.z,'n')+'<td style="font-size:11px">'+esc(b.note)+'</td></tr>'))+'<div class="code"><code id="anom-slack">'+esc(an.slack)+'</code></div>';
     else h+='<p>No per-bot bursts (z≥3, ≥10 req/h). New-ASN surge proxy: watch stealth cloud IPs in Module 9.</p>';
     if(an.not404.length)h+=mkTable([th('404 cluster URI'),th('Hits','n')],an.not404.map(x=>'<tr><td style="font-size:11px">'+esc(x.uri)+'</td>'+td(fmtN(x.count),'n')+'</tr>'));
-    h+='<p style="font-size:11px">Week-over-week: <button class="btn-sm" id="diff-save">Save summary.json</button> then re-run next week and <button class="btn-sm" id="diff-dl">Download summary.json</button> to diff locally (no server). See METHOD.md.</p></div>';
+    try{const tk=genTicketText(an,A.sec);h+='<div class="code"><code id="ticket-txt">'+esc(tk)+'</code></div>';}catch(e){}
+    h+='<p style="font-size:11px">Week-over-week: <button class="btn-sm" id="diff-save">Save summary.json</button> then re-run next week and <button class="btn-sm" id="diff-dl">Download summary.json</button> to diff locally (no server). GSC clicks overlay: paste GSC export in the Join card — uncrawled sorted by clicks = exec priority. See METHOD.md.</p></div>';
   }catch(e){}
   h+='<div class="card"><h3>Top 25 IPs by Request Volume</h3>';
   h+=mkTable([th('IP Address'),th('Requests','n'),th('% of Total','n')],
@@ -1432,10 +1516,10 @@ function renderTab9(A){
   if(A.sec.threats.length)h+=critIssue('Security Threats — '+fmtN(A.sec.threats.length)+' Patterns','Detected suspicious patterns including path traversal, admin probes, and sensitive file access. Active attacks against your infrastructure.','Potential data breach','Block IPs at edge immediately. Enable WAF rules.');
   if(A.sec.threats.length){
     const grouped=grpBy(A.sec.threats,'type');
-    h+='<div class="card"><h3>Suspicious Request Patterns</h3>';
+    h+='<div class="card"><h3>Suspicious Request Patterns</h3><details><summary>'+fmtN(A.sec.threats.length)+' threats — show (collapsed to thin the tab monster)</summary>';
     h+=mkTable([th('Threat'),th('Severity'),th('Count','n'),th('Sample IP'),th('Sample URI'),th('User-Agent')],
       Object.entries(grouped).map(([threat,items])=>'<tr class="hl"><td><strong>'+esc(threat)+'</strong></td><td><span class="badge '+(items[0].sev==='critical'?'b-red':items[0].sev==='high'?'b-amber':'b-blue')+'">'+items[0].sev.toUpperCase()+'</span></td>'+td(fmtN(items.length),'n')+'<td style="font-family:var(--mono);font-size:11px">'+esc(items[0].ip)+'</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">'+esc(items[0].uri)+'</td><td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">'+esc((items[0].ua||'').substring(0,50))+'</td></tr>'));
-    h+='</div>';
+    h+='</details></div>';
   }
   if(A.sec.hvIPs.length){
     h+=warnIssue('High-Velocity IPs — Potential DDoS/Scraping',fmtN(A.sec.hvIPs.length)+' IPs exceeding '+A.sec.velocityThreshold.toFixed(1)+' req/sec.','Origin overload','Block at CDN edge.');
@@ -1507,6 +1591,10 @@ function renderTab10(A){
     '<div class="sr"><span class="sr-l">Human / Bot Split</span><span class="sr-v">'+fmtP(s.humanPct)+' human / '+fmtP(s.botPct)+' bot</span></div>'+
     '<div class="sr"><span class="sr-l">Pricing Used</span><span class="sr-v">CDN '+fmtC(pricing.cdnEgress)+'/GB, Req '+fmtC(pricing.request10K)+'/10K'+(pricing.ssr1K>0?', Compute '+fmtC(pricing.ssr1K)+'/1K (opt-in ON)':', Compute OFF (opt-in)')+'</span></div>'+
     '</div>';
+  try{
+    const rec2=calcPayPerCrawlRecovery(A.botData,0.02);
+    h+='<div class="card"><h3>Pay Per Crawl recovery model (CFO)</h3><p>'+esc(rec2.headline)+'</p>'+mkTable([th('Training bot'),th('Hits','n'),th('Recoverable/mo','n')],rec2.rows.slice(0,10).map(r=>'<tr><td><strong>'+esc(r.bot)+'</strong></td>'+td(fmtN(r.hits),'n')+td(fmtC(r.recoverable),'n')+'</tr>'))+'<p style="font-size:11px;color:var(--text-3)">'+esc(rec2.disclaimer)+' Total recoverable @ $0.02: <strong>'+fmtC(rec2.totalMonthly)+'/mo</strong>. That is what sells Pro $49.</p></div>';
+  }catch(e){}
   el.innerHTML=h;
 }
 
@@ -1980,6 +2068,7 @@ function showTab(id){document.querySelectorAll('.tp').forEach(p=>p.classList.rem
 function processRecords(records,file,meta){
       try{if(typeof lastRecords!=='undefined')lastRecords=records;}catch(e){}
       meta=meta||{};
+      try{migrateLegacyTier(records);}catch(e){}
       if(!records.length)throw new Error('No valid records found. Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, Cloudflare text.');
       if(typeof window!=='undefined'&&records.length>100000&&!('Worker' in window)){alert('Large file: 100k+ rows without Web Worker — UI may freeze briefly. Progress shown below.');}
       document.getElementById('ib-file').textContent=file?file.name:'pasted/sample';
@@ -1990,6 +2079,7 @@ function processRecords(records,file,meta){
       document.getElementById('live-monitor-bar').classList.remove('hidden');
       const run=()=>{
         currentAnalysis=analyze(records,currentCfg,(pct,msg)=>{document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;document.getElementById('progress-pct').textContent=pct+'%'});
+        try{currentAnalysis._guessMode=isGuessMode(meta);currentAnalysis._lowConfidence=meta.lowConfidence||{};}catch(e){}
         // analyze() already builds a full deduped _urlSet (100k cap). Keep it —
         // never overwrite with a 20k slice.
         if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){
@@ -2006,8 +2096,8 @@ function processRecords(records,file,meta){
       // Web Worker path if available (js/worker.js), else main thread
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
-          const w=new Worker('./js/worker.js?v=1.3.0');
-          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();recordHistory(records,file);}else if(type==='error'){w.terminate();run();}};
+          const w=new Worker('./js/worker.js?v=2.0.0');
+          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;try{currentAnalysis._guessMode=isGuessMode(meta);currentAnalysis._lowConfidence=meta.lowConfidence||{};}catch(e){}if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();recordHistory(records,file);}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
           w.postMessage({records,cfg:currentCfg});
           // fallback timeout: if worker fails silently, run on main thread
@@ -2085,7 +2175,318 @@ async function processFiles(files){
     if(!err||!err.cancelled)alert('Error: '+(err&&err.message||err));
   }
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectStealth,detectJsShell,countUnverified,detectAnomalies,diffAnalyses,estimateEdgeBlocked,genBQPack,joinTriple,cfoContext,isChromeUA,cloudOf,botDbAgeDays,verifyRdnsDoh,reverseIPv4,loadHistory,saveHistoryEntry,clearHistory,encodeCfg,decodeCfg,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,BOT_IP_SOURCES,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION,BOT_IP_JSON_DATE};}
+/* ==== V2 ENTERPRISE 2026 — P0/P1 + removals/fixes (Sept-2026 Cloudflare defaults,
+ * Pay Per Crawl v2, Web Bot Auth batch verify, 4-file policy bundle, citation-gap
+ * closer, Bot Dynamics, BQ streaming, freshness fallback, guess-mode guard) ==== */
+const AI_MATRIX_DISCLAIMER='Directional crawl-to-referral ratios (OAI ~85:1, Perplexity ~210:1, Claude ~5,143:1): measured medians from public 2026 studies + your logs — NOT guarantees. Ranges, not promises. Confirm against YOUR analytics before blocking. Logs prove fetch, not citation.';
+const FALLBACK_PIN={date:BOT_IP_JSON_DATE,note:'Pinned fallback snapshot ships in data/bot-ips.json — used when weekly fetch fails. UI shows "last good" banner, never silent stale.'};
+function getFreshnessStatus(nowMs){
+  const age=botDbAgeDays(nowMs);
+  const level=age<=7?'green':age<=21?'amber':'red';
+  const label=age<=7?age+'d fresh':age<=21?age+'d aging — refresh soon':'STALE '+age+'d — showing last-good pinned snapshot ('+FALLBACK_PIN.date+')';
+  return {age,level,label,fallback:FALLBACK_PIN,stale:age>21};
+}
+/* P0-1: Cloudflare Sept 15 2026 defaults. New domains auto-block Training+Agent on
+ * ad pages, allow Search-only. This preset generates the exact WAF rule + diffs it
+ * against YOUR current log mix (training hits that would now 403 vs search kept). */
+const CLOUDFLARE_SEPT_DEFAULTS={
+  version:'2026.09.15',training:'block',agent:'block-on-ad-pages',search:'allow',
+  note:'Cloudflare AI Crawl Control Sept-15-2026 defaults: block training + agent bots on ad pages for new domains; allow search-only. Apply via Dashboard > Security > AI Crawl Control or the WAF rule below.'
+};
+const BOTBASE_TAXONOMY=[
+  {botbase:'AI Training',tier:'ai_training',policy:'Block freely @ 60/min (20 aggressive). Zero live citation loss.'},
+  {botbase:'AI Search / Retrieval',tier:'ai_search_index',policy:'ALLOW @ 120/min (60 aggressive), 429 + Retry-After only. Never hard block.'},
+  {botbase:'AI Agent / Assistant fetch',tier:'ai_user_fetch',policy:'DO NOT throttle. 300/min abuse ceiling only. 429 = missing live answer.'},
+  {botbase:'Search Engine',tier:'search_engine',policy:'Allow. Organic visibility.'},
+  {botbase:'SEO Tool',tier:'seo_tool',policy:'Rate-limit 60/min, allowlist paying seats.'}
+];
+function genSept2026Defaults(botData){
+  const training=[],search=[],agent=[];
+  for(const[name,bd]of Object.entries(botData||{})){
+    const t=normalizeTier(bd.tier);
+    const ua=(bd.topUAList&&bd.topUAList[0]&&bd.topUAList[0][0])||name;
+    if(t==='ai_training')training.push({bot:name,count:bd.count,ua:ua.substring(0,80)});
+    else if(t==='ai_search_index')search.push({bot:name,count:bd.count,ua:ua.substring(0,80)});
+    else if(t==='ai_user_fetch')agent.push({bot:name,count:bd.count,ua:ua.substring(0,80)});
+  }
+  const tN=training.reduce((s,x)=>s+x.count,0),sN=search.reduce((s,x)=>s+x.count,0),aN=agent.reduce((s,x)=>s+x.count,0);
+  const waf=[
+    '# Cloudflare Sept-15-2026 defaults — paste into Security > WAF > Custom rules',
+    '# Training + Agent BLOCK on ad pages, Search ALLOW. Preview mode first.',
+    'cf.ai_crawl_control.training == "block" and http.request.uri.path wildcard r"/ads/*"',
+    '  => Block (training). Search-index bypasses this rule (allow + 120/min rate limit).',
+    '',
+    '(http.user_agent contains "GPTBot" or http.user_agent contains "ClaudeBot" or',
+    ' http.user_agent contains "CCBot" or http.user_agent contains "Bytespider" or',
+    ' http.user_agent contains "GoogleOther" or http.user_agent contains "Meta-ExternalAgent")',
+    '  and http.request.uri.path wildcard r"/ads/*"',
+    '  => Block. Log sample first: Security > Events, filter by this rule.',
+    '',
+    '# Rate-limit companions (ALLOW, never block):',
+    '# OAI-SearchBot/PerplexityBot/Claude-SearchBot -> 120/min/IP, exceed => 429 + Retry-After: 30',
+    '# ChatGPT-User/Perplexity-User/Claude-User -> allow + log, abuse ceiling 300/min => 429 + Retry-After: 10'
+  ].join('\n');
+  const diff=[
+    'Diff vs YOUR logs: training '+tN.toLocaleString()+' req would newly BLOCK on /ads/*;',
+    'search-index '+sN.toLocaleString()+' req stays ALLOWED (120/min);',
+    'user-fetch '+aN.toLocaleString()+' req stays ALLOWED (agent rule is ad-page scoped).',
+    training.length?'Top training to verify before enforcing: '+training.sort((a,b)=>b.count-a.count).slice(0,5).map(x=>x.bot+' ('+x.count+')').join(', '):'No training bots in this window — rule is no-op until they appear.'
+  ].join(' ');
+  return {defaults:CLOUDFLARE_SEPT_DEFAULTS,waf,diff,training,search,agent,counts:{training:tN,search:sN,agent:aN}};
+}
+/* P0-2: Pay Per Crawl v2 — per-path pricing (not single numbers), origin
+ * crawler-price header generator, dynamic Worker, Discovery checklist, CFO model. */
+function genPayPerCrawlV2(opts){
+  opts=opts||{};
+  const free=opts.freePaths||['/','/blog/*','/docs/*'];
+  const premium=opts.premiumPaths||['/premium/*'];
+  const api=opts.apiPaths||['/api/*'];
+  const pFree=0, pPremium=opts.premiumPrice!=null?opts.premiumPrice:0.05, pApi=opts.apiPrice!=null?opts.apiPrice:0.25;
+  const nginx=[
+    '# Pay Per Crawl v2 — per-path pricing (origin-enforced, Cloudflare 402 beta)',
+    '# FREE: '+free.join(', ')+'  -> always 200 for legit crawlers',
+    '# PREMIUM $'+pPremium.toFixed(2)+': '+premium.join(', '),
+    '# API $'+pApi.toFixed(2)+': '+api.join(', '),
+    'map $http_user_agent $is_train { default 0; ~*(GPTBot|ClaudeBot|CCBot|Bytespider|cohere-ai|AI2Bot|GoogleOther|ImageSiftBot|DeepSeekBot) 1; }',
+    'map $http_user_agent $is_bypass { default 0; ~*(OAI-SearchBot|PerplexityBot|Claude-SearchBot|DuckAssistBot|ChatGPT-User|Perplexity-User|OAI-AdsBot) 1; }',
+    '',
+    '# API tier: $'+pApi.toFixed(2)+'/req for training without token',
+    'location ^~ /api/ {',
+    '  if ($is_bypass = 1) { break; }  # citations first, never charge search/user',
+    '  if ($is_train = 1) {',
+    '    add_header X-Crawl-Price "USD '+pApi.toFixed(2)+'/request" always;',
+    '    add_header Crawler-Price "USD '+pApi.toFixed(2)+'" always;',
+    '    add_header Link \'<https://tollbit.example.com/buy>; rel="payment"\' always;',
+    '    return 402 \'{"error":"Payment Required","price_usd_per_request":'+pApi.toFixed(2)+'}\';',
+    '  }',
+    '}',
+    '# Premium tier: $'+pPremium.toFixed(2)+'/req',
+    'location ^~ /premium/ {',
+    '  if ($is_bypass = 1) { break; }',
+    '  if ($is_train = 1) {',
+    '    add_header X-Crawl-Price "USD '+pPremium.toFixed(2)+'/request" always;',
+    '    add_header Crawler-Price "USD '+pPremium.toFixed(2)+'" always;',
+    '    return 402 \'{"error":"Payment Required","price_usd_per_request":'+pPremium.toFixed(2)+'}\';',
+    '  }',
+    '}'
+  ].join('\n');
+  const worker=[
+    '// Cloudflare Worker — dynamic Pay Per Crawl (origin crawler-price header wins)',
+    '// Set response header at origin: `Crawler-Price: USD 0.05` per path; Worker enforces.',
+    'const TRAIN = /GPTBot|ClaudeBot|CCBot|Bytespider|cohere-ai|AI2Bot|GoogleOther|ImageSiftBot|DeepSeekBot/i;',
+    'const BYPASS = /OAI-SearchBot|PerplexityBot|Claude-SearchBot|DuckAssistBot|ChatGPT-User|Perplexity-User|OAI-AdsBot/i;',
+    'export default { async fetch(req, env) {',
+    '  const ua = req.headers.get("user-agent") || "";',
+    '  if (BYPASS.test(ua)) return fetch(req); // never charge search/user',
+    '  if (req.headers.has("cf-pay-per-crawl")) return fetch(req); // Tollbit token present',
+    '  const res = await fetch(req);',
+    '  const price = res.headers.get("crawler-price") || res.headers.get("crawler-exact-price");',
+    '  const maxOk = req.headers.get("crawler-max-price");',
+    '  if (TRAIN.test(ua) && price && !req.headers.has("x-crawl-token")) {',
+    '    // Optional: respect buyer max-price ("Discovery API" pattern)',
+    '    // if (maxOk && parseFloat(maxOk.replace(/[^0-9.]/g,"")) >= parseFloat(price.replace(/[^0-9.]/g,""))) return res;',
+    '    return new Response(JSON.stringify({ error: "Payment Required", price }), {',
+    '      status: 402, headers: { "content-type": "application/json", "X-Crawl-Price": price } });',
+    '  }',
+    '  return res;',
+    '}}'
+  ].join('\n');
+  const discovery=[
+    'Discovery API checklist (private beta, 2026):',
+    '1) Origin sends per-path price: `Crawler-Price: USD 0.05` (or crawler-exact-price).',
+    '2) Crawler declares budget: `Crawler-Max-Price: USD 0.10` request header.',
+    '3) Worker compares max >= price -> serve 200 + `cf-pay-per-crawl: receipt` header; else 402.',
+    '4) Analytics: log 402s by UA + path (Discovery API dashboard). Start in monitor-only: add header, count, then enforce.',
+    '5) NEVER price search-index or user-fetch paths — bypass list above is mandatory.'
+  ].join('\n');
+  const harness=[
+    '# Test before enforcing:',
+    '# curl -A "GPTBot/1.0" -i https://YOUR-DOMAIN/api/prices | head -5        # expect 402 + Crawler-Price',
+    '# curl -A "OAI-SearchBot/1.0" -i https://YOUR-DOMAIN/api/prices | head -5  # expect 200 (bypass)',
+    '# curl -A "ChatGPT-User/1.0" -i https://YOUR-DOMAIN/premium/x | head -5    # expect 200 (never charge users)',
+    '# curl -A "GPTBot/1.0" -H "X-Crawl-Token: PARTNER" -i https://YOUR-DOMAIN/api/ # expect 200 (allowlisted)'
+  ].join('\n');
+  return {nginx,worker,discovery,harness,pricing:{free,pFree,premium,pPremium,api,pApi}};
+}
+function calcPayPerCrawlRecovery(botData,pricePerReq){
+  const p=pricePerReq!=null?pricePerReq:0.02;
+  const rows=[];
+  for(const[name,bd]of Object.entries(botData||{})){
+    if(normalizeTier(bd.tier)!=='ai_training')continue;
+    rows.push({bot:name,hits:bd.count,recoverable:bd.count*p});
+  }
+  rows.sort((a,b)=>b.recoverable-a.recoverable);
+  const total=rows.reduce((s,r)=>s+r.recoverable,0);
+  const top=rows[0];
+  const headline=top?('If you charge $'+p.toFixed(2)+' and '+top.bot+' hits '+top.hits.toLocaleString()+'/mo = $'+top.recoverable.toLocaleString(undefined,{maximumFractionDigits:0})+'/mo recoverable (training only — search/user never charged).'):('No training hits in window.');
+  return {pricePerReq:p,rows:rows.slice(0,20),totalMonthly:total,headline,disclaimer:'Projection range from YOUR log window scaled to 30d — not a guarantee. Confirm volume stability 4+ weeks before quoting.'};
+}
+/* P0-3: Web Bot Auth + one-click batch verify for top UNVERIFIED IPs.
+ * Cloudflare adds `cf-web-bot-auth` / signed fetch headers; origin logs can carry
+ * them. detectWebBotAuth() surfaces presence; genBatchVerifyCommands() emits the
+ * copy-paste DoH + dig -x bundle for the top-20 unverified IPs. */
+function detectWebBotAuth(rec){
+  if(!rec)return {present:false};
+  const v=rec.wba||rec.cf_web_bot_auth||rec.web_bot_auth||rec['cf-web-bot-auth']||rec['web-bot-auth']||rec.webBotAuth||rec.cf_pay_per_crawl||rec.crawler_price||'';
+  if(v)return {present:true,value:String(v).slice(0,120),note:'Web Bot Auth / pay-per-crawl header present — signed fetch, treat as strong positive alongside IP JSON.'};
+  return {present:false,note:'No Web Bot Auth header in this log row (needs Cloudflare log field enabled).'};
+}
+function genBatchVerifyCommands(topIPs){
+  const ips=(topIPs||[]).map(x=>Array.isArray(x)?x[0]:x.ip||x).filter(Boolean).slice(0,20);
+  const lines=['# Batch-verify top '+ips.length+' UNVERIFIED IPs — run server-side (authoritative), DoH preview in-browser'];
+  for(const ip of ips){
+    lines.push('# --- '+ip);
+    lines.push('dig -x '+ip+' +short');
+    lines.push('# then forward-confirm: dig <ptr-hostname> +short  # must resolve back to '+ip);
+    lines.push('# CLI: node tools/cli.js --verify-rdns '+ip);
+  }
+  lines.push('# In-browser (opt-in, IPv4, via 1.1.1.1 DoH): click "Verify top 20" in Module 2 — PTR + A/AAAA forward check per IP.');
+  return lines.join('\n');
+}
+async function verifyTopUnverifiedBatch(topIPs,verifyFn){
+  const ips=(topIPs||[]).map(x=>Array.isArray(x)?x[0]:x.ip||x).filter(Boolean).slice(0,20);
+  const fn=verifyFn||((typeof verifyRdnsDoh!=='undefined')?verifyRdnsDoh:null);
+  const out=[];
+  for(const ip of ips){
+    if(!fn){out.push({ip,error:'no DoH verifier in this context (browser only)'});continue;}
+    try{out.push(await fn(ip));}catch(e){out.push({ip,error:String((e&&e.message)||e)});}
+  }
+  return out;
+}
+/* P0-4: robots.txt + llms.txt + /crawlers.json + /.well-known/security.txt bundle
+ * with consistency checker (e.g. allow-in-robots vs block-at-edge conflict). */
+function genCrawlersJson(botData){
+  const agents=[];
+  for(const[name,bd]of Object.entries(botData||{})){
+    agents.push({name,pattern:(bd.topUAList&&bd.topUAList[0]&&bd.topUAList[0][0])||name,tier:normalizeTier(bd.tier),policy:(RATE_POLICY[normalizeTier(bd.tier)]||{}).action||'see RATE_POLICY'});
+  }
+  return JSON.stringify({version:'2026.09',note:'Machine-readable crawler policy. Serve at /crawlers.json. Mirrors robots.txt tiers.',agents:agents.slice(0,100)},null,2);
+}
+function genSecurityTxt(opts){
+  opts=opts||{};
+  return ['# Serve at /.well-known/security.txt (RFC 9116)',
+    'Contact: '+(opts.contact||'mailto:security@example.com'),
+    'Expires: '+(opts.expires||'2027-09-17T00:00:00.000Z'),
+    'Preferred-Languages: en',
+    '# Crawler allow-list contact for licensing / Pay Per Crawl disputes:',
+    '# Policy: '+((opts.policyUrl)||'https://example.com/crawlers.json'),
+    ''
+  ].join('\n');
+}
+function genPolicyBundle(analysis,opts){
+  opts=opts||{};
+  const robots=genEdgeRules({},{hvIPs:[]}).robots;
+  const llms=genLlmsTxt(analysis);
+  const crawlers=genCrawlersJson((analysis&&analysis.botData)||{});
+  const security=genSecurityTxt(opts);
+  return {robots,llms,crawlers,security};
+}
+function checkPolicyConsistency(o){
+  // o: {robotsAllows:[...], robotsDisallows:[...], cfBlocksTraining:bool, cfAllowsSearch:bool}
+  o=o||{};
+  const issues=[];
+  const allows=new Set(o.robotsAllows||[]), disallows=new Set(o.robotsDisallows||[]);
+  for(const b of ['PerplexityBot','OAI-SearchBot','Claude-SearchBot']){
+    if(allows.has(b)&&o.cfBlocksSearch)issues.push('CONFLICT: You ALLOW '+b+' in robots but BLOCK search at Cloudflare — pick one (recommend: allow + 120/min).');
+  }
+  for(const b of ['GPTBot','ClaudeBot','CCBot','Bytespider']){
+    if(allows.has(b)&&o.cfBlocksTraining!==false)issues.push('INFO: You ALLOW '+b+' in robots while Cloudflare blocks training — training will still 403 at edge (edge wins). Tighten robots to Disallow.');
+  }
+  if((o.robotsDisallows||[]).includes('OAI-AdsBot'))issues.push('REVENUE RISK: You Disallow OAI-AdsBot — breaks ChatGPT shopping checks on ecommerce. Remove it.');
+  if(!issues.length)issues.push('OK: no robots-vs-edge conflicts detected in the checked set.');
+  return issues;
+}
+/* P0-5: JS vs HTML citation-gap closer. Generate the exact curl harness for a URL,
+ * plus static "citation killer" heuristics for pasted HTML (content only in JS,
+ * prices in client fetch, blocked _next/data). Browser fetch is CORS-limited, so
+ * the CLI curl is the source of truth — fetchCitationGap() attempts a same-origin
+ * fetch and reports CORS honestly. */
+function genCitationGapCommands(url){
+  const u=url||'https://YOUR-DOMAIN/page';
+  return ['# Citation-gap harness for '+u,
+    '# 1) What GPTBot sees (raw HTML, no JS):',
+    'curl -sL -A "GPTBot/1.0 (+https://openai.com/gptbot)" "'+u+'" -o /tmp/gptbot.html && wc -c /tmp/gptbot.html && grep -oiE "<h1.*|price|\\$[0-9]+" /tmp/gptbot.html | head -20',
+    '# 2) What Perplexity sees:',
+    'curl -sL -A "PerplexityBot/1.0 (+https://docs.perplexity.ai)" "'+u+'" -o /tmp/pplx.html && wc -c /tmp/pplx.html',
+    '# 3) Byte diff bot vs browser (shell = bot body < 30% of browser):',
+    'curl -sL -A "Mozilla/5.0 (Windows NT 10.0) Chrome/126.0" "'+u+'" -o /tmp/browser.html && wc -c /tmp/*.html && diff <(wc -c < /tmp/gptbot.html) <(wc -c < /tmp/browser.html) || true',
+    '# 4) Next.js data route check:',
+    'curl -sL -A "GPTBot/1.0" "'+u.replace(/\/$/,'')+'" | grep -o "_next/data[^\\\"]*" | head -5'
+  ].join('\n');
+}
+function detectCitationKillers(html){
+  const h=String(html||'');
+  const killers=[];
+  if(/<div id="root"><\/div>|<div id="__next"><\/div>|<body[^>]*>\s*<script/i.test(h))killers.push('Shell markup only (root/__next empty) — content renders client-side, invisible to AI fetchers.');
+  if(/fetch\(.+price|axios\.get.+price|__NEXT_DATA__.*price/i.test(h))killers.push('Prices/quotes loaded via client fetch — inline them server-side or AI cites competitors.');
+  if(/\/_next\/data\//.test(h))killers.push('Depends on /_next/data/ JSON — bots that skip it see a shell. SSR the critical copy.');
+  if(h.length<5120)killers.push('Tiny body ('+h.length+'B < 5KB) — same threshold as Module 3b JS-shell flag.');
+  if(!/<h1/i.test(h))killers.push('No <h1> in raw HTML — quotable headline missing for extractive citations.');
+  if(!killers.length)killers.push('No classic killers found in pasted HTML — still confirm with the curl harness (CORS blocks in-browser fetch).');
+  return killers;
+}
+async function fetchCitationGap(url){
+  // Same-origin attempt only; cross-origin honestly reports CORS instead of faking.
+  try{
+    const r=await fetch(url,{headers:{'user-agent':'GPTBot/1.0'}});
+    const t=await r.text();
+    return {ok:true,bytes:t.length,killers:detectCitationKillers(t),note:'Same-origin fetch only — UA header may be stripped by browsers. CLI curl is authoritative.'};
+  }catch(e){return {ok:false,error:String((e&&e.message)||e),note:'CORS-limited by design (no backend). Use the generated curl commands — they are the source of truth.',commands:genCitationGapCommands(url)};}
+}
+/* P1-7: Bot Dynamics (crawl-rate spike/drop correlated to deploys), 404-cluster
+ * auto-ticket text, GSC clicks overlay. P1-8: BQ streaming pack. */
+function genBotDynamics(current,previous){
+  const c=(current&&current.botData)||{}, p=(previous&&previous.botCounts)?previous.botCounts:(previous&&previous.botData||{});
+  const rows=[];
+  const keys=new Set([...Object.keys(c),...Object.keys(p)]);
+  for(const k of keys){
+    const a=p[k]?(p[k].count!=null?p[k].count:p[k]):0, b=c[k]?c[k].count:0;
+    const delta=b-a, pct=a?delta/a*100:(b>0?100:0);
+    if(Math.abs(delta)>=10||Math.abs(pct)>=50)rows.push({bot:k,before:a,after:b,delta,pct:+pct.toFixed(1),flag:pct>=100?'SPIKE':pct<=-50?'DROP':Math.abs(delta)>=100?'SHIFT':'—'});
+  }
+  rows.sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta));
+  return {rows:rows.slice(0,30),note:'Bot Dynamics: spike/drop vs previous window. Correlate SPIKE/DROP rows with deploy log / WAF changes before blaming bots.'};
+}
+function genTicketText(anomalies,sec){
+  const lines=['# Auto-ticket draft — paste into Jira/Linear (generated from YOUR logs)'];
+  for(const b of ((anomalies&&anomalies.bursts)||[]).slice(0,5))lines.push('[BOT-BURST] '+b.bot+': '+b.count+' req in 1h (z='+b.z+', avg '+b.mean+') — check deploys + rate limit 120/min search / challenge training.');
+  for(const x of ((anomalies&&anomalies.not404)||[]).slice(0,5))lines.push('[404-CLUSTER] '+x.uri+' hit '+x.count+'x — block, not 404 (vendor/phpunit/.git/.env = exploit probe, not content).');
+  for(const ip of ((sec&&sec.hvIPs)||[]).slice(0,5))lines.push('[HV-IP] '+ip.ip+' @ '+ip.rps.toFixed(1)+' req/s ('+ip.count+' req) — challenge at edge, verify rDNS.');
+  if(lines.length===1)lines.push('No bursts / 404-clusters / HV-IPs in this window — nothing to ticket.');
+  return lines.join('\n');
+}
+function overlayGscClicks(joinResult){
+  const rows=(joinResult&&joinResult.uncrawled)||[];
+  return rows.slice(0,20).map(r=>({url:r.url,clicks:r.clicks||0,impressions:r.impressions||0,action:'indexed/clicked but never crawled — submit + internal-link'}));
+}
+function genBQStreamingPack(){
+  const ddl=genBQPack().ddl+'\n'+genBQPack().queries;
+  const streaming=[
+    '-- Logpush -> R2 -> Parquet (native streaming, no server):',
+    '-- 1) Cloudflare Logpush job -> R2 bucket (docs: Logpush + R2). Files land as JSON/CSV per minute.',
+    "-- 2) DuckDB one-liner -> Parquet (partitioned, queryable from BQ external table):",
+    "CREATE TABLE logs AS SELECT * FROM read_json('r2-logs/*.json', header=true);",
+    "COPY logs TO 'logs.parquet' (FORMAT PARQUET, PARTITION_BY (date));",
+    '-- 3) BigQuery external table over the Parquet prefix, then scheduled query below daily.',
+    '',
+    '-- Scheduled query: daily UNVERIFIED % (spoof trend for execs):',
+    'SELECT DATE(tstamp) d, COUNT(*) claimed,',
+    '  SUM(CASE WHEN bot LIKE "%GPTBot%" AND ip NOT IN (SELECT ip FROM bot_logs.verified_ips) THEN 1 ELSE 0 END) unverified,',
+    '  ROUND(100*SUM(CASE WHEN bot LIKE "%GPTBot%" THEN 1 ELSE 0 END)/COUNT(*),1) pct',
+    'FROM bot_logs.logs WHERE tier IN (\'ai_training\',\'ai_search_index\') GROUP BY d ORDER BY d;'
+  ].join('\n');
+  return {ddl,streaming};
+}
+/* Freshness fallback + guess-mode guard (fixes). */
+function isGuessMode(meta){return !!(meta&&meta.lowConfidence&&(meta.lowConfidence['w3c-guess']||meta.lowConfidence.guess));}
+function guardEdgeRules(edgeRules,meta){
+  if(isGuessMode(meta)){
+    return {blocked:true,rules:{cloudflare:[],fastly:[],aws:[]},
+      notice:'BLOCKED: W3C guess-mode (no #Fields header) — IP/column mapping is low-confidence. Edge-rule generation is disabled to prevent blocking the wrong UA/IP. Add a #Fields header and re-run.'};
+  }
+  return {blocked:false,rules:edgeRules,notice:''};
+}
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectStealth,detectJsShell,countUnverified,detectAnomalies,diffAnalyses,estimateEdgeBlocked,genBQPack,joinTriple,cfoContext,isChromeUA,cloudOf,botDbAgeDays,verifyRdnsDoh,reverseIPv4,loadHistory,saveHistoryEntry,clearHistory,encodeCfg,decodeCfg,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,migrateLegacyTier,BOT_IP_SOURCES,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION,BOT_IP_JSON_DATE,CLOUDFLARE_SEPT_DEFAULTS,BOTBASE_TAXONOMY,genSept2026Defaults,genPayPerCrawlV2,calcPayPerCrawlRecovery,detectWebBotAuth,genBatchVerifyCommands,verifyTopUnverifiedBatch,genCrawlersJson,genSecurityTxt,genPolicyBundle,checkPolicyConsistency,genCitationGapCommands,detectCitationKillers,fetchCitationGap,genBotDynamics,genTicketText,overlayGscClicks,genBQStreamingPack,getFreshnessStatus,FALLBACK_PIN,AI_MATRIX_DISCLAIMER,isGuessMode,guardEdgeRules};}
 
 function renderHistory(){
   try{
@@ -2163,10 +2564,10 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
   });
-  // Freshness pill: green <7d, amber <21d, red stale
+  // Freshness pill: green <7d, amber <21d, red stale + last-good fallback pin (v2)
   try{
-    const age=botDbAgeDays();const pill=document.getElementById('db-fresh-pill');
-    if(pill){pill.textContent='DB v'+BOT_DB_VERSION+' · '+BOTS.length+' sigs · '+(age<=7?age+'d fresh':age<=21?age+'d aging':age+'d STALE');pill.className='badge '+(age<=7?'b-green':age<=21?'b-amber':'b-red');}
+    const fs0=getFreshnessStatus();const pill=document.getElementById('db-fresh-pill');
+    if(pill){pill.textContent='DB v'+BOT_DB_VERSION+' · '+BOTS.length+' sigs · '+fs0.label;pill.className='badge '+(fs0.level==='green'?'b-green':fs0.level==='amber'?'b-amber':'b-red');pill.title='Bot DB freshness + BotBase taxonomy (14th source). Fallback pin: '+FALLBACK_PIN.date;}
   }catch(e){}
   document.getElementById('example-chip')?.addEventListener('click',e=>{e.stopPropagation();location.href='?sample=10k';});
   document.getElementById('upload-drop')?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();document.getElementById('file-input')?.click();}});

@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.0.0 — 2026-09-17
+
+Enterprise-ready: all P0/P1 from the 2026 competitive review + removals.
+
+### Added (P0)
+- P0-1 Cloudflare Sept-15-2026 defaults: `genSept2026Defaults()` exact WAF rule + diff vs logs; BotBase taxonomy as 14th source (`BOTBASE_TAXONOMY`, `data/bot-ips.json`, `BOTS.md`, `fetch-bot-ips.js` taxonomy-only).
+- P0-2 Pay Per Crawl v2: `genPayPerCrawlV2()` per-path pricing (/ free, /premium/* $0.05, /api/* $0.25), origin `Crawler-Price` header, dynamic Worker, `cf-pay-per-crawl` handling, Discovery checklist; `calcPayPerCrawlRecovery()` CFO model ("$0.02 × 180k = $3,600/mo").
+- P0-3 Web Bot Auth + batch verify: `norm()` surfaces `wba`, `detectWebBotAuth()`, one-click "Verify top 20 UNVERIFIED" batch (`verifyTopUnverifiedBatch()` DoH) + `genBatchVerifyCommands()` dig bundle; CLI `--verify-batch`.
+- P0-4 Policy bundle: `genCrawlersJson()` + `genSecurityTxt()` + `genPolicyBundle()` (robots + llms + crawlers.json + security.txt) + `checkPolicyConsistency()` (robots-vs-edge, OAI-AdsBot revenue risk); CLI `--bundle-dir`.
+- P0-5 Citation-gap closer: `genCitationGapCommands()` curl harness + `detectCitationKillers()` + `fetchCitationGap()` (CORS-honest); Module 5 card + wiring.
+- P0-6 MCP server: `tools/mcp-server.js` stdio JSON-RPC (analyzeLogs, getBotPolicy, genEdgeRule), grounding via llms-full.txt.
+- P1-7 Bot Dynamics: `genBotDynamics()` + `genTicketText()` 404 auto-tickets + `overlayGscClicks()`; Module 8 rewrite.
+- P1-8 BQ streaming: `genBQStreamingPack()` Logpush → R2 → Parquet `COPY TO` + scheduled daily UNVERIFIED %; CLI `--bq-streaming`.
+
+### Removed / Fixed
+- `server.js` → `dev-server.js` (Pages-only banner, package/Dockerfile/CI/README updated). Never deploy to Pages.
+- `ai_citation` DELETED (v2): `normalizeTier()` is now identity; `migrateLegacyTier()` rewrites pre-v1.3 exports on load with a log. Tests + CI updated.
+- Thinned tabs: short labels (Bots/Verification/Costs/AI Matrix/Edge + Policy Bundle/Performance + Traffic/Dynamics/CFO), Performance + Traffic merged, Security threats collapsed behind `<details>`.
+- AI Matrix disclaimer (`AI_MATRIX_DISCLAIMER`) printed ON the card (screenshot-safe), not just METHOD.md.
+- Freshness-or-death: `getFreshnessStatus()` + `FALLBACK_PIN` last-good banner (green <7d/amber <21d/red stale), surfaced in Module 2 + pill.
+- Guess-mode guard: `isGuessMode()` + `guardEdgeRules()` — W3C without #Fields BLOCKS edge-rule generation (Module 6 refuses with notice).
+
 ## v1.4.0 — 2026-09-17
 
 Enterprise pass: 127 signatures, JS-shell render gap, UNVERIFIED spoof KPI, anomaly ML-lite, CLI exact mode, BQ native pack, Origin-vs-Edge toggle, A/B diff.

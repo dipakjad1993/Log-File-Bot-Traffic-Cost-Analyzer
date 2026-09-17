@@ -1,6 +1,6 @@
 # Open Bot DB — 127 signatures, training vs search-index vs user-triggered (v2026.09.17)
 
-Machine-readable snapshot: [`data/bot-ips.json`](data/bot-ips.json) (dated 2026-09-17, 13 sources, full CIDRs + IPv6, ETag + fetched-date, refreshed weekly by GitHub Actions). Engine: `js/analyzer.js` (`BOTS`, 127 entries).
+Machine-readable snapshot: [`data/bot-ips.json`](data/bot-ips.json) (dated 2026-09-17, 14 sources incl. BotBase taxonomy, full CIDRs + IPv6, ETag + fetched-date, refreshed weekly by GitHub Actions, last-good pin fallback). Engine: `js/analyzer.js` (`BOTS`, 127 entries).
 
 ## Rule of thumb
 
@@ -21,4 +21,18 @@ Machine-readable snapshot: [`data/bot-ips.json`](data/bot-ips.json) (dated 2026-
 - **Perplexity Aug 2025:** Chrome-UA + rotating ASNs after robots block — see UNVERIFIED spoof KPI + stealth score.
 - **Verification:** vendor-IP-JSON match = VERIFIED; `/16`-or-longer prefix = heuristic low-confidence; single-octet `/8` never used.
 
-Refresh: `npm run fetch-ips` (OpenAI x3, Perplexity x3, Anthropic policy, Google x2, Bing; Apple/Meta/ByteDance robots/ASN-only by design).
+Refresh: `npm run fetch-ips` (OpenAI x3, Perplexity x3, Anthropic policy, Google x2, Bing; Apple/Meta/ByteDance robots/ASN-only by design; BotBase taxonomy-only).
+
+## Cloudflare BotBase mapping (Sept 2026)
+
+| BotBase category | Our tier | Edge action |
+|------------------|----------|-------------|
+| AI Training | `ai_training` | Block freely @ 60/min (20 aggressive) |
+| AI Search / Retrieval | `ai_search_index` | ALLOW @ 120/min, 429 + Retry-After only |
+| AI Agent / Assistant fetch | `ai_user_fetch` | DO NOT throttle, 300/min abuse ceiling only |
+| Search Engine | `search_engine` | Allow |
+| SEO Tool | `seo_tool` | Rate-limit 60/min, allowlist paying seats |
+
+## Cloudflare Sept-15-2026 defaults
+
+New domains auto-block Training + Agent on ad pages, allow Search-only. In the app: Module 6 → "Apply Cloudflare Sept-2026 defaults" generates the exact WAF rule + diffs it against your current logs (training hits that would 403 vs search kept).
