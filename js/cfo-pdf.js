@@ -1,20 +1,17 @@
 /* ============================================================
-   CFO PDF engine — zero-dependency, 100% client-side.
-   Generates a REAL .pdf download (PDF 1.4, Helvetica only).
-   No CDN, no fonts, no network — keeps the offline/privacy audit green.
-   Used by js/analyzer.js exportCFOPDF(). Node-testable via module.exports.
-
-   v1.0.1: WinAnsi-safe output (all text sanitized to ASCII before it hits
-   the content stream) + real table grid with right-aligned numerics,
-   wrapping rows, non-overlapping KPI cards, smart bar labels.
+   CFO PDF engine — real PDF download, 100% client-side.
+   Built on vendored jsPDF 2.5.1 + jspdf-autotable 3.8.2
+   (js/vendor/, MIT — no CDN, no runtime network; the offline /
+   privacy audit stays green: zero XHR/WebSocket, ever).
+   Node: require('jspdf') + require('jspdf-autotable') (package.json).
+   Browser: js/vendor/*.min.js script tags before this file.
+   Node-testable via module.exports.
    ============================================================ */
 (function (root) {
 'use strict';
 
-/* ---------- ASCII sanitizer: Helvetica Base-14 = WinAnsi only ----------
-   Any char outside printable ASCII is mapped BEFORE pdfEsc runs, so the
-   stream Length, xref offsets and byte conversion (all ASCII-based) stay
-   exact and viewers never render mojibake like "[116;5u". */
+/* ---------- ASCII sanitizer: keeps every emitted string WinAnsi-clean,
+   so text stays selectable/searchable and byte-stable across viewers. */
 var SAN_MAP = {
   '\u2014': '--', '\u2013': '-', '\u2012': '-', '\u2212': '-',
   '\u2192': '->', '\u2190': '<-', '\u21D2': '=>', '\u2713': 'ok',
@@ -68,7 +65,6 @@ function isoDay(v) {
 function shortBot(name, max) {
   var t = san(name || '');
   if (t.length <= max) return t;
-  // Prefer the head token: "Human Browser (Chrome on Windows)" -> "Human Browser (Chrome...)"
   var cut = t.slice(0, max - 3);
   var sp = cut.lastIndexOf(' ');
   if (sp > max * 0.5) cut = cut.slice(0, sp);
@@ -93,7 +89,6 @@ function buildCFOData(A, opts) {
   }
   var periodDays = (durMs && durMs > 0) ? durMs / 86400000 : null;
   var monthlyFactor = periodDays ? 30 / periodDays : 1;
-  // Guard absurd extrapolation: cap scaling display, always label the base window.
   var scaledCapped = periodDays && (periodDays < 0.5 || periodDays > 400);
 
   var total = +((c.total && c.total.all) || 0);
@@ -105,7 +100,6 @@ function buildCFOData(A, opts) {
   var sampled = !!(stride && stride > 1) || !!((A && A.vs && A.vs.sampled));
   var badge = sampled ? ('SAMPLED 1-in-' + stride) : 'EXACT';
 
-  // Cost by tier (display taxonomy)
   var tierRows = [];
   var tierAgg = {};
   try {
@@ -121,13 +115,11 @@ function buildCFOData(A, opts) {
     tierRows.push({ tier: t, cost: tierAgg[t].cost, reqs: tierAgg[t].reqs, bytes: tierAgg[t].bytes, share: total > 0 ? tierAgg[t].cost / total * 100 : 0 });
   });
 
-  // Top bots by measured cost
   var topBots = Object.keys(c.byBot || {}).map(function (bn) {
     var v = c.byBot[bn];
     return { bot: bn, tier: (A.botData && A.botData[bn] && A.botData[bn].tier) || '', count: v.count || 0, bytes: v.totalBytes || 0, cost: v.total || 0 };
   }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 8);
 
-  // Traps with $ attribution (same rate math as calcCosts)
   var traps = [];
   try {
     var entries = Object.entries(A.traps || {}).sort(function (a, b) { return b[1].count - a[1].count; }).slice(0, 5);
@@ -138,8 +130,6 @@ function buildCFOData(A, opts) {
     }
   } catch (e) {}
 
-  // Safe business actions (NEVER raw truncated UA): derive from edge rules but
-  // rewrite as finance-safe rows with risk + savings lookup.
   var actions = [];
   try {
     var rules = ((A.edgeRules || {}).cloudflare) || [];
@@ -155,7 +145,6 @@ function buildCFOData(A, opts) {
     }
   } catch (e) {}
 
-  // Do-not-block guardrails (revenue protection)
   var doNotBlock = ['OAI-SearchBot (search-index -- citations)', 'PerplexityBot (search-index -- best referral)', 'OAI-AdsBot (shopping ads -- revenue)', 'ChatGPT-User / Perplexity-User / Claude-User (user-triggered -- 429 = missing answer)'];
 
   var vs = (A && A.vs) || {};
@@ -165,7 +154,7 @@ function buildCFOData(A, opts) {
     var trainHits = 0;
     for (var k in (A.botData || {})) { if (A.botData[k].tier === 'ai_training') trainHits += A.botData[k].count || 0; }
     var perMo = periodDays ? trainHits * (30 / periodDays) : trainHits;
-    ppcMonthly = perMo * 0.002; // $0.002/request Pay Per Crawl beta
+    ppcMonthly = perMo * 0.002;
   } catch (e) {}
 
   var ciAbs = (c.ci && c.ci.abs) || 0;
@@ -197,320 +186,232 @@ function buildCFOData(A, opts) {
   };
 }
 
-/* ---------- minimal PDF 1.4 writer (Helvetica only, ASCII-only stream) ---------- */
-function pdfEsc(s) {
-  return san(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-function wrap(s, n) {
-  s = san(s);
-  var words = s.split(/\s+/), lines = [], cur = '';
-  for (var i = 0; i < words.length; i++) {
-    var w = words[i];
-    if (!w) continue;
-    if ((cur + ' ' + w).trim().length > n) { if (cur) lines.push(cur); cur = w; }
-    else cur = (cur + ' ' + w).trim();
-    while (cur.length > n * 2) { lines.push(cur.slice(0, n)); cur = cur.slice(n); }
+/* ---------- engine access (browser globals vs Node requires) ---------- */
+function getJsPDFCtor() {
+  if (typeof module !== 'undefined' && module.exports && typeof require === 'function') {
+    try {
+      var ns = require('jspdf');
+      try { require('jspdf-autotable'); } catch (e2) { /* plugin optional in exotic envs */ }
+      if (ns && ns.jsPDF) return ns.jsPDF;
+    } catch (e) { /* fall through to globals */ }
   }
-  if (cur) lines.push(cur);
-  return lines.length ? lines : [''];
+  var g = (root && root.jspdf) || {};
+  if (g.jsPDF) return g.jsPDF;
+  throw new Error('CFO PDF engine missing: load js/vendor/jspdf.umd.min.js + jspdf-autotable.min.js before js/cfo-pdf.js (browser) or npm install (Node).');
 }
 
-function PdfDoc() {
-  this.W = 595; this.H = 842; this.M = 40;
-  this.pages = [[]]; // array of op-arrays per page
-  this.y = 0;
-  this.pageNo = 0;
-  this.resetPage = function () { this.y = this.H - 46; };
-  this.resetPage();
-  this.op = function (s) { this.pages[this.pageNo].push(s); };
-  this.newPage = function () { this.pages.push([]); this.pageNo++; this.resetPage(); };
-  this.need = function (h) { if (this.y - h < 56) this.newPage(); };
-  this.text = function (x, str, size, bold, color) {
-    var f = bold ? 'F2' : 'F1';
-    var c = color || [0.10, 0.11, 0.17];
-    this.op('BT /' + f + ' ' + size + ' Tf ' + c[0].toFixed(2) + ' ' + c[1].toFixed(2) + ' ' + c[2].toFixed(2) + ' rg ' + x.toFixed(1) + ' ' + this.y.toFixed(1) + ' Td (' + pdfEsc(str) + ') Tj ET');
-  };
-  // Right-aligned text ending at xRight (for numeric columns / badges / values)
-  this.textR = function (xRight, str, size, bold, color) {
-    var t = san(str);
-    var w = t.length * size * 0.55; // Helvetica avg advance ~0.55em
-    this.text(xRight - w, t, size, bold, color);
-  };
-  this.fillRect = function (x, y, w, h, fill) {
-    this.op(fill[0].toFixed(2) + ' ' + fill[1].toFixed(2) + ' ' + fill[2].toFixed(2) + ' rg ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ' + w.toFixed(1) + ' ' + h.toFixed(1) + ' re f');
-  };
-  this.box = function (x, y, w, h, fill, stroke) {
-    if (fill) this.fillRect(x, y, w, h, fill);
-    var s = stroke || [0.78, 0.80, 0.86];
-    this.op(s[0].toFixed(2) + ' ' + s[1].toFixed(2) + ' ' + s[2].toFixed(2) + ' RG 0.7 w ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ' + w.toFixed(1) + ' ' + h.toFixed(1) + ' re S');
-  };
-  this.hline = function (x1, x2, y) {
-    this.op('0.78 0.80 0.86 RG 0.7 w ' + x1.toFixed(1) + ' ' + y.toFixed(1) + ' m ' + x2.toFixed(1) + ' ' + y.toFixed(1) + ' l S');
-  };
-  this.vline = function (x, y1, y2) {
-    this.op('0.78 0.80 0.86 RG 0.6 w ' + x.toFixed(1) + ' ' + y1.toFixed(1) + ' m ' + x.toFixed(1) + ' ' + y2.toFixed(1) + ' l S');
-  };
-}
-
-var INK = [0.10, 0.11, 0.17], MUT = [0.29, 0.31, 0.41], FAINT = [0.49, 0.51, 0.62];
-var ACC = [0.31, 0.27, 0.90], HDR = [0.16, 0.18, 0.28], RED = [0.86, 0.15, 0.15];
+/* ---------- layout constants ---------- */
+var M = 40, PW = 595, PH = 842, CW = PW - M * 2; // A4 pt
+var INK = [26, 29, 43], MUT = [74, 80, 104], FAINT = [124, 130, 157];
+var ACC = [79, 70, 229], HDRF = [40, 46, 71], GRID = [197, 203, 214];
+var ZEBRA = [246, 247, 250], RED = [220, 38, 38];
+var TOTAL_PAGES = '{total_pages_count_string}';
 
 function drawHeader(doc, d) {
-  var W = doc.W, M = doc.M;
-  doc.op('0.31 0.27 0.90 rg 0 786 595 56 re f');
-  doc.y = 818;
-  doc.text(M, 'BOT TRAFFIC COST - EXECUTIVE SUMMARY', 11, true, [1, 1, 1]);
-  doc.y = 804;
-  doc.text(M, san(d.meta.domain) + '  |  ' + d.meta.periodStart + ' to ' + d.meta.periodEnd + '  |  Generated ' + d.meta.generated, 7.5, false, [0.88, 0.89, 0.97]);
-  doc.textR(W - M, san(d.meta.badge), 7.5, true, [1, 1, 1]);
-  doc.y = 772;
+  doc.setFillColor(ACC[0], ACC[1], ACC[2]);
+  doc.rect(0, 0, PW, 56, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text(san('BOT TRAFFIC COST - EXECUTIVE SUMMARY'), M, 24);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.setTextColor(224, 227, 244);
+  doc.text(san(d.meta.domain + '  |  ' + d.meta.periodStart + ' to ' + d.meta.periodEnd + '  |  Generated ' + d.meta.generated), M, 40);
+  doc.setFont('helvetica', 'bold');
+  doc.text(san(d.meta.badge), PW - M, 40, { align: 'right' });
 }
-function h1(doc, t) {
-  doc.need(28);
-  doc.text(doc.M, t, 12, true, INK);
-  doc.y -= 6;
-  doc.hline(doc.M, doc.W - doc.M, doc.y);
-  doc.y -= 12;
+function drawFooter(doc, pageNo) {
+  var y = PH - 22;
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.6);
+  doc.line(M, y - 8, PW - M, y - 8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+  doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
+  doc.text(san('Confidential  |  Measured bytes x configured CDN pricing. Blockable = training + suspicious only.'), M, y);
+  doc.text(san('Page ' + pageNo + ' of ' + TOTAL_PAGES), PW - M, y, { align: 'right' });
 }
-function h2(doc, t) {
-  doc.need(20);
-  doc.text(doc.M, t, 9.5, true, ACC);
-  doc.y -= 11;
+function hookPage(doc, d) {
+  return function (data) {
+    drawHeader(doc, d);
+    drawFooter(doc, data.pageNumber);
+  };
 }
-function para(doc, t, size, color) {
-  var lines = wrap(t, 102);
+function h1(doc, d, y, t) {
+  y = ensure(doc, d, y, 90);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.text(san(t), M, y);
+  y += 5;
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
+  doc.line(M, y, PW - M, y);
+  return y + 14;
+}
+function h2(doc, d, y, t) {
+  y = ensure(doc, d, y, 60);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
+  doc.text(san(t), M, y);
+  return y + 12;
+}
+/* Keep blocks together: section titles never strand at a page bottom. */
+function ensure(doc, d, y, need) {
+  if (y + need > PH - 56) {
+    doc.addPage();
+    drawHeader(doc, d);
+    drawFooter(doc, doc.getNumberOfPages());
+    return 76;
+  }
+  return y;
+}
+function para(doc, d, y, t, size) {
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(size || 8.5);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  var lines = doc.splitTextToSize(san(t), CW);
   for (var i = 0; i < lines.length; i++) {
-    doc.need(12);
-    doc.text(doc.M, lines[i], size || 8.5, false, color);
-    doc.y -= 10.5;
+    y = ensure(doc, d, y, 12);
+    doc.text(lines[i], M, y);
+    y += 10.5;
   }
-  doc.y -= 2;
+  return y + 3;
 }
-
-/* KPI cards: reserve the whole grid up front so page breaks never split it,
-   then lay out row by row from a fixed top. */
-function kpiGrid(doc, d) {
-  var M = doc.M, W = doc.W;
-  var gw = (W - M * 2 - 12) / 2, gh = 46, gap = 8;
+function kpiGrid(doc, d, y) {
+  var gw = (CW - 12) / 2, gh = 48, gap = 10;
+  y = ensure(doc, d, y, gh * 2 + gap + 4);
   var kpis = [
-    { l: 'TOTAL PERIOD COST', v: money(d.kpis.total), s: num(d.meta.records) + ' records  |  ' + bytesFmt(d.totalBytes), c: [0.96, 0.96, 1.0] },
-    { l: 'BLOCKABLE (PERIOD)', v: money(d.kpis.blockable) + '  (' + pct(d.kpis.blockableShare) + ')', s: 'Training + suspicious only', c: [1.0, 0.93, 0.93] },
-    { l: 'PROJECTED MONTHLY SAVING', v: money(d.kpis.monthly) + ' / mo', s: 'Scaled x' + d.kpis.monthlyFactor.toFixed(2) + ' from ' + (d.meta.periodDays ? d.meta.periodDays.toFixed(0) + '-day window' : 'window'), c: [0.93, 1.0, 0.94] },
-    { l: 'PROJECTED ANNUAL SAVING', v: money(d.kpis.annual) + ' / yr', s: '12 x monthly  |  95% CI +/-' + money(d.meta.ciAbs), c: [0.93, 0.98, 1.0] }
+    { l: 'TOTAL PERIOD COST', v: money(d.kpis.total), s: num(d.meta.records) + ' records  |  ' + bytesFmt(d.totalBytes), c: [245, 245, 255] },
+    { l: 'BLOCKABLE (PERIOD)', v: money(d.kpis.blockable) + '  (' + pct(d.kpis.blockableShare) + ')', s: 'Training + suspicious only', c: [255, 237, 237] },
+    { l: 'PROJECTED MONTHLY SAVING', v: money(d.kpis.monthly) + ' / mo', s: 'Scaled x' + d.kpis.monthlyFactor.toFixed(2) + ' from ' + (d.meta.periodDays ? d.meta.periodDays.toFixed(0) + '-day window' : 'window'), c: [237, 255, 240] },
+    { l: 'PROJECTED ANNUAL SAVING', v: money(d.kpis.annual) + ' / yr', s: '12 x monthly  |  95% CI +/-' + money(d.meta.ciAbs), c: [237, 250, 255] }
   ];
-  doc.need(gh * 2 + gap + 6);
-  var yTop = doc.y;
   for (var i = 0; i < 4; i++) {
-    var col = i % 2, row = Math.floor(i / 2);
-    var x = M + col * (gw + 12);
-    var top = yTop - row * (gh + gap);
-    doc.box(x, top - gh, gw, gh, kpis[i].c, [0.78, 0.80, 0.86]);
-    var ySave = doc.y;
-    doc.y = top - 13; doc.text(x + 8, kpis[i].l, 6.5, true, FAINT);
-    doc.y = top - 28; doc.text(x + 8, kpis[i].v, 11, true, INK);
-    doc.y = top - 40; doc.text(x + 8, kpis[i].s.slice(0, 54), 7, false, MUT);
-    doc.y = ySave;
+    var x = M + (i % 2) * (gw + 12);
+    var yy = y + Math.floor(i / 2) * (gh + gap);
+    doc.setFillColor(kpis[i].c[0], kpis[i].c[1], kpis[i].c[2]);
+    doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
+    doc.roundedRect(x, yy, gw, gh, 4, 4, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+    doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
+    doc.text(kpis[i].l, x + 8, yy + 13);
+    doc.setFontSize(11);
+    doc.setTextColor(INK[0], INK[1], INK[2]);
+    doc.text(kpis[i].v, x + 8, yy + 29);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+    doc.setTextColor(MUT[0], MUT[1], MUT[2]);
+    doc.text(kpis[i].s.slice(0, 56), x + 8, yy + 41);
   }
-  doc.y = yTop - (gh * 2 + gap) - 8;
+  return y + gh * 2 + gap + 10;
 }
-
-/* Enterprise table: header band, zebra rows, full grid (outer box, row
-   rules, column rules), left-aligned text columns, right-aligned numeric
-   columns, and word-wrapped cells with dynamic row height. No truncation. */
-function table(doc, cols, rows, opts) {
-  opts = opts || {};
-  var M = doc.M, W = doc.W;
-  var avail = W - M * 2;
-  var widths = cols.map(function (c) { return avail * c.w; });
-  var fs = opts.fontSize || 7.5, lh = 9.5;
-  var pad = 4;
-
-  function rowLines(row) {
-    var max = 1;
-    for (var i = 0; i < cols.length; i++) {
-      var maxCh = Math.max(10, Math.floor((widths[i] - pad * 2) / (fs * 0.55)));
-      var ls = wrap(row[i], maxCh);
-      row['_w' + i] = ls;
-      if (ls.length > max) max = ls.length;
-    }
-    return max;
-  }
-  function drawHeaderRow() {
-    var hh = 15;
-    doc.need(hh + 4);
-    doc.fillRect(M, doc.y - hh + 2, avail, hh, HDR);
-    var ySave = doc.y, x = M;
-    for (var i = 0; i < cols.length; i++) {
-      doc.y = ySave - 1;
-      doc.text(x + pad, san(cols[i].t).toUpperCase(), 6.5, true, [1, 1, 1]);
-      x += widths[i];
-    }
-    // column rules over header
-    var xx = M;
-    for (var j = 0; j < cols.length; j++) { doc.vline(xx, ySave - hh + 2, ySave + 2); xx += widths[j]; }
-    doc.vline(M + avail, ySave - hh + 2, ySave + 2);
-    doc.y = ySave - hh - 1;
-  }
-  drawHeaderRow();
-  for (var r = 0; r < rows.length; r++) {
-    var nlines = rowLines(rows[r]);
-    var rh = Math.max(14, nlines * lh + 5);
-    doc.need(rh + 1);
-    var top = doc.y;
-    if (r % 2 === 1) doc.fillRect(M, top - rh + 2, avail, rh, [0.96, 0.97, 0.99]);
-    var ySave2 = doc.y, x2 = M;
-    for (var cI = 0; cI < cols.length; cI++) {
-      var lines = rows[r]['_w' + cI];
-      var right = (cols[cI].a === 'r');
-      var col = (opts.redLast && cI === cols.length - 1) ? RED : (cI === 0 && opts.boldCol0 ? INK : MUT);
-      for (var li = 0; li < lines.length; li++) {
-        doc.y = top - 3 - li * lh - 7;
-        if (right) doc.textR(x2 + widths[cI] - pad, lines[li], fs, cI === 0 && opts.boldCol0, col);
-        else doc.text(x2 + pad, lines[li], fs, cI === 0 && !!opts.boldCol0, col);
-      }
-      x2 += widths[cI];
-    }
-    // grid: row rule + column rules
-    doc.hline(M, M + avail, top - rh + 2);
-    var gx = M;
-    for (var g = 0; g < cols.length; g++) { doc.vline(gx, top - rh + 2, top + 2); gx += widths[g]; }
-    doc.vline(M + avail, top - rh + 2, top + 2);
-    doc.y = ySave2 - rh - 0.5;
-  }
-  doc.y -= 6;
+var TABLE_BASE = {
+  theme: 'grid',
+  margin: { left: M, right: M },
+  styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 3.5, textColor: INK, lineColor: GRID, lineWidth: 0.6, valign: 'middle' },
+  headStyles: { fillColor: HDRF, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+  alternateRowStyles: { fillColor: ZEBRA },
+  showHead: 'everyPage'
+};
+function autoTable(doc, d, y, head, body, colStyles) {
+  y = ensure(doc, d, y, 44);
+  doc.autoTable(Object.assign({}, TABLE_BASE, {
+    startY: y, head: [head.map(san)], body: body.map(function (r) { return r.map(san); }),
+    columnStyles: colStyles || {},
+    didDrawPage: hookPage(doc, d)
+  }));
+  return doc.lastAutoTable.finalY + 9;
 }
-
-function bars(doc, d) {
-  if (!d.topBots.length) return;
-  h2(doc, 'Cost concentration (top bots)');
+function bars(doc, d, y) {
+  if (!d.topBots.length) return y;
+  y = h2(doc, d, y, 'Cost concentration (top bots)');
   var max = Math.max.apply(null, d.topBots.map(function (b) { return b.cost; }).concat([0.0001]));
-  var M = doc.M, W = doc.W;
-  var labelW = 225, barW = 195;
-  var valX = W - M;
+  var labelX = M, barX = M + 232, barMax = 190, valX = PW - M;
   for (var i = 0; i < Math.min(5, d.topBots.length); i++) {
     var b = d.topBots[i];
-    doc.need(15);
-    doc.text(M, shortBot(b.bot, 38), 7.5, true, INK);
-    var bw = barW * (b.cost / max);
-    doc.fillRect(M + labelW, doc.y - 2, Math.max(3, bw), 8, ACC);
-    doc.textR(valX, money(b.cost), 7.5, true, INK);
-    doc.y -= 13.5;
+    y = ensure(doc, d, y, 15);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    doc.setTextColor(INK[0], INK[1], INK[2]);
+    doc.text(shortBot(b.bot, 38), labelX, y);
+    var bw = Math.max(3, barMax * (b.cost / max));
+    doc.setFillColor(ACC[0], ACC[1], ACC[2]);
+    doc.rect(barX, y - 7, bw, 8, 'F');
+    doc.text(money(b.cost), valX, y, { align: 'right' });
+    y += 13.5;
   }
-  doc.y -= 2;
+  return y + 4;
 }
 
 function generateCFOPDFBytes(A, opts) {
   var d = buildCFOData(A, opts);
-  var doc = new PdfDoc();
+  var JsPDF = getJsPDFCtor();
+  var doc = new JsPDF({ unit: 'pt', format: 'a4', compress: false });
+  var hook = hookPage(doc, d);
+  var y = 76;
+
   drawHeader(doc, d);
+  drawFooter(doc, 1);
 
-  // Executive narrative
-  doc.need(66);
-  doc.fillRect(doc.M, doc.y - 54, doc.W - doc.M * 2, 54, [0.93, 0.95, 1.0]);
-  doc.box(doc.M, doc.y - 54, doc.W - doc.M * 2, 54, null, [0.78, 0.80, 0.86]);
-  var yBox = doc.y;
-  doc.y = yBox - 12; doc.text(doc.M + 8, 'EXECUTIVE RECOMMENDATION', 7.5, true, ACC);
-  doc.y = yBox - 15;
-  para(doc, '    AI training bots consumed ' + money(d.kpis.blockable) + ' (' + pct(d.kpis.blockableShare) + ' of egress) with zero citation value. Blocking recovers ~' + money(d.kpis.monthly) + '/mo (' + money(d.kpis.annual) + '/yr). Search-index + user-fetch traffic must stay allowed -- blocking drops AI citations in 1-2 weeks and breaks shopping-ad verification.', 8.5);
-  doc.y -= 2;
+  // Executive recommendation box
+  y = ensure(doc, d, y, 64);
+  doc.setFillColor(237, 240, 255);
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
+  doc.roundedRect(M, y - 2, CW, 56, 4, 4, 'FD');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
+  doc.text('EXECUTIVE RECOMMENDATION', M + 8, y + 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  var recLines = doc.splitTextToSize(san('AI training bots consumed ' + money(d.kpis.blockable) + ' (' + pct(d.kpis.blockableShare) + ' of egress) with zero citation value. Blocking recovers ~' + money(d.kpis.monthly) + '/mo (' + money(d.kpis.annual) + '/yr). Search-index + user-fetch traffic must stay allowed -- blocking drops AI citations in 1-2 weeks and breaks shopping-ad verification.'), CW - 16);
+  for (var ri = 0; ri < recLines.length; ri++) doc.text(recLines[ri], M + 8, y + 24 + ri * 10.5);
+  y += 66;
 
-  h1(doc, '1 - Financials (measured, auditable)');
-  kpiGrid(doc, d);
-  h2(doc, 'Cost breakdown by tier');
-  table(doc, [{ t: 'Tier', w: 0.34 }, { t: 'Requests', w: 0.16, a: 'r' }, { t: 'Bandwidth', w: 0.16, a: 'r' }, { t: 'Cost', w: 0.17, a: 'r' }, { t: 'Share', w: 0.17, a: 'r' }],
+  y = h1(doc, d, y, '1 - Financials (measured, auditable)');
+  y = kpiGrid(doc, d, y);
+  y = h2(doc, d, y, 'Cost breakdown by tier');
+  y = autoTable(doc, d, y,
+    ['Tier', 'Requests', 'Bandwidth', 'Cost', 'Share'],
     d.tierRows.map(function (r) { return [r.tier, num(r.reqs), bytesFmt(r.bytes), money(r.cost), pct(r.share)]; }),
-    { boldCol0: true });
-  para(doc, 'Pricing: ' + d.meta.preset + ' @ $' + d.meta.cdnEgress.toFixed(3) + '/GB + $' + d.meta.req10k.toFixed(4) + '/10K. Origin-compute excluded unless opt-in. ' + d.meta.badge + ' analysis.' + (d.meta.scaledCapped ? ' Window <0.5d or >400d -- treat monthly/annual as directional, act on period savings.' : ''), 7);
+    { 0: { fontStyle: 'bold' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } });
+  y = para(doc, d, y, 'Pricing: ' + d.meta.preset + ' @ $' + d.meta.cdnEgress.toFixed(3) + '/GB + $' + d.meta.req10k.toFixed(4) + '/10K. Origin-compute excluded unless opt-in. ' + d.meta.badge + ' analysis.' + (d.meta.scaledCapped ? ' Window <0.5d or >400d -- treat monthly/annual as directional, act on period savings.' : ''), 7);
 
-  h1(doc, '2 - Where the waste is');
-  h2(doc, 'Top cost bots (measured)');
-  table(doc, [{ t: 'Bot', w: 0.32 }, { t: 'Tier', w: 0.24 }, { t: 'Reqs', w: 0.15, a: 'r' }, { t: 'Bytes', w: 0.14, a: 'r' }, { t: 'Cost', w: 0.15, a: 'r' }],
+  y = h1(doc, d, y, '2 - Where the waste is');
+  y = h2(doc, d, y, 'Top cost bots (measured)');
+  y = autoTable(doc, d, y,
+    ['Bot', 'Tier', 'Reqs', 'Bytes', 'Cost'],
     d.topBots.map(function (b) { return [b.bot, b.tier, num(b.count), bytesFmt(b.bytes), money(b.cost)]; }),
-    { boldCol0: true, redLast: true });
-  bars(doc, d);
-  h2(doc, 'Crawl traps -> $ waste (fix owners: Eng/SEO)');
+    { 0: { fontStyle: 'bold' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', textColor: RED } });
+  y = bars(doc, d, y);
+  y = h2(doc, d, y, 'Crawl traps -> $ waste (fix owners: Eng/SEO)');
   if (d.traps.length) {
-    table(doc, [{ t: 'Trap', w: 0.36 }, { t: 'Reqs', w: 0.15, a: 'r' }, { t: 'Waste', w: 0.15, a: 'r' }, { t: 'Cost', w: 0.17, a: 'r' }, { t: 'Share', w: 0.17, a: 'r' }],
+    y = autoTable(doc, d, y,
+      ['Trap', 'Reqs', 'Waste', 'Cost', 'Share'],
       d.traps.map(function (t) { return [t.name, num(t.count), bytesFmt(t.bytes), money(t.cost), pct(t.share)]; }),
-      { boldCol0: true });
-  } else para(doc, 'No parameterized/faceted trap patterns above threshold in this window.', 8);
+      { 0: { fontStyle: 'bold' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } });
+  } else y = para(doc, d, y, 'No parameterized/faceted trap patterns above threshold in this window.', 8);
 
-  h1(doc, '3 - Actions (finance-safe, eng-ready)');
+  y = h1(doc, d, y, '3 - Actions (finance-safe, eng-ready)');
   if (d.actions.length) {
-    table(doc, [{ t: 'Bot', w: 0.28 }, { t: 'Edge action', w: 0.28 }, { t: 'Saving', w: 0.16, a: 'r' }, { t: 'Risk', w: 0.28 }],
+    y = autoTable(doc, d, y,
+      ['Bot', 'Edge action', 'Saving', 'Risk'],
       d.actions.map(function (a) { return [a.bot, a.action, money(a.saving), a.risk]; }),
-      { boldCol0: true });
-  } else para(doc, 'No training/suspicious volume above the >=2-request floor -- nothing to block. Re-run after a larger window.', 8);
-  h2(doc, 'Do NOT block (revenue / citation protection)');
-  d.doNotBlock.forEach(function (x) { para(doc, '- ' + x, 7.5); });
-  try {
-    if (d.kpis.ppcMonthly > 0.5) para(doc, 'Pay Per Crawl upside (402 beta, $0.002/req on training hits): ~' + money(d.kpis.ppcMonthly) + '/mo recoverable instead of pure block.', 7.5);
-  } catch (e) {}
+      { 0: { fontStyle: 'bold' }, 2: { halign: 'right' } });
+  } else y = para(doc, d, y, 'No training/suspicious volume above the >=2-request floor -- nothing to block. Re-run after a larger window.', 8);
+  y = h2(doc, d, y, 'Do NOT block (revenue / citation protection)');
+  for (var di = 0; di < d.doNotBlock.length; di++) y = para(doc, d, y, '- ' + d.doNotBlock[di], 7.5);
+  if (d.kpis.ppcMonthly > 0.5) y = para(doc, d, y, 'Pay Per Crawl upside (402 beta, $0.002/req on training hits): ~' + money(d.kpis.ppcMonthly) + '/mo recoverable instead of pure block.', 7.5);
 
-  h1(doc, '4 - Trust, method and sign-off');
-  para(doc, 'Verification: ' + num(d.verify.verified) + ' checks match expected patterns; ' + num(d.verify.suspicious) + ' unusual. Claimed AI fetches: ' + num(d.verify.claimed) + ', unverified ' + num(d.verify.unverified) + ' (' + pct(d.verify.unverifiedPct) + '). Confirm blocks with vendor IP JSON + server-side reverse DNS (dig -x) before enforcing.', 7.5);
-  para(doc, 'Human ' + pct(d.humanPct) + ' / bot ' + pct(d.botPct) + '  |  IPs ' + num(d.uniqueIPs) + '  |  URLs ' + num(d.uniqueURLs) + '  |  File: ' + (d.meta.file || 'upload') + '  |  Tool v' + d.meta.db + ' client-side -- no log leaves this browser.', 7);
-  para(doc, 'Method: ' + d.method, 7);
-  doc.need(30);
-  doc.text(doc.M, 'Approved: ______________________    Date: __________    Owner: __________', 8, false);
-  doc.y -= 14;
-  doc.text(doc.M, 'Full WAF + robots bundle lives in Module 6 (copy buttons) -- this PDF carries the business case, not raw regex.', 7, false, FAINT);
+  y = h1(doc, d, y, '4 - Trust, method and sign-off');
+  y = para(doc, d, y, 'Verification: ' + num(d.verify.verified) + ' checks match expected patterns; ' + num(d.verify.suspicious) + ' unusual. Claimed AI fetches: ' + num(d.verify.claimed) + ', unverified ' + num(d.verify.unverified) + ' (' + pct(d.verify.unverifiedPct) + '). Confirm blocks with vendor IP JSON + server-side reverse DNS (dig -x) before enforcing.', 7.5);
+  y = para(doc, d, y, 'Human ' + pct(d.humanPct) + ' / bot ' + pct(d.botPct) + '  |  IPs ' + num(d.uniqueIPs) + '  |  URLs ' + num(d.uniqueURLs) + '  |  File: ' + (d.meta.file || 'upload') + '  |  Tool v' + d.meta.db + ' client-side -- no log leaves this browser.', 7);
+  y = para(doc, d, y, 'Method: ' + d.method, 7);
+  y = ensure(doc, d, y, 34);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.text('Approved: ______________________    Date: __________    Owner: __________', M, y);
+  y += 14;
+  doc.setFontSize(7);
+  doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
+  doc.text('Full WAF + robots bundle lives in Module 6 (copy buttons) -- this PDF carries the business case, not raw regex.', M, y);
 
-  var total = doc.pages.length;
-  for (var p = 0; p < total; p++) { doc.pageNo = p; }
-  return { bytes: assemble(doc, d), data: d, pages: total };
-}
-
-function assemble(doc, d) {
-  var nPages = doc.pages.length;
-  // object numbering: 1 catalog, 2 pages, 3 fontR, 4 fontB, then 5.. pairs
-  var pageObjNums = [], contentObjNums = [];
-  var next = 5;
-  for (var i = 0; i < nPages; i++) { pageObjNums.push(next++); contentObjNums.push(next++); }
-  var out = ['%PDF-1.4', '%enterprise-cfo'];
-  var offsets = [0];
-  function pushObj(n, body) {
-    offsets[n] = out.join('\n').length + 1;
-    out.push(n + ' 0 obj');
-    out.push(body);
-    out.push('endobj');
-  }
-  pushObj(1, '<< /Type /Catalog /Pages 2 0 R >>');
-  pushObj(2, '<< /Type /Pages /Kids [' + pageObjNums.map(function (n) { return n + ' 0 R'; }).join(' ') + '] /Count ' + nPages + ' >>');
-  pushObj(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-  pushObj(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
-  var footL = san('Confidential  |  Measured bytes x configured CDN pricing. Blockable = training + suspicious only.');
-  for (var p = 0; p < nPages; p++) {
-    var ops = doc.pages[p].slice();
-    var footOps = [];
-    footOps.push('0.78 0.80 0.86 RG 0.6 w ' + doc.M + ' 44 m ' + (doc.W - doc.M) + ' 44 l S');
-    footOps.push('BT /F1 6.5 Tf 0.49 0.51 0.62 rg ' + doc.M.toFixed(1) + ' 32.0 Td (' + pdfEsc(footL) + ') Tj ET');
-    var pg = 'Page ' + (p + 1) + ' of ' + nPages;
-    var pgW = san(pg).length * 6.5 * 0.55;
-    footOps.push('BT /F1 6.5 Tf 0.49 0.51 0.62 rg ' + (doc.W - doc.M - pgW).toFixed(1) + ' 32.0 Td (' + pdfEsc(pg) + ') Tj ET');
-    var stream = ops.concat(footOps).join('\n');
-    pushObj(contentObjNums[p], '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream');
-    pushObj(pageObjNums[p], '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + contentObjNums[p] + ' 0 R >>');
-  }
-  var xrefPos = out.join('\n').length + 1;
-  var maxObj = next - 1;
-  out.push('xref');
-  out.push('0 ' + (maxObj + 1));
-  out.push('0000000000 65535 f ');
-  for (var o = 1; o <= maxObj; o++) {
-    var off = offsets[o] || 0;
-    out.push(String(off).padStart(10, '0') + ' 00000 n ');
-  }
-  out.push('trailer');
-  out.push('<< /Size ' + (maxObj + 1) + ' /Root 1 0 R >>');
-  out.push('startxref');
-  out.push(String(xrefPos));
-  out.push('%%EOF');
-  var str = out.join('\n');
-  // Stream is pure ASCII by construction (san() at every emit point).
-  var bytes = new Uint8Array(str.length);
-  for (var b = 0; b < str.length; b++) bytes[b] = str.charCodeAt(b) & 0x7f;
-  return bytes;
+  if (typeof doc.putTotalPages === 'function') doc.putTotalPages(TOTAL_PAGES);
+  var pages = doc.getNumberOfPages();
+  var buf = doc.output('arraybuffer');
+  return { bytes: new Uint8Array(buf), data: d, pages: pages };
 }
 
 function downloadCFOPDF(A, opts) {
