@@ -8,6 +8,7 @@ P0 credibility pass: edge-rule threshold fix, AdsBot revenue guard, freshness 14
 - `genEdgeRules` threshold `count>=10` → `count>=2 OR ≥0.5 req/min/IP` (training + suspicious). The old gate silently emitted ZERO training blocks on long windows and failed the asserted `count=3 → BLOCK` contract in `tests/costs.test.js`. GPTBot 1810 + Bytespider 1511 req windows now emit all 4 training BLOCKs; search stays 429-only, user-fetch allow-only.
 - Freshness red at >14d (was 21d): pill + Module 2 + CI agree — green <7d, amber 7–14d, red stale with last-good fallback pin.
 - "Start Monitoring / Interval" → "Re-analyze locally / Re-analyze locally every" (no fake live-tail implication).
+- Removed the bottom site-footer block (privacy-audit line + Free/Pro upsell) and the inline "verified: no XHR/WebSocket/sendBeacon" dropzone claim from `index.html` — tool UI only, docs/audit claims in METHOD.md + SECURITY.md unchanged.
 
 ### Added
 - OAI-AdsBot revenue guard: engine strips accidental block/challenge rules for OAI-AdsBot; Module 6 green guard card when AdsBot is in-window; `checkPolicyConsistency` REVENUE RISK on Disallow.

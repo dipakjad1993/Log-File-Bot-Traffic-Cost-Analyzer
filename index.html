@@ -117,7 +117,7 @@
       <button class="btn-primary" id="browse-btn">Browse Files</button>
       <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log,.txt,.csv,.gz" multiple hidden aria-label="Log file input (multiple files + .gz supported)">
       <div class="drop-formats">📄 .log &nbsp; 📄 .jsonl &nbsp; 📄 .csv &nbsp; 🗜️ .gz &nbsp; — JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush. Multi-select rotations. <strong>Mobile: 50MB guard pre-drop.</strong> 500MB+ → <code>node tools/cli.js --exact</code> (exact, no sampling).</div>
-      <div class="drop-formats">🔒 No upload — <a href="./METHOD.md">verified: no XHR/WebSocket/sendBeacon</a>. Example: <button class="btn-sm" id="example-chip">access.log.gz sample</button></div>
+      <div class="drop-formats">Example: <button class="btn-sm" id="example-chip">access.log.gz sample</button></div>
     </div>
     <div class="upload-extras">
       <span class="divider-text">no log file?</span>
@@ -306,11 +306,6 @@
 </section>
 
 </div>
-
-<footer class="site-footer" style="text-align:center;padding:24px 16px;opacity:.9">
-  <p>🔒 No upload — files never leave your machine. Verified: no XHR/WebSocket/sendBeacon in audit. SOC2-irrelevant by design — no data transmitted. Accessibility: WCAG 2.2 AA target, prefers-reduced-motion respected, keyboard 1-0 tabs.</p>
-  <p><strong>Free</strong> — every analysis under 50MB, client-side, forever. <strong>Pro — $49 one-time</strong> (500MB+ CLI exact + weekly blocklist feed, shipped v1.4): <a href="https://gumroad.com/l/log-analyzer-pro">Pre-order on Gumroad</a> · <code>node tools/cli.js --exact --out parquet</code> · <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">star the repo</a>. <a href="./bots/">Open bot DB (127 sigs)</a> · <a href="./research/1gb-teardown.html">1GB proof</a> · <a href="./sitemap.xml">Sitemap</a> · <a href="./CHANGELOG.md">Changelog</a> · <a href="./METHOD.md">Method</a> · <a href="./llms-full.txt">llms-full.txt</a></p>
-</footer>
 
 <script src="./js/analyzer.js?v=1.4.0"></script>
 </body>
