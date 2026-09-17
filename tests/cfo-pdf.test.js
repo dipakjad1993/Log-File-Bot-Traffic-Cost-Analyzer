@@ -46,6 +46,23 @@ test('cfo-pdf: WinAnsi-clean stream — no mojibake, real tables', () => {
   assert.equal(CFO.san('a — b → c ± d × e'), 'a -- b -> c +/- d x e');
 });
 
+test('cfo-pdf: chrome stamped exactly once per page, numbers sequential', () => {
+  const rs = [];
+  for (let i = 0; i < 400; i++) rs.push(rec('10.0.0.' + (i % 20 + 1), 'GPTBot/1.0 (+https://openai.com/gptbot)', '/p' + (i % 60) + (i % 3 ? '?page=' + (i % 9) : ''), 200, 60000, '2026-0' + (6 + (i % 3)) + '-15T10:00:00Z'));
+  for (let i = 0; i < 200; i++) rs.push(rec('10.0.1.' + (i % 10 + 1), 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126 Safari/537.36', '/blog/a' + (i % 10), 200, 40000, '2026-07-01T10:00:00Z'));
+  for (let i = 0; i < 120; i++) rs.push(rec('10.0.2.' + (i % 8 + 1), 'OAI-SearchBot/1.0', '/products/widget-pro', 200, 30000, '2026-08-01T10:00:00Z'));
+  const out = A.analyze(rs, { cdnEgress: 0.09, request10K: 0.0075, ssr1K: 0, preset: 'AWS CloudFront' }, () => {});
+  const res = CFO.generateCFOPDFBytes(out, { domain: 'example.com', file: 'access.log' });
+  const body = Buffer.from(res.bytes).toString('latin1');
+  const headers = (body.match(/EXECUTIVE SUMMARY/g) || []).length;
+  const footers = [...body.matchAll(/Page (\d+) of (\d+)/g)].map((m) => [m[1], m[2]]);
+  assert.equal(headers, res.pages, 'one header band per page, got ' + headers + ' for ' + res.pages + ' pages');
+  assert.equal(footers.length, res.pages, 'one footer per page, got ' + footers.length + ' for ' + res.pages + ' pages');
+  footers.forEach(([pg, tot], i) => {
+    assert.equal(+pg, i + 1, 'footer ' + i + ' numbers page ' + pg);
+    assert.equal(+tot, res.pages, 'footer ' + i + ' totals ' + tot);
+  });
+});
 test('cfo-pdf: data model annualizes + labels pricing + badge', () => {
   const rs = [];
   for (let i = 0; i < 100; i++) rs.push(rec('9.9.9.' + (i % 5 + 1), 'GPTBot/1.0', '/x', 200, 100000, '2026-06-03T00:00:00Z'));

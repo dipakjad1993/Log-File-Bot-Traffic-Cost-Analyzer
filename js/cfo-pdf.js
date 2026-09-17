@@ -207,6 +207,10 @@ var ACC = [79, 70, 229], HDRF = [40, 46, 71], GRID = [197, 203, 214];
 var ZEBRA = [246, 247, 250], RED = [220, 38, 38];
 var TOTAL_PAGES = '{total_pages_count_string}';
 
+/* Chrome (header/footer) is stamped in ONE post-pass after all content is
+ * laid out — exactly once per page with correct numbers. Never in didDrawPage
+ * (fires once per page PER TABLE → duplicated/overlapping bands and stale
+ * page numbers) and never inline in flow helpers. */
 function drawHeader(doc, d) {
   doc.setFillColor(ACC[0], ACC[1], ACC[2]);
   doc.rect(0, 0, PW, 56, 'F');
@@ -228,11 +232,13 @@ function drawFooter(doc, pageNo) {
   doc.text(san('Confidential  |  Measured bytes x configured CDN pricing. Blockable = training + suspicious only.'), M, y);
   doc.text(san('Page ' + pageNo + ' of ' + TOTAL_PAGES), PW - M, y, { align: 'right' });
 }
-function hookPage(doc, d) {
-  return function (data) {
+function stampChrome(doc, d) {
+  var n = doc.getNumberOfPages();
+  for (var i = 1; i <= n; i++) {
+    doc.setPage(i);
     drawHeader(doc, d);
-    drawFooter(doc, data.pageNumber);
-  };
+    drawFooter(doc, i);
+  }
 }
 function h1(doc, d, y, t) {
   y = ensure(doc, d, y, 90);
@@ -251,12 +257,11 @@ function h2(doc, d, y, t) {
   doc.text(san(t), M, y);
   return y + 12;
 }
-/* Keep blocks together: section titles never strand at a page bottom. */
+/* Keep blocks together: section titles never strand at a page bottom.
+ * Adds a page WITHOUT chrome — stampChrome owns all chrome in post-pass. */
 function ensure(doc, d, y, need) {
   if (y + need > PH - 56) {
     doc.addPage();
-    drawHeader(doc, d);
-    drawFooter(doc, doc.getNumberOfPages());
     return 76;
   }
   return y;
@@ -311,8 +316,7 @@ function autoTable(doc, d, y, head, body, colStyles) {
   y = ensure(doc, d, y, 44);
   doc.autoTable(Object.assign({}, TABLE_BASE, {
     startY: y, head: [head.map(san)], body: body.map(function (r) { return r.map(san); }),
-    columnStyles: colStyles || {},
-    didDrawPage: hookPage(doc, d)
+    columnStyles: colStyles || {}
   }));
   return doc.lastAutoTable.finalY + 9;
 }
@@ -340,11 +344,7 @@ function generateCFOPDFBytes(A, opts) {
   var d = buildCFOData(A, opts);
   var JsPDF = getJsPDFCtor();
   var doc = new JsPDF({ unit: 'pt', format: 'a4', compress: false });
-  var hook = hookPage(doc, d);
-  var y = 76;
-
-  drawHeader(doc, d);
-  drawFooter(doc, 1);
+  var y = 76; // header band occupies 0..56; post-pass stamps it on every page
 
   // Executive recommendation box
   y = ensure(doc, d, y, 64);
@@ -408,7 +408,8 @@ function generateCFOPDFBytes(A, opts) {
   doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
   doc.text('Full WAF + robots bundle lives in Module 6 (copy buttons) -- this PDF carries the business case, not raw regex.', M, y);
 
-  if (typeof doc.putTotalPages === 'function') doc.putTotalPages(TOTAL_PAGES);
+  stampChrome(doc, d); // footers carry the {total} placeholder…
+  if (typeof doc.putTotalPages === 'function') doc.putTotalPages(TOTAL_PAGES); // …resolved here, once
   var pages = doc.getNumberOfPages();
   var buf = doc.output('arraybuffer');
   return { bytes: new Uint8Array(buf), data: d, pages: pages };
