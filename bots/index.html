@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open Bot DB: 75 Signatures — Training vs Search vs User (2026)</title>
+<meta name="description" content="Searchable bot signature database: which AI crawlers to block, rate-limit, or never touch. Training 60/min, search-index 120/min, user-triggered do-not-block.">
+<link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card" style="max-width:960px">
+<p class="crumbs"><a href="../">Analyzer</a> / Bot DB</p>
+<h1>Open Bot DB — 75 signatures (v2026.09.13)</h1>
+<p>Training = block freely (60/min). Search-index = allow at 120/min with 429 + Retry-After — never hard block. User-triggered = do not throttle. IP snapshot: <code>data/bot-ips.json</code> dated 2026-09-13, refreshed weekly. <a href="../?sample=10k">Test on the 10k demo</a>.</p>
+<p><input id="bot-q" placeholder="Filter: gptbot, perplexity, shopping…" aria-label="Filter bots" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-1);color:var(--text-1)"></p>
+<div id="bot-db">
+<h2>Training — block freely (28)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="ai2bot"><td><strong>AI2Bot</strong><br><code>ai2bot</code></td><td>60/min</td><td>Allen Institute training crawler. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="applebot-extended"><td><strong>Applebot-Extended</strong><br><code>applebot-extended</code></td><td>60/min</td><td>Apple training crawler. Block via robots token. <em>Risk: none.</em></td></tr>
+<tr id="bright-data-brightdata"><td><strong>Bright Data (brightdata)</strong><br><code>brightdata</code></td><td>20/min aggressive</td><td>Bright Data proxy-network scraper. Rotates residential IPs — block at WAF + ASN. <em>Risk: none.</em></td></tr>
+<tr id="bytespider"><td><strong>Bytespider</strong><br><code>bytespider</code></td><td>20/min aggressive</td><td>ByteDance training. Extremely aggressive. Block. <em>Risk: none.</em></td></tr>
+<tr id="ccbot"><td><strong>CCBot</strong><br><code>ccbot</code></td><td>60/min (20 aggressive)</td><td>Common Crawl. Zero direct ROI. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="claudebot"><td><strong>ClaudeBot</strong><br><code>claudebot</code></td><td>60/min (20 aggressive)</td><td>Anthropic training. No IP list — robots.txt only. Block freely. Crawl-to-referral was 20,583:1, now ~5,143:1 — still worst in class. <em>Risk: none.</em></td></tr>
+<tr id="cohere-ai"><td><strong>cohere-ai</strong><br><code>cohere-ai</code></td><td>60/min (20 aggressive)</td><td>Cohere training crawler. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="curl"><td><strong>cURL</strong><br><code>curl/</code></td><td>throttle/block freely — 60 req/min/IP</td><td>cURL command. Automated downloading.</td></tr>
+<tr id="deepseekbot"><td><strong>DeepSeekBot</strong><br><code>deepseekbot</code></td><td>60/min (20 aggressive)</td><td>DeepSeek model training crawler (2026 surge). Block freely. <em>Risk: none.</em></td></tr>
+<tr id="firecrawl"><td><strong>Firecrawl</strong><br><code>firecrawl</code></td><td>60/min (20 aggressive)</td><td>Firecrawl scraping infra (user-configured crawls). Block by default, allowlist paying partners. <em>Risk: none.</em></td></tr>
+<tr id="go-http-client"><td><strong>Go-http-client</strong><br><code>go-http-client</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Go HTTP client. Often automated.</td></tr>
+<tr id="google-extended-robots-token"><td><strong>Google-Extended (robots token)</strong><br><code>google-extended</code></td><td>robots.txt Disallow</td><td>NOT a UA — robots.txt token controlling Gemini training. See Robots tab. <em>Risk: none.</em></td></tr>
+<tr id="googleother"><td><strong>GoogleOther</strong><br><code>googleother</code></td><td>60/min (20 aggressive)</td><td>Google non-search crawl (R&amp;D/AI/product). Covers GoogleOther-Image/Video. Rate-limit; blocking is lower-risk than Googlebot. <em>Risk: none.</em></td></tr>
+<tr id="gptbot"><td><strong>GPTBot</strong><br><code>gptbot</code></td><td>60/min (20 aggressive)</td><td>OpenAI training. Block freely — zero live citation loss. <em>Risk: none.</em> <a href="https://openai.com/gptbot.json">vendor list</a></td></tr>
+<tr id="headlesschrome"><td><strong>HeadlessChrome</strong><br><code>headlesschrome</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Headless Chrome. Automated browser.</td></tr>
+<tr id="imagesiftbot"><td><strong>ImageSiftBot</strong><br><code>imagesiftbot</code></td><td>60/min (20 aggressive)</td><td>Image-training crawler. Block freely via robots + edge. <em>Risk: none.</em></td></tr>
+<tr id="java-http"><td><strong>Java/HTTP</strong><br><code>java/</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Java HTTP client.</td></tr>
+<tr id="meta-externalagent"><td><strong>Meta-ExternalAgent</strong><br><code>meta-externalagent</code></td><td>60/min (20 aggressive)</td><td>Meta AI training crawler. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="phantomjs"><td><strong>PhantomJS</strong><br><code>phantomjs</code></td><td>throttle/block freely — 60 req/min/IP</td><td>PhantomJS headless browser.</td></tr>
+<tr id="playwright"><td><strong>Playwright</strong><br><code>playwright</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Playwright test automation.</td></tr>
+<tr id="puppeteer"><td><strong>Puppeteer</strong><br><code>puppeteer</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Puppeteer headless browser.</td></tr>
+<tr id="python-requests"><td><strong>Python-requests</strong><br><code>python-requests</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Python HTTP client. Generic scraper.</td></tr>
+<tr id="python-urllib"><td><strong>Python-urllib</strong><br><code>python-urllib</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Python urllib. Generic scraper.</td></tr>
+<tr id="qwenbot-alibaba"><td><strong>QwenBot (Alibaba)</strong><br><code>qwenbot</code></td><td>60/min (20 aggressive)</td><td>Alibaba Qwen training crawler. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="scrapy"><td><strong>Scrapy</strong><br><code>scrapy</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Python Scrapy framework scraper.</td></tr>
+<tr id="sidetiq"><td><strong>Sidetiq</strong><br><code>sidetiq</code></td><td>60/min (20 aggressive)</td><td>Sidetiq scraping/prospecting bot. No referral value. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="timpibot-timpi"><td><strong>Timpibot (Timpi)</strong><br><code>timpibot</code></td><td>60/min (20 aggressive)</td><td>Timpi decentralized-index crawler. Aggressive on faceted pages. Block freely. <em>Risk: none.</em></td></tr>
+<tr id="wget"><td><strong>Wget</strong><br><code>wget/</code></td><td>throttle/block freely — 60 req/min/IP</td><td>Wget. Automated downloading.</td></tr>
+</tbody></table>
+<h2>Search-index — allow (8)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="amazonbot"><td><strong>Amazonbot</strong><br><code>amazonbot</code></td><td>120/min/IP</td><td>Amazon/Alexa crawler. ALLOW with limits. <em>Risk: medium.</em></td></tr>
+<tr id="bravebot"><td><strong>BraveBot</strong><br><code>bravebot</code></td><td>120/min/IP</td><td>Brave Search AI crawler. ALLOW. <em>Risk: medium.</em></td></tr>
+<tr id="claude-searchbot"><td><strong>Claude-SearchBot</strong><br><code>claude-searchbot</code></td><td>120/min/IP</td><td>Anthropic Claude search. No IP list — robots.txt only. ALLOW. Crawl-to-referral ~5,143:1 (improved from 20,583:1, still worst in class). <em>Risk: high.</em></td></tr>
+<tr id="duckassistbot"><td><strong>DuckAssistBot</strong><br><code>duckassistbot</code></td><td>120/min/IP</td><td>DuckDuckGo AI answer fetcher. Allow — citation source. <em>Risk: medium.</em></td></tr>
+<tr id="mistralai-search"><td><strong>MistralAI-Search</strong><br><code>mistralai-search</code></td><td>120/min/IP</td><td>Mistral AI search-index fetcher (distinct from MistralAI-User). ALLOW @120/min. <em>Risk: medium.</em></td></tr>
+<tr id="oai-searchbot"><td><strong>OAI-SearchBot</strong><br><code>oai-searchbot</code></td><td>120/min/IP</td><td>OpenAI ChatGPT Search. 85:1 crawl-to-referral. ALLOW — 5% blocked vs GPTBot 25%. <em>Risk: high.</em> <a href="https://openai.com/searchbot.json">vendor list</a></td></tr>
+<tr id="perplexitybot"><td><strong>PerplexityBot</strong><br><code>perplexitybot</code></td><td>120/min/IP</td><td>Perplexity AI search. Best ROI 210:1 crawl-to-referral. ALLOW. <em>Risk: high.</em> <a href="https://docs.perplexity.ai/bot.json">vendor list</a></td></tr>
+<tr id="youbot"><td><strong>YouBot</strong><br><code>youbot</code></td><td>120/min/IP</td><td>You.com AI search crawler. ALLOW. <em>Risk: medium.</em></td></tr>
+</tbody></table>
+<h2>User-triggered — do not throttle (5)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="chatgpt-user"><td><strong>ChatGPT-User</strong><br><code>chatgpt-user</code></td><td>no-throttle (300/min abuse ceiling only)</td><td>User-triggered live browse. 54% ignore robots. Do NOT throttle; 429 = missing live answer. <em>Risk: critical-do-not-block.</em> <a href="https://openai.com/gptbot.json">vendor list</a></td></tr>
+<tr id="claude-user"><td><strong>Claude-User</strong><br><code>claude-user</code></td><td>no-throttle</td><td>User-triggered Claude fetch. Do NOT throttle. <em>Risk: critical-do-not-block.</em></td></tr>
+<tr id="google-agent"><td><strong>Google-Agent</strong><br><code>google-agent</code></td><td>no-throttle</td><td>Google AI agent (user-triggered). Do NOT throttle. <em>Risk: critical-do-not-block.</em></td></tr>
+<tr id="mistralai-user"><td><strong>MistralAI-User</strong><br><code>mistralai-user</code></td><td>no-throttle</td><td>User-triggered Mistral fetch. Do NOT throttle. <em>Risk: critical-do-not-block.</em></td></tr>
+<tr id="perplexity-user"><td><strong>Perplexity-User</strong><br><code>perplexity-user</code></td><td>no-throttle</td><td>User-triggered Perplexity fetch. robots.txt may not apply. Do NOT throttle. <em>Risk: critical-do-not-block.</em></td></tr>
+</tbody></table>
+<h2>Search engines (16)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="adsbot-google"><td><strong>AdsBot-Google</strong><br><code>adsbot-google</code></td><td>allow — none</td><td>Google Ads landing page quality crawler.</td></tr>
+<tr id="applebot"><td><strong>Applebot</strong><br><code>applebot</code></td><td>allow — none</td><td>Apple/Siri web index crawler.</td></tr>
+<tr id="baiduspider"><td><strong>BaiduSpider</strong><br><code>baiduspider</code></td><td>allow — none</td><td>Baidu search crawler.</td></tr>
+<tr id="bingbot"><td><strong>Bingbot</strong><br><code>bingbot</code></td><td>allow — none</td><td>Microsoft Bing crawler.</td></tr>
+<tr id="bingpreview"><td><strong>BingPreview</strong><br><code>bingpreview</code></td><td>allow — none</td><td>Bing snapshot crawler.</td></tr>
+<tr id="duckduckbot"><td><strong>DuckDuckBot</strong><br><code>duckduckbot</code></td><td>allow — none</td><td>DuckDuckGo search crawler.</td></tr>
+<tr id="feedfetcher-google"><td><strong>FeedFetcher-Google</strong><br><code>feedfetcher-google</code></td><td>allow — none</td><td>Google feed fetcher.</td></tr>
+<tr id="google-inspectiontool"><td><strong>Google InspectionTool</strong><br><code>google-inspectiontool</code></td><td>allow — none</td><td>Google Rich Results testing tool.</td></tr>
+<tr id="google-read-aloud"><td><strong>Google-Read-Aloud</strong><br><code>google-read-aloud</code></td><td>allow — none</td><td>Google Read Aloud voice agent.</td></tr>
+<tr id="googlebot"><td><strong>Googlebot</strong><br><code>googlebot</code></td><td>allow — none</td><td>Primary organic search crawler. Critical for SEO visibility.</td></tr>
+<tr id="mediapartners-google"><td><strong>Mediapartners-Google</strong><br><code>mediapartners-google</code></td><td>allow — none</td><td>Google AdSense crawler.</td></tr>
+<tr id="msnbot"><td><strong>MSNbot</strong><br><code>msnbot</code></td><td>allow — none</td><td>Legacy Bing crawler.</td></tr>
+<tr id="oai-adsbot"><td><strong>OAI-AdsBot</strong><br><code>oai-adsbot</code></td><td>allow; 300/min abuse ceiling only</td><td>OpenAI ChatGPT Ads/commerce verification. DO NOT BLOCK on ecommerce — blocking breaks revenue checks for ChatGPT shopping surfaces. <em>Risk: critical-do-not-block.</em></td></tr>
+<tr id="petalbot-huawei"><td><strong>PetalBot (Huawei)</strong><br><code>petalbot</code></td><td>allow — none</td><td>Huawei Petal Search crawler. ALLOW — organic visibility in Petal/HarmonyOS surfaces.</td></tr>
+<tr id="yahoo-slurp"><td><strong>Yahoo Slurp</strong><br><code>yahoo! slurp</code></td><td>allow — none</td><td>Yahoo search crawler.</td></tr>
+<tr id="yandexbot"><td><strong>YandexBot</strong><br><code>yandexbot</code></td><td>allow — none</td><td>Yandex search crawler.</td></tr>
+</tbody></table>
+<h2>Social / link previews (8)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="discordbot"><td><strong>Discordbot</strong><br><code>discordbot</code></td><td></td><td>Discord link embed.</td></tr>
+<tr id="facebookbot"><td><strong>Facebookbot</strong><br><code>facebot</code></td><td></td><td>Facebook/Meta link preview crawler.</td></tr>
+<tr id="facebookexternalhit"><td><strong>facebookexternalhit</strong><br><code>facebookexternalhit</code></td><td></td><td>Facebook link sharing crawler.</td></tr>
+<tr id="linkedinbot"><td><strong>LinkedInBot</strong><br><code>linkedinbot</code></td><td></td><td>LinkedIn link preview crawler.</td></tr>
+<tr id="meta-externalfetcher"><td><strong>Meta-ExternalFetcher</strong><br><code>meta-externalfetcher</code></td><td></td><td>Meta link preview fetcher (user-triggered shares). Do not aggressively block.</td></tr>
+<tr id="pinterestbot"><td><strong>Pinterestbot</strong><br><code>pinterestbot</code></td><td></td><td>Pinterest pin crawler.</td></tr>
+<tr id="slackbot"><td><strong>Slackbot</strong><br><code>slackbot</code></td><td></td><td>Slack link unfurling.</td></tr>
+<tr id="twitterbot"><td><strong>Twitterbot</strong><br><code>twitterbot</code></td><td></td><td>Twitter/X card preview crawler.</td></tr>
+</tbody></table>
+<h2>SEO tools (5)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="ahrefsbot"><td><strong>AhrefsBot</strong><br><code>ahrefsbot</code></td><td></td><td>Ahrefs SEO crawler. Provides backlink data.</td></tr>
+<tr id="dotbot-moz"><td><strong>DotBot (Moz)</strong><br><code>dotbot</code></td><td></td><td>Moz/DotBot SEO crawler.</td></tr>
+<tr id="mj12bot"><td><strong>MJ12bot</strong><br><code>mj12bot</code></td><td></td><td>Majestic SEO crawler.</td></tr>
+<tr id="screaming-frog"><td><strong>Screaming Frog</strong><br><code>screaming frog</code></td><td></td><td>Screaming Frog SEO Spider tool.</td></tr>
+<tr id="semrushbot"><td><strong>SEMrushBot</strong><br><code>semrushbot</code></td><td></td><td>SEMrush SEO crawler.</td></tr>
+</tbody></table>
+<h2>Monitoring (5)</h2>
+<table class="dt"><thead><tr><th>Bot</th><th>Policy</th><th>Notes</th></tr></thead><tbody>
+<tr id="datadog"><td><strong>Datadog</strong><br><code>datadog</code></td><td></td><td>Datadog monitoring agent.</td></tr>
+<tr id="gtmetrix"><td><strong>GTmetrix</strong><br><code>gtmetrix</code></td><td></td><td>GTmetrix performance monitor.</td></tr>
+<tr id="new-relic"><td><strong>New Relic</strong><br><code>newrelic</code></td><td></td><td>New Relic monitoring agent.</td></tr>
+<tr id="pingdom"><td><strong>Pingdom</strong><br><code>pingdom</code></td><td></td><td>Pingdom uptime monitor.</td></tr>
+<tr id="uptimerobot"><td><strong>UptimeRobot</strong><br><code>uptimerobot</code></td><td></td><td>UptimeRobot monitor.</td></tr>
+</tbody></table>
+
+</div>
+<p class="crumbs" style="margin-top:16px">See also: <a href="./gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="./perplexitybot-block-or-allow.html">PerplexityBot</a> · <a href="./claudebot-no-ip-robots-only.html">ClaudeBot IPs</a> · <a href="../guides/compare-screaming-frog-jetoctopus-free.html">Tool comparison</a></p>
+</div></div>
+<script>
+document.getElementById('bot-q').addEventListener('input',e=>{
+  const q=e.target.value.toLowerCase();
+  document.querySelectorAll('#bot-db tr[id]').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});
+});
+</script>
+</body>
+</html>

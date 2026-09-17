@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body><div class="main-wrap"><div class="card">
-<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<p class="crumbs"><a href="../">Analyzer</a> / <a href="../#guides">Guides</a> / Block training bots</p>
 <h1>Block training bots without losing AI citations</h1>
 <p>The mistake: one rule blocks "AI bots" and kills ChatGPT/Perplexity citations for 2 weeks. The fix: split <strong>training (block)</strong> vs <strong>search-index (allow 120/min)</strong> vs <strong>user-triggered (never throttle)</strong> — exactly what the analyzer's 75-signature DB does.</p>
 <h2>1. robots.txt split (RFC 9309 most-specific-wins)</h2>
@@ -40,5 +40,6 @@ or (http.user_agent contains "CCBot") or (http.user_agent contains "Bytespider")
 <p>Run your log through the <a href="../">free analyzer</a> → Tab 4 Cost shows blockable = training + suspicious only ($0.25 on the 1.02&nbsp;GB sample) → Tab 6 Edge Rules generates the exact rule set with copy buttons. No log leaves your machine — verified: no XHR/WebSocket, only the demo file loads on click.</p>
 <p><img src="../assets/screenshots/14-tab6-edge-rules.png" alt="Edge rules tab with copy buttons" style="max-width:100%"></p>
 <p><a class="btn-primary" href="../?sample=10k">Test on the 10k demo first</a></p>
-</div></div></body>
+</div></div><p class="crumbs">See also: <a href="./cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <a href="./compare-screaming-frog-jetoctopus-free.html">Tool comparison</a> · <a href="../bots/gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="../research/1gb-teardown.html">1GB proof</a></p>
+</body>
 </html>

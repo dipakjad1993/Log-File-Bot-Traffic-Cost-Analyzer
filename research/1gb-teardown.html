@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body><div class="main-wrap"><div class="card">
-<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<p class="crumbs"><a href="../">Analyzer</a> / Research / 1GB teardown</p>
 <h1>I streamed 3.2M log lines in-browser: $2.61, $0.25 blockable</h1>
 <p>Not a toy demo. On 2026-09-11 the tool ran end-to-end in headless Chromium against a <strong>real 1.02 GB NDJSON log (3,200,000 lines, seed 7)</strong>. Every number below is measured.</p>
 <table>
@@ -28,5 +28,6 @@
 <p>9 Cloudflare rules fired on the sample. 75 signatures classified, 4-layer verification surfaced (not hid) 427 unusual checks. The on-screen banner states sampling honestly — figures describe the sample and scale ~10×.</p>
 <h2>Run your own log</h2>
 <p><a class="btn-primary" href="../">Run your own log — no upload, files never leave your machine</a> · <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">GitHub + EXPECTED.md</a></p>
-</div></div></body>
+</div></div><p class="crumbs">See also: <a href="../guides/cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <a href="../guides/compare-screaming-frog-jetoctopus-free.html">Tool comparison</a> · <a href="../bots/">Full bot DB</a></p>
+</body>
 </html>

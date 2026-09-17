@@ -105,7 +105,8 @@ const RATE_POLICY={
   ai_user_fetch:{label:'User-triggered',action:'DO NOT throttle',limit:'no throttle (300/min abuse ceiling only)',aggressive:'429 = missing live answer',robots:'Allow (robots.txt may not apply)',cf:'Cloudflare AI Crawl Control → Allow Agent',risk:'critical (do not block)'},
   search_engine:{label:'Search engine',action:'allow',limit:'none',aggressive:'none',robots:'Allow',cf:'Allow',risk:'critical (organic visibility)'}
 };
-function normalizeTier(t){return t==='ai_citation'?'ai_search_index':t;}
+let _aiCitationWarned=false;
+function normalizeTier(t){if(t==='ai_citation'&&!_aiCitationWarned){_aiCitationWarned=true;try{if(typeof console!=='undefined')console.warn('[lfa] DEPRECATED tier "ai_citation" seen — mapped to "ai_search_index". Support ends in v2.0; migrate exports.')}catch(e){}}return t==='ai_citation'?'ai_search_index':t;}
 
 // Bot-first classification order documented: bot signatures take precedence over browser
 // fingerprints to prevent spoofed-UA bypass. python/curl-in-Chrome edge case handled explicitly.
@@ -370,6 +371,53 @@ function genRdnsChecklist(botData,records){
   const lines=[...seen.entries()].slice(0,100).map(([ip,name])=>`# claimed ${name} from ${ip}\ndig -x ${ip} +short\n# expect: ${/google/i.test(name)?'.googlebot.com':/bing/i.test(name)?'.search.msn.com':/yandex/i.test(name)?'.yandex.':/baidu/i.test(name)?'.baidu.com':'vendor domain'} then: dig <hostname> +short  # must resolve back to ${ip}`);
   return lines.join('\n');
 }
+/* Opt-in in-browser rDNS via DNS-over-HTTPS (Cloudflare 1.1.1.1). Runs ONLY on
+ * user click — never automatically — so the no-telemetry default stands.
+ * Returns {ptr, forward, match}. Match=true means forward-confirmed (strong);
+ * anything else is a signal, not a verdict. IPv4 only. */
+function reverseIPv4(ip){
+  const m=String(ip||'').trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if(!m||m.slice(1).some(o=>+o>255))return null;
+  return m.slice(1).reverse().join('.')+'.in-addr.arpa';
+}
+async function verifyRdnsDoh(ip){
+  const arpa=reverseIPv4(ip);
+  if(!arpa)throw new Error('IPv4 only (e.g. 66.249.66.1)');
+  const q=async(name,type)=>{
+    const res=await fetch('https://cloudflare-dns.com/dns-query?name='+encodeURIComponent(name)+'&type='+type,{headers:{accept:'application/dns-json'}});
+    if(!res.ok)throw new Error('DoH query failed ('+res.status+')');
+    return res.json();
+  };
+  const ptrJ=await q(arpa,'PTR');
+  const ptr=ptrJ&&ptrJ.Answer&&ptrJ.Answer[0]?String(ptrJ.Answer[0].data).replace(/\.$/,''):null;
+  let forward=[];
+  if(ptr){
+    for(const t of ['A','AAAA']){
+      try{const fj=await q(ptr,t);for(const a of (fj.Answer||[]))if(a.data)forward.push(String(a.data));}catch(e){}
+    }
+  }
+  const nip=normalizeIP(ip);
+  return{ip:nip,ptr:ptr||'(no PTR record)',forward,match:forward.map(normalizeIP).includes(nip)};
+}
+/* Privacy-safe local history (metadata only — never log contents) + shareable
+ * ?cfg= hash for edge-rule configs. Retention without accounts or servers. */
+const HISTORY_KEY='lfa-history-v1';
+function loadHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]')}catch(e){return[]}}
+function saveHistoryEntry(e){
+  try{
+    const h=loadHistory();
+    h.unshift({t:new Date().toISOString().slice(0,19).replace('T',' '),file:e.file||'upload',records:e.records||0,bytes:e.bytes||0,total:+((e.total||0).toFixed(2)),blockable:+((e.blockable||0).toFixed(2))});
+    localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,20)));
+    return h.slice(0,20);
+  }catch(err){return[]}
+}
+function clearHistory(){try{localStorage.removeItem(HISTORY_KEY)}catch(e){}}
+function encodeCfg(cfg){
+  try{return btoa(unescape(encodeURIComponent(JSON.stringify(cfg||{})))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}catch(e){return''}
+}
+function decodeCfg(s){
+  try{const b=String(s||'').replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(decodeURIComponent(escape(atob(b))))}catch(e){return null}
+}
 
 /* ==== F: TRAP DETECTION ==== */
 function detectTraps(records){
@@ -396,10 +444,13 @@ const DEFAULT_COSTS={cdnEgress:0.09,request10K:0.0075,ssr1K:0};
 const COST_PRESETS={
   'AWS CloudFront':{cdnEgress:0.085,request10K:0.0075,ssr1K:0},
   'Cloudflare':{cdnEgress:0.03,request10K:0.0,ssr1K:0},
+  'Cloudflare R2 + Workers (edge)':{cdnEgress:0.0,request10K:0.005,ssr1K:0},
   'Fastly':{cdnEgress:0.08,request10K:0.009,ssr1K:0},
   'GCS / GCE':{cdnEgress:0.08,request10K:0.004,ssr1K:0},
   'CloudFront + Lambda@Edge SSR (opt-in)':{cdnEgress:0.085,request10K:0.0075,ssr1K:0.005}
 };
+// R2 egress = $0 (zero egress fees). Workers request cost = $0.50/M beyond the
+// 10M included on the $5/mo plan → $0.005/10K. Verify at cloudflare.com/plans.
 function calcCosts(botData,cfg){
   const c={...DEFAULT_COSTS,...cfg};
   if(c.ssr1K==null)c.ssr1K=c.compute1K!=null?c.compute1K:0; // backward-compat alias
@@ -415,7 +466,60 @@ function calcCosts(botData,cfg){
     if(bd.tier==='ai_training'||bd.tier==='suspicious'||bd.tier==='unknown_bot'){r.savings.botBlocking+=tot;if(!r.savings.byTier[bd.tier])r.savings.byTier[bd.tier]=0;r.savings.byTier[bd.tier]+=tot;}
   }
   // savings = botBlocking only (no fake SaaS)
+  // 95% sampling confidence interval (Poisson approx): ±1.96/sqrt(N) on
+  // request-driven totals. N = analyzed records; full-file scale-up widens it
+  // by the stride — the UI labels both. FinOps-grade honesty, not fake precision.
+  const _n=Object.values(botData).reduce((s,b)=>s+(b.count||0),0);
+  r.ci={n:_n,rel:_n>0?1.96/Math.sqrt(_n):0,abs:0};
+  r.ci.abs=r.total.all*r.ci.rel;
   return r;
+}
+/* Bot DB freshness: days since BOT_IP_JSON_DATE. UI shows "N days old" badge. */
+function botDbAgeDays(nowMs){
+  const then=Date.parse(BOT_IP_JSON_DATE+'T00:00:00Z');
+  const now=nowMs||Date.now();
+  return Math.max(0,Math.floor((now-then)/86400000));
+}
+/* Stealth / spoof scoring (2026 non-negotiable): flags Chrome-UA + cloud-ASN +
+ * high-velocity fetches as "possible spoofed AI fetch" — the Perplexity Aug
+ * 2025 pattern (Chrome UA + rotating cloud IPs after a robots.txt block).
+ * Score 0-100, signals listed. Heuristic, never a verdict — confirm server-side. */
+function isChromeUA(ua){const u=String(ua||'').toLowerCase();return u.includes('chrome/')&&(u.includes('mozilla')||u.includes('applewebkit'));}
+function cloudOf(ip){
+  const s=normalizeIP(ip);
+  for(const[prov,pfxs] of Object.entries(CLOUD_IPS)){if(ipMatchesAny(s,pfxs))return prov;}
+  return '';
+}
+function detectStealth(normed,cls,sec){
+  const byIP={};
+  for(let i=0;i<normed.length;i++){
+    const r=normed[i],c=cls[i];
+    if(!r.ip)continue;
+    if(!byIP[r.ip])byIP[r.ip]={ip:r.ip,count:0,bytes:0,urls:new Set(),chromeHits:0,botHits:0,s4xx:0,uas:new Set()};
+    const d=byIP[r.ip];d.count++;d.bytes+=r.bytes;d.urls.add(String(r.uri||'/').split('?')[0]);
+    if(r.ua)d.uas.add(r.ua.substring(0,60));
+    if(isChromeUA(r.ua))d.chromeHits++;
+    if(c&&(c.cat==='unknown_bot'||c.tier==='suspicious'||c.tier==='unknown_bot'))d.botHits++;
+    if(r.status>=400&&r.status<500)d.s4xx++;
+  }
+  const vt=(sec&&sec.velocityThreshold)||3;
+  const rpsByIP={};
+  for(const arr of [(sec&&sec.topIPs)||[],(sec&&sec.hvIPs)||[]])for(const e of arr){if(e&&e.ip&&e.rps!=null&&!(e.ip in rpsByIP))rpsByIP[e.ip]=e.rps;}
+  const out=[];
+  for(const d of Object.values(byIP)){
+    if(d.count<10)continue; // need a minimum sample before scoring
+    const signals=[];let score=0;
+    const cloud=cloudOf(d.ip);
+    const chromeRatio=d.chromeHits/d.count;
+    if(chromeRatio>0.8&&cloud){score+=40;signals.push('Chrome UA ('+Math.round(chromeRatio*100)+'%) from '+cloud+' cloud range — classic AI-fetch spoof shape');}
+    else if(chromeRatio>0.8&&d.botHits>0){score+=25;signals.push('Chrome UA with bot-telltales ('+d.botHits+' flagged) — mixed human/bot fingerprint');}
+    if(cloud&&d.urls.size>Math.max(50,d.count*0.5)){score+=25;signals.push(d.urls.size+' unique paths from one cloud IP — scraper breadth, not human browsing');}
+    if((rpsByIP[d.ip]||0)>vt){score+=30;signals.push((rpsByIP[d.ip]).toFixed(1)+' req/sec exceeds '+vt.toFixed(1)+' data-driven threshold — machine velocity');}
+    if(d.s4xx/d.count>0.3&&d.count>20){score+=15;signals.push(Math.round(d.s4xx/d.count*100)+'% 4xx — probing/evasion pattern');}
+    if(score>=40)out.push({ip:d.ip,score:Math.min(100,score),signals,count:d.count,bytes:d.bytes,uniqueUrls:d.urls.size,cloud:cloud||'non-cloud',topUA:[...d.uas][0]||''});
+  }
+  out.sort((a,b)=>b.score-a.score||b.count-a.count);
+  return out.slice(0,30);
 }
 
 /* ==== H: CRAWL BUDGET ==== */
@@ -483,13 +587,21 @@ function security(records){
 }
 
 /* ==== K: EDGE RULES ==== */
-function genEdgeRules(botData,sec){
-  const r={cloudflare:[],fastly:[],aws:[],robots:'',cfAICrawl:''};
+/* Thresholds are DYNAMIC rates, not raw counts: avg req/min/IP over the log
+ * window (falls back to raw counts when the window is unknown). Decision tree:
+ * training → block/challenge; search-index → 429 + Retry-After only;
+ * user-fetch → observe, abuse ceiling only. 429 beats challenge beats block
+ * for anything citation-bearing. */
+function genEdgeRules(botData,sec,durationMs){
+  const r={cloudflare:[],fastly:[],aws:[],robots:'',cfAICrawl:'',decision:''};
   const escQ=s=>String(s||'').replace(/"/g,'\\"').substring(0,60);
+  const winMin=(durationMs&&durationMs>=60000)?durationMs/60000:null;
+  const ratePerMinIP=bd=>(winMin&&bd.uniqueIPCount)?(bd.count/bd.uniqueIPCount/winMin):null;
+  const rateTxt=bd=>{const v=ratePerMinIP(bd);return v==null?fmtN(bd.count)+' req (window unknown — confirm rate before enforcing)':v.toFixed(1)+' req/min/IP over '+winMin.toFixed(1)+' min window';};
   for(const[name,bd] of Object.entries(botData)){
-    if(bd.tier==='ai_training'&&bd.count>=2){
+    if(bd.tier==='ai_training'&&(ratePerMinIP(bd)==null?bd.count>=2:ratePerMinIP(bd)>=0.5)){
       const u=bd.topUAList?.[0]?.[0]||name;
-      r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${fmtN(bd.count)} requests, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${u.substring(0,40)}") { action: "block"; }`});
+      r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${rateTxt(bd)}, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${u.substring(0,40)}") { action: "block"; }`});
       r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${u.substring(0,40)}") { error 403 "Blocked"; }`});
       r.aws.push({name:`Block ${name}`,act:'BLOCK',rule:`{ "Statement": { "ByteMatchStatement": { "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } }, "PositionalConstraint": "CONTAINS", "SearchString": "${u.substring(0,40)}" } }, "Action": { "Block": {} } }`});
     }
@@ -507,6 +619,12 @@ function genEdgeRules(botData,sec){
     }
   }
   if(sec.hvIPs.length>0)r.cloudflare.push({name:'Block High-Velocity IPs',act:'BLOCK',desc:`${sec.hvIPs.length} IPs exceeding safe velocity`,rule:`ip.src in { ${sec.hvIPs.slice(0,10).map(i=>i.ip).join(' ')} } -> block + 429 Retry-After: 60`});
+  r.decision=['# 429-vs-challenge-vs-block decision tree (apply top-down):',
+    '# 1) user-fetch (ChatGPT-User, Perplexity-User…) → ALLOW + LOG, abuse ceiling 300/min → 429 + Retry-After: 10. Never challenge: 429 = missing live answer.',
+    '# 2) search-index (OAI-SearchBot, PerplexityBot…) → ALLOW, 120/min/IP (60 aggressive) → 429 + Retry-After: 30. Never hard block: citations drop in 1-2 wks.',
+    '# 3) training (GPTBot, CCBot, Bytespider…) ≥0.5 req/min/IP → Managed Challenge first, Block on repeat. Zero citation loss.',
+    '# 4) suspicious/unknown ≥0.5 req/min/IP → Managed Challenge; block only on repeat + threat-pattern match.',
+    '# 5) stealth score ≥70 (Module 9) → Challenge regardless of UA; verify via rDNS + vendor JSON before blocking.'].join('\n');
   r.robots=['# Generated '+new Date().toISOString().slice(0,10)+' — training vs search split (Cloudflare 15 Sep 2026: auto-block Training+Agent on ad pages for new domains; Pay Per Crawl 402 beta)','User-agent: GPTBot','Disallow: /','','User-agent: ClaudeBot','Disallow: /','','User-agent: CCBot','Disallow: /','','User-agent: Bytespider','Disallow: /','','User-agent: Meta-ExternalAgent','Disallow: /','','User-agent: Applebot-Extended','Disallow: /','','User-agent: cohere-ai','Disallow: /','','User-agent: AI2Bot','Disallow: /','','User-agent: GoogleOther','Disallow: /','','User-agent: ImageSiftBot','Disallow: /','','User-agent: DeepSeekBot','Disallow: /','','User-agent: QwenBot','Disallow: /','','User-agent: Timpibot','Disallow: /','','User-agent: Sidetiq','Disallow: /','','User-agent: Firecrawl','Disallow: /','','User-agent: Google-Extended','Disallow: /','','User-agent: OAI-SearchBot','Allow: /','','User-agent: OAI-AdsBot','Allow: /','# OAI-AdsBot verifies ChatGPT shopping ads — never Disallow on ecommerce','','User-agent: PerplexityBot','Allow: /','','User-agent: Claude-SearchBot','Allow: /','','User-agent: DuckAssistBot','Allow: /','','User-agent: MistralAI-Search','Allow: /','','# User-triggered (ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent):','# robots.txt may not apply — enforce at edge with ALLOW + abuse ceiling, not Disallow.','','# NOTE: a trailing "User-agent: * / Allow: /" (if you append one) does NOT override','# the specific Disallows above — most-specific group wins per RFC 9309.',''].join('\n');
   r.cfAICrawl='Cloudflare Dashboard > Security > AI Crawl Control (15 Sep 2026): Training=Block, Search=Allow @120/min, Agent=Allow @300/min ceiling, Pay Per Crawl=402 beta';
   return r;
@@ -525,7 +643,7 @@ function genLlmsTxt(analysis){
     '# Mirror these in robots.txt (Module 6) — llms.txt is advisory, robots.txt + edge rules enforce.',
     'Disallow: /api/', 'Disallow: /internal/', 'Disallow: /calendar/', '',
     '# Contact for Pay Per Crawl / licensing (402 beta):',
-    '# Contact: you@example.com  Price: $0.002/request  Endpoint: https://tollbit.example.com/price',
+    '# Contact: via this repo (issues)  Price: $0.002/request',
     '');
   return L.join('\n');
 }
@@ -556,7 +674,22 @@ function gen402Example(){
     '    return 402 \'{"error":"Payment Required","price_usd_per_request":0.002,"buy":"https://tollbit.example.com/buy"}\';','}',
     '','# 2) Search-index + user-fetch ALWAYS bypass the paywall (citations first):',
     '# if ($http_user_agent ~* "(OAI-SearchBot|PerplexityBot|Claude-SearchBot|DuckAssistBot|ChatGPT-User|OAI-AdsBot)") { break; }',
-    '','# Cloudflare Worker equivalent: respond 402 + price headers for ai_training UAs only.'].join('\n');
+    '','# 3) Cloudflare Worker: "Training pays, Search/User bypass"','',
+    '// addEventListener("fetch", e => e.respondWith(crawlGate(e.request)));',
+    '// const TRAIN = /GPTBot|ClaudeBot|CCBot|Bytespider|cohere-ai|AI2Bot|GoogleOther|ImageSiftBot/i;',
+    '// const BYPASS = /OAI-SearchBot|PerplexityBot|Claude-SearchBot|DuckAssistBot|ChatGPT-User|Perplexity-User|OAI-AdsBot/i;',
+    '// async function crawlGate(req){',
+    '//   const ua = req.headers.get("user-agent") || "";',
+    '//   if (BYPASS.test(ua)) return fetch(req); // citations first, never charge',
+    '//   if (TRAIN.test(ua) && !req.headers.has("x-crawl-token"))',
+    '//     return new Response(JSON.stringify({error:"Payment Required",price_usd_per_request:0.002}),',
+    '//       {status:402,headers:{"content-type":"application/json","X-Crawl-Price":"USD 0.002/request"}});',
+    '//   return fetch(req);',
+    '// }',
+    '','# 4) Test harness (run before enforcing):',
+    '# curl -A "GPTBot/1.0" -i https://YOUR-DOMAIN/ | head -5        # expect 402 + X-Crawl-Price',
+    '# curl -A "OAI-SearchBot/1.0" -i https://YOUR-DOMAIN/ | head -5  # expect 200 (bypass)',
+    '# curl -A "ChatGPT-User/1.0" -i https://YOUR-DOMAIN/ | head -5   # expect 200 (never charge users)'].join('\n');
 }
 /* GEO/AEO add-on: logs tell you crawl, not citation. Export the top-50 crawled
  * URLs as a "prompt test list" to check ChatGPT/Perplexity citation manually —
@@ -646,9 +779,14 @@ function analyze(records,cfg,onProgress){
   const tp=trafficP(normed);
   adv('Running security analysis...');
   const sec=security(normed);
-  adv('Generating edge blocking rules...');
-  const edgeRules=genEdgeRules(botData,sec);
+  adv('Scoring stealth / spoofed AI fetches...');
+  const stealth=detectStealth(normed,cls,sec);
   adv('Computing executive summary...');
+  const dateStart=normed.filter(r=>r.tstamp).sort((a,b)=>a.tstamp-b.tstamp)[0]?.tstamp;
+  const dateEnd=normed.filter(r=>r.tstamp).sort((a,b)=>b.tstamp-a.tstamp)[0]?.tstamp;
+  const durationMs=dateStart&&dateEnd?dateEnd-dateStart:null;
+  adv('Generating edge blocking rules...');
+  const edgeRules=genEdgeRules(botData,sec,durationMs);
 
   const allRT=normed.filter(r=>r.rt!==null).map(r=>r.rt);
   const totalBytes=normed.reduce((s,r)=>s+r.bytes,0);
@@ -659,9 +797,6 @@ function analyze(records,cfg,onProgress){
     tierData[b.tier].count+=b.count;tierData[b.tier].totalBytes+=b.totalBytes;tierData[b.tier].bots.push(b.name);
   }
 
-  const dateStart=normed.filter(r=>r.tstamp).sort((a,b)=>a.tstamp-b.tstamp)[0]?.tstamp;
-  const dateEnd=normed.filter(r=>r.tstamp).sort((a,b)=>b.tstamp-a.tstamp)[0]?.tstamp;
-  const durationMs=dateStart&&dateEnd?dateEnd-dateStart:null;
   // Full log-URL set (deduped, capped at 100k unique paths to bound memory) so the
   // Crawl+GSC join never silently works on a 20k slice of large files.
   const _urlSet=[];const _seen=new Set();
@@ -671,7 +806,7 @@ function analyze(records,cfg,onProgress){
       dateRange:{start:dateStart,end:dateEnd},timeRange:{start:dateStart,end:dateEnd,durationMs},
       avgMs:allRT.length?avg(allRT)*1000:null,p95Ms:allRT.length?pctl(allRT,95)*1000:null,p99Ms:allRT.length?pctl(allRT,99)*1000:null,
       botsDetected:Object.keys(botData).length,humanPct:total?humanCount/total*100:0,botPct:total?(total-humanCount)/total*100:0},
-    botData,tierData,vs:{verified:vsScaled.verified,suspicious:vsScaled.suspicious,skipped:vsScaled.skipped,matches:vsScaled.verified,unusual:vsScaled.suspicious,informational:vsScaled.skipped,sampled:!doFull,sampleSize:sZ,verifySampled:!doFull,verifyBase:sZ,totalRecords:normed.length},crawlBud,traps,costs,aiMatrix,tp,sec,edgeRules,cfg,durationMs,_records:records,_urlSet};
+    botData,tierData,vs:{verified:vsScaled.verified,suspicious:vsScaled.suspicious,skipped:vsScaled.skipped,matches:vsScaled.verified,unusual:vsScaled.suspicious,informational:vsScaled.skipped,sampled:!doFull,sampleSize:sZ,verifySampled:!doFull,verifyBase:sZ,totalRecords:normed.length},crawlBud,traps,costs,aiMatrix,tp,sec,stealth,edgeRules,cfg,durationMs,_records:records,_urlSet};
 }
 
 /* ==== M: RENDER HELPERS ==== */
@@ -760,9 +895,11 @@ function renderTab1(A){
 function renderTab2(A){
   const el=document.getElementById('tab2');let h='';
   const vs=A.vs;
+  const dbAge=botDbAgeDays();
   h+='<div class="card"><h3>Module 2: Multi-Layer Bot Verification</h3>'+
     '<p>Each request checked through four heuristic layers. These are <strong>signals, not proof</strong> — they help identify likely spoofing but cannot provide definitive verification in a browser-only environment.</p>'+
-    '<div class="infobox" style="border-left-color:var(--amber)"><strong>Important limitation:</strong> True reverse DNS, TLS fingerprinting (JA3/JA4), and ASN lookups require server-side network access. This tool uses the best available heuristics from your log data.</div></div>';
+    '<div class="infobox" style="border-left-color:var(--amber)"><strong>Important limitation:</strong> True reverse DNS, TLS fingerprinting (JA3/JA4), and ASN lookups require server-side network access. This tool uses the best available heuristics from your log data.</div>'+
+    '<div class="sr"><span class="sr-l">Bot IP DB (data/bot-ips.json)</span><span class="sr-v">v'+BOT_DB_VERSION+' · IP JSON '+BOT_IP_JSON_DATE+' ('+dbAge+' days old'+(dbAge>14?' — <strong>refresh via npm run fetch-ips</strong>':' · fresh')+')</span></div></div>';
   if(vs.unusual>0)h+=warnIssue('Unusual Verifications Detected',fmtN(vs.unusual)+' checks flagged unusual patterns. Bots claiming to be search engines but IP does not match known ranges, or TLS version differs, or behavior appears aggressive.','Review Module 6 for blocking rules','Cross-reference with server-side logs before blocking.');
   h+='<div class="card"><h3>Verification Summary</h3><div class="cols2"><div>'+
     '<div class="sr"><span class="sr-l">Checks matching expected patterns</span><span class="sr-v" style="color:var(--green)">'+fmtN(vs.matches)+'</span></div>'+
@@ -780,7 +917,20 @@ function renderTab2(A){
   h+=mkTable([th('Search Engine'),th('Known IP Prefixes'),th('Official DNS Suffix'),th('Method')],
     Object.entries(ENGINE_IPS).map(([eng,pfxs])=>'<tr><td><strong>'+esc(eng)+'</strong></td><td style="font-size:10px">'+pfxs.slice(0,4).join(', ')+'...</td><td>'+(eng==='Google'?'.googlebot.com':eng==='Bing'?'.search.msn.com':eng==='Yandex'?'.yandex.ru':'.baidu.com')+'</td><td><span class="badge b-amber">IP Prefix Match</span></td></tr>'));
   h+='</div>';
+  h+='<div class="card"><h3>Reverse-DNS Verifier (opt-in, in-browser DoH)</h3>'+
+    '<p>Runs ONLY when you click — one DNS-over-HTTPS query to Cloudflare 1.1.1.1 per lookup. PTR + forward-confirm (A/AAAA must resolve back to the IP). IPv4 only. A match is strong evidence; anything else is a signal, not a verdict.</p>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="rdns-ip" placeholder="66.249.66.1" aria-label="IP to verify" style="font-family:var(--mono);padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);color:var(--text-1)"><button class="btn-primary" id="rdns-btn">Verify via DoH</button></div>'+
+    '<div id="rdns-out" aria-live="polite" style="margin-top:8px;font-size:12px"></div></div>';
   el.innerHTML=h;
+  const rb=document.getElementById('rdns-btn');
+  if(rb)rb.onclick=async()=>{
+    const out=document.getElementById('rdns-out');const ip=(document.getElementById('rdns-ip')||{}).value||'';
+    out.textContent='Querying 1.1.1.1…';
+    try{
+      const v=await verifyRdnsDoh(ip);
+      out.innerHTML='IP <b>'+esc(v.ip)+'</b> → PTR <b>'+esc(v.ptr)+'</b> → forward ['+esc(v.forward.join(', ')||'none')+'] → '+(v.match?'<span class="badge b-green">FORWARD-CONFIRMED</span>':'<span class="badge b-amber">NOT CONFIRMED — treat as signal</span>');
+    }catch(e){out.innerHTML='<span class="badge b-red">ERROR</span> '+esc(e.message||String(e));}
+  };
 }
 
 function renderTab3(A){
@@ -854,6 +1004,7 @@ function renderTab4(A){
     '<div class="card" style="margin:0"><h4>Suspicious/Unknown Bot Cost</h4><div style="font-size:22px;font-weight:800;color:var(--red);font-family:var(--mono)">'+fmtC((c.savings.byTier?.suspicious||0)+(c.savings.byTier?.unknown_bot||0))+'</div><p>Bandwidth + compute from suspicious traffic</p></div>'+
     '</div>'+
     '<div class="rec green"><h5>Total Blockable Cost</h5><p>Blocking AI training scrapers and suspicious bots would save <strong>'+fmtC(c.savings.botBlocking)+'</strong> in this log period.</p></div>'+
+    (c.ci&&c.ci.n>0?'<p style="font-size:11px;color:var(--text-3)">95% sampling interval: '+fmtC(c.total.all)+' ± '+fmtC(c.ci.abs)+' (±'+(c.ci.rel*100).toFixed(1)+'%, N='+fmtN(c.ci.n)+'). Scale-up to full files widens this by the sampling stride — projections are ranges, not promises.</p>':'')+
     '</div>';
   el.innerHTML=h;
 }
@@ -895,13 +1046,15 @@ function renderTab6(A){
   const el=document.getElementById('tab6');let h='';
   h+='<div class="card"><h3>Module 6: Automated Edge Policy Engine</h3>'+
     '<p>Ready-to-deploy rules from YOUR log data. Copy directly into your CDN/WAF dashboard to block or rate-limit bots at the edge.</p></div>';
-  for(const[provider,ruleset] of Object.entries(A.edgeRules)){
+  for(const provider of ['cloudflare','fastly','aws']){
+    const ruleset=A.edgeRules[provider]||[];
     if(!ruleset.length)continue;
     const label=provider==='cloudflare'?'Cloudflare WAF Rules':provider==='fastly'?'Fastly VCL Snippets':'AWS WAF Rules';
     h+='<div class="card"><h3>'+label+'</h3>';
     for(const rule of ruleset)h+='<div class="code"><h5>'+esc(rule.name)+' <span class="badge '+(rule.act==='BLOCK'?'b-red':'b-amber')+'" style="margin-left:6px">'+rule.act+'</span> <button class="btn-sm copy-btn" data-copy="'+esc(rule.rule).replace(/"/g,'&quot;')+'">Copy</button></h5><p>'+esc(rule.desc)+'</p><code>'+esc(rule.rule)+'</code></div>';
     h+='</div>';
   }
+  if(A.edgeRules.decision)h+='<div class="card"><h3>429 vs Challenge vs Block — Decision Tree <button class="btn-sm copy-btn" data-copy-id="edge-decision">Copy</button></h3><div class="code"><code id="edge-decision">'+esc(A.edgeRules.decision)+'</code></div></div>';
   if(A.edgeRules.robots)h+='<div class="card"><h3>robots.txt — Training vs Search Split <button class="btn-sm copy-btn" data-copy-id="robots-txt">Copy</button></h3><div class="code"><code id="robots-txt">'+esc(A.edgeRules.robots)+'</code></div><p style="font-size:12px">Google-Extended is a robots token, not a UA — this file is the only way to control it. 15% of bots ignore robots overall; ChatGPT-User ignores 54% — enforce user-agents at the edge.</p></div>';
   if(A.edgeRules.cfAICrawl)h+='<div class="card"><h3>Cloudflare AI Crawl Control Mapping <button class="btn-sm copy-btn" data-copy-id="cf-ai">Copy</button></h3><div class="code"><code id="cf-ai">'+esc(A.edgeRules.cfAICrawl)+'</code></div></div>';
   h+='<div class="card"><h3>Cloudflare AI Crawl Control JSON <button class="btn-sm copy-btn" data-copy-id="cf-ai-json">Copy</button></h3><p style="font-size:12px">Paste-parity with Dashboard &gt; Security &gt; AI Crawl Control. Training=Block, Search=Allow @120/min, Agent=Allow @300/min ceiling.</p><div class="code"><code id="cf-ai-json">'+esc(genCfAICrawlJSON(A.botData))+'</code></div></div>';
@@ -1006,6 +1159,13 @@ function renderTab9(A){
       A.sec.hvIPs.slice(0,15).map(ip=>'<tr class="hl"><td style="font-family:var(--mono)">'+esc(ip.ip)+'</td>'+td(fmtN(ip.count),'n')+td(ip.rps.toFixed(1),'n','style="color:var(--red)"')+td(fmtN(ip.uniqueUrls),'n')+td(fmtN(ip.s4xx),'n')+'<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">'+esc((ip.uas[0]||'').substring(0,55))+'</td></tr>'));
     h+='</div>';
   }
+  if((A.stealth||[]).length){
+    h+=warnIssue('Possible Spoofed AI Fetch — '+A.stealth.length+' IP(s) scored ≥40','Chrome-UA + cloud-ASN + machine-velocity shape matches the Aug 2025 stealth pattern (browser UA, rotating cloud IPs, robots.txt ignored). Scores are heuristics — confirm with reverse DNS + vendor JSON before blocking.',fmtB(A.stealth.reduce((s,x)=>s+x.bytes,0))+' from flagged IPs','Challenge (score ≥70) at the edge; use the rDNS verifier in Module 2.');
+    h+='<div class="card"><h3>Stealth / Spoof Scores (0–100, heuristic)</h3>';
+    h+=mkTable([th('IP'),th('Score','n'),th('Requests','n'),th('Network'),th('Signals')],
+      A.stealth.map(x=>'<tr class="hl"><td style="font-family:var(--mono)">'+esc(x.ip)+'</td>'+td(x.score,'n','style="color:var(--red);font-weight:700"')+td(fmtN(x.count),'n')+'<td>'+esc(x.cloud)+'</td><td style="font-size:11px;white-space:normal;min-width:280px">'+x.signals.map(esc).join('<br>')+'</td></tr>'));
+    h+='<p style="font-size:11px;color:var(--text-3)">Score ≥70 → challenge at edge. Score 40–69 → watch + verify. Never auto-block on score alone.</p></div>';
+  }
   if(A.sec.largeP.length){
     h+='<div class="card"><h3>Large Payload Requests (>10MB)</h3>';
     h+=mkTable([th('IP'),th('URI'),th('Size','n'),th('User-Agent')],
@@ -1037,7 +1197,7 @@ function renderTab10(A){
      ['Request Processing',c.total.request,c.total.all>0?fmtP(c.total.request/c.total.all*100):'0%','Per-request CDN charges'],
      ['Origin Compute*',c.total.ssr,c.total.all>0?fmtP(c.total.ssr/c.total.all*100):'0%','Opt-in estimate only (OFF by default — enable in Pricing if you run SSR/Workers)'],
      ['<strong>Total</strong>',c.total.all,'100%','']].map(([cat,cost,pct,desc])=>'<tr><td>'+cat+'</td>'+td(fmtC(cost),'n')+td(pct,'n')+'<td style="font-size:11px">'+desc+'</td></tr>'));
-  h+='<p style="font-size:11px;color:var(--text-3)">* Origin compute is NOT in your logs — it is an estimate you opt into. Egress + request costs are measured bytes × your pricing.</p>';
+  h+='<p style="font-size:11px;color:var(--text-3)">* Origin compute is NOT in your logs — it is an estimate you opt into. Egress + request costs are measured bytes × your pricing.'+(c.ci&&c.ci.n>0?' 95% interval on total: ±'+fmtC(c.ci.abs)+' (±'+(c.ci.rel*100).toFixed(1)+'%).':'')+'</p>';
   h+='</div>';
   h+='<div class="card"><h3>Blockable Cost Breakdown</h3>';
   h+=mkTable([th('Category'),th('Measured Cost','n'),th('Annual Projection','n'),th('Blocking Method')],
@@ -1045,6 +1205,8 @@ function renderTab10(A){
      ['Suspicious/Unknown Bots',(c.savings.byTier?.suspicious||0)+(c.savings.byTier?.unknown_bot||0),((c.savings.byTier?.suspicious||0)+(c.savings.byTier?.unknown_bot||0))*12,'Rate-limit + edge rules'],
      ['<strong>Total Blockable</strong>',c.savings.botBlocking,c.savings.botBlocking*12,'']].map(([cat,cost,ann,method])=>'<tr><td>'+cat+'</td>'+td(fmtC(cost),'n','style="color:var(--red)"')+td(fmtC(ann),'n','style="color:var(--amber)"')+'<td style="font-size:11px">'+method+'</td></tr>'));
   h+='</div>';
+  const humanSlow=Object.values(A.botData).filter(b=>b.tier==='human'&&b.p95Ms).sort((a,b)=>b.p95Ms-a.p95Ms)[0];
+  if(humanSlow)h+='<div class="card"><h3>Human Latency → Revenue (lab hint)</h3><p>Slowest human-facing responses: <strong>'+esc(humanSlow.name)+'</strong> at '+Math.round(humanSlow.p95Ms)+'ms p95. Lab heuristic: every 100ms ≈ −1% conversion — confirm in CrUX / RUM before quoting revenue. Slow <em>bots</em> = origin pressure; slow <em>humans</em> = lost revenue. Prioritize the human-slow paths first.</p></div>';
   h+='<div class="card"><h3>Time-Based Projections</h3>'+
     '<div class="cols2">'+
     '<div class="card" style="margin:0"><h4>Log Time Range</h4><div style="font-size:18px;font-weight:800;font-family:var(--mono)">'+(logDurationDays?logDurationDays.toFixed(1)+' days':'N/A')+'</div><p>'+(tr?tr.start.toISOString().split('T')[0]+' to '+tr.end.toISOString().split('T')[0]:'No timestamps')+'</p></div>'+
@@ -1073,7 +1235,7 @@ function updateTabCounts(A){
     const wastePct=A.summary.totalBytes?Math.round(trapBytes/A.summary.totalBytes*100):0;
     set('tab1',n1);set('tab2',n2);set('tab3',`waste ${wastePct}%`);set('tab4',fmtC(A.costs.total.all));
     set('tab5',Object.keys(A.aiMatrix).length);set('tab6',A.edgeRules.cloudflare.length);
-    set('tab9',A.sec.threats.length);set('tab10',fmtC(A.costs.savings.botBlocking));
+    set('tab9',(A.sec.threats.length+(A.stealth||[]).length));set('tab10',fmtC(A.costs.savings.botBlocking));
   }catch(e){}
 }
 function downloadFile(name,content,type){const b=new Blob([content],{type:type||'text/plain'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
@@ -1534,13 +1696,13 @@ function processRecords(records,file,meta){
         if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);
         else{const old=document.getElementById('sample-note');old&&old.remove();}
         if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);
-        wireExportButtons();
+        wireExportButtons();recordHistory(records,file);
       };
       // Web Worker path if available (js/worker.js), else main thread
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
           const w=new Worker('./js/worker.js?v=1.3.0');
-          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
+          w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();recordHistory(records,file);}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
           w.postMessage({records,cfg:currentCfg});
           // fallback timeout: if worker fails silently, run on main thread
@@ -1618,8 +1780,25 @@ async function processFiles(files){
     if(!err||!err.cancelled)alert('Error: '+(err&&err.message||err));
   }
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION,BOT_IP_JSON_DATE};}
+if(typeof module!=='undefined'&&module.exports){module.exports={classifyBot,norm,parseTime,verifyBot,detectStealth,isChromeUA,cloudOf,botDbAgeDays,verifyRdnsDoh,reverseIPv4,loadHistory,saveHistoryEntry,clearHistory,encodeCfg,decodeCfg,genRdnsChecklist,detectTraps,calcCosts,crawlBudget,trafficP,security,genEdgeRules,genRobotsTxt,genLlmsTxt,genCfAICrawlJSON,gen402Example,genPromptList,exportLogsCSV,BQ_SAMPLE_SQL,analyze,parseCombinedLine,parseALBLine,parseTextLogs,joinCrawlGsc,parseGscCsv,genSample,genSampleStream,sampleTargetRecords,mulberry32,SAMPLE_SEED_DEFAULT,parseLine,readFileRecords,readFilesRecords,ANALYZE_CAP,normalizeIP,ipInCidr,ipMatchesAny,normalizeTier,BOTS,RATE_POLICY,TRAPS,THREATS,COST_PRESETS,DEFAULT_COSTS,BOT_DB_VERSION,BOT_IP_JSON_DATE};}
 
+function renderHistory(){
+  try{
+    const h=loadHistory();const card=document.getElementById('history-card'),out=document.getElementById('history-out');
+    if(!card||!out)return;
+    if(!h.length){card.classList.add('hidden');return;}
+    card.classList.remove('hidden');
+    out.innerHTML='<div class="tbl-wrap"><table class="dt"><thead><tr><th>When</th><th>File</th><th>Records</th><th>Total</th><th>Blockable</th></tr></thead><tbody>'+
+      h.map(e=>'<tr><td>'+e.t+'</td><td>'+String(e.file).substring(0,60)+'</td><td>'+Number(e.records).toLocaleString()+'</td><td>$'+Number(e.total).toFixed(2)+'</td><td>$'+Number(e.blockable).toFixed(2)+'</td></tr>').join('')+'</tbody></table></div>';
+  }catch(e){}
+}
+function recordHistory(records,file){
+  try{
+    if(!currentAnalysis||!currentAnalysis.costs)return;
+    saveHistoryEntry({file:(file&&(file.name||file))||'upload',records:records?records.length:0,bytes:(file&&file.size)||0,total:currentAnalysis.costs.total.all,blockable:currentAnalysis.costs.savings.botBlocking});
+    renderHistory();
+  }catch(e){}
+}
 function wireExportButtons(){
   const add=(id,label,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=label||id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};
   add('export-csv-btn','Download CSV',()=>currentAnalysis&&exportBotCSV(currentAnalysis));
@@ -1663,6 +1842,24 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   if(presetSel)presetSel.onchange=()=>{const p=COST_PRESETS[presetSel.value];if(p){document.getElementById('cfg-cdnEgress').value=p.cdnEgress;document.getElementById('cfg-request10K').value=p.request10K;document.getElementById('cfg-ssr1K').value=p.ssr1K;}};
   document.getElementById('pricing-save')?.addEventListener('click',()=>{const v=parseFloat(document.getElementById('cfg-ssr1K').value);currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0,ssr1K:isNaN(v)?0:v};document.getElementById('pricing-panel').classList.add('hidden');if(lastRecords)processRecords(lastRecords,null);});
   document.getElementById('pricing-reset')?.addEventListener('click',()=>{document.getElementById('cfg-cdnEgress').value=DEFAULT_COSTS.cdnEgress;document.getElementById('cfg-request10K').value=DEFAULT_COSTS.request10K;document.getElementById('cfg-ssr1K').value=DEFAULT_COSTS.ssr1K;});
+  document.getElementById('pricing-share')?.addEventListener('click',async()=>{
+    currentCfg={cdnEgress:parseFloat(document.getElementById('cfg-cdnEgress').value)||0.09,request10K:parseFloat(document.getElementById('cfg-request10K').value)||0,ssr1K:parseFloat(document.getElementById('cfg-ssr1K').value)||0};
+    const url=location.origin+location.pathname+'?cfg='+encodeCfg(currentCfg);
+    try{await navigator.clipboard.writeText(url);alert('Share link copied — pricing travels in ?cfg=, logs never leave the machine.');}
+    catch(e){prompt('Copy this share link:',url);}
+  });
+  // shared pricing (?cfg=): applied before first analysis, no account needed
+  try{
+    const shared=decodeCfg(prm.get('cfg'));
+    if(shared&&(shared.cdnEgress!=null||shared.request10K!=null)){
+      currentCfg={cdnEgress:+shared.cdnEgress||0.09,request10K:+shared.request10K||0,ssr1K:+shared.ssr1K||0};
+      document.getElementById('cfg-cdnEgress').value=currentCfg.cdnEgress;
+      document.getElementById('cfg-request10K').value=currentCfg.request10K;
+      document.getElementById('cfg-ssr1K').value=currentCfg.ssr1K;
+    }
+  }catch(e){}
+  document.getElementById('history-clear')?.addEventListener('click',()=>{clearHistory();renderHistory();});
+  renderHistory();
   document.getElementById('pricing-btn')?.addEventListener('click',()=>document.getElementById('pricing-panel').classList.remove('hidden'));
   document.getElementById('pricing-close')?.addEventListener('click',()=>document.getElementById('pricing-panel').classList.add('hidden'));
   document.getElementById('live-start-btn')?.addEventListener('click',()=>setLive(true));

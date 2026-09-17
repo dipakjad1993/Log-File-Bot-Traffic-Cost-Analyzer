@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body><div class="main-wrap"><div class="card">
-<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<p class="crumbs"><a href="../">Analyzer</a> / <a href="./">Bots</a> / GPTBot vs OAI-SearchBot</p>
 <h1>GPTBot vs OAI-SearchBot: same vendor, opposite rules</h1>
 <p><strong>GPTBot</strong> trains models — zero live citation loss if you block it. <strong>OAI-SearchBot</strong> powers ChatGPT Search citations (crawl-to-referral ~85:1). Block it and citation share drops in 1–2 weeks. The analyzer splits them automatically across 75 signatures and prices each side separately.</p>
 <h2>The rule that gets it right</h2>
@@ -30,5 +30,6 @@ Allow: /</code></pre>
 <li><strong>Verify:</strong> vendor IP JSON (<code>data/bot-ips.json</code>, dated 2026-09-13, full CIDRs + IPv6) = VERIFIED; prefix-only = heuristic low-confidence.</li>
 </ul>
 <p><a class="btn-primary" href="../">Analyze your log free — files never leave your machine</a></p>
-</div></div></body>
+</div></div><p class="crumbs">See also: <a href="./perplexitybot-block-or-allow.html">PerplexityBot</a> · <a href="./claudebot-no-ip-robots-only.html">ClaudeBot IPs</a> · <a href="./">Full bot DB</a> · <a href="../guides/block-training-bots-cloudflare-without-losing-citations.html">Cloudflare guide</a></p>
+</body>
 </html>

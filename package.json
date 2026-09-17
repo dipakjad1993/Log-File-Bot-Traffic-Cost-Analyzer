@@ -5,9 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/bots.test.js tests/traps.test.js tests/costs.test.js tests/sample.test.js tests/upload.test.js",
-    "lint": "node --check js/analyzer.js && node --check js/worker.js && node --check server.js && node --check tools/gen-logs.js && node --check tools/fetch-bot-ips.js",
+    "test": "node --test tests/bots.test.js tests/traps.test.js tests/costs.test.js tests/sample.test.js tests/upload.test.js tests/enterprise.test.js",
+    "lint": "node --check js/analyzer.js && node --check js/worker.js && node --check server.js && node --check tools/gen-logs.js && node --check tools/fetch-bot-ips.js && node --check tools/gen-bots-page.js",
     "gen-logs": "node tools/gen-logs.js",
+    "gen-bots-page": "node tools/gen-bots-page.js",
     "fetch-ips": "node tools/fetch-bot-ips.js"
   },
   "engines": {

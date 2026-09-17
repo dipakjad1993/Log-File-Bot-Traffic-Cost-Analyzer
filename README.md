@@ -15,8 +15,6 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 
 No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
 
-> Fallback (legacy, sleeps): [Render mirror](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · Backup: GitHub Pages (enable in repo Settings → Pages, branch `main`, folder `/ (root)`).
-
 > [!NOTE]
 > `main` branch. v1.3.0 · Bot DB v2026.09.13 (75 signatures) · IP JSON 2026-09-13 (full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md).
 
@@ -174,9 +172,11 @@ Measured totals, blockable waste ($0.25 on the sample), projections, one-click C
 ```bash
 git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
 cd Log-File-Bot-Traffic-Cost-Analyzer
-node server.js   # http://localhost:8080 (gzip + security headers, ?v= cache-busted assets)
+node server.js   # LOCAL DEV ONLY — http://localhost:8080 (gzip + headers parity). Never deploy server.js to Pages.
 # or: docker build -t log-analyzer . && docker run -p 8080:8080 log-analyzer
 ```
+
+**Free vs Pro:** Free = every analysis under 50MB, client-side, forever. Pro = $49 one-time (500MB+ CLI + weekly blocklist feed) — checkout opens with v1.4 via Gumroad/Lemon Squeezy; star the repo to get notified. Honest comparison with paid tools: [`guides/compare-screaming-frog-jetoctopus-free.html`](https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/compare-screaming-frog-jetoctopus-free.html).
 
 Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fields), Nginx default, W3C Extended (real `#Fields` parsing, guess-mode flagged), AWS ALB, Cloudflare Logpush, **.gz** — auto-detected per line, mixed files OK, multi-select for rotations.
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
@@ -195,6 +195,8 @@ The app is 100% client-side, so it hosts as pure static files. `server.js` + `Do
 **Primary — Cloudflare Pages (never sleeps, free SSL/Brotli):** Dash → Workers & Pages → Create → **Pages** (not Worker) → Connect to Git → select this repo. Framework preset `None`, build command empty, build output + root directory empty, production branch `main`. Live at `https://log-file-bot-traffic-cost-analyzer.pages.dev`. Security/cache headers come from [`_headers`](_headers).
 
 **Backup — GitHub Pages:** repo Settings → Pages → Deploy from branch → `main`, folder `/ (root)`. (Ignores `_headers`; fine for a backup.)
+
+Legacy Render mirror (sleeps, kept for old links only): `https://log-file-bot-traffic-cost-analyzer-1.onrender.com` — do not share; hero links are Pages-only because speed is trust.
 
 **Bot DB stays fresh:** [`.github/workflows/fetch-ips.yml`](.github/workflows/fetch-ips.yml) runs `npm run fetch-ips` + `npm test` every Monday 2am UTC and auto-commits `data/bot-ips.json`. Pages redeploys on every push.
 

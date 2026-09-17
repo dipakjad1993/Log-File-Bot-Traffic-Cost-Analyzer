@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body><div class="main-wrap"><div class="card">
-<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<p class="crumbs"><a href="../">Analyzer</a> / <a href="./">Bots</a> / PerplexityBot</p>
 <h1>PerplexityBot: block or allow?</h1>
 <p><strong>Allow — at 120/min.</strong> PerplexityBot is search-index with the best measured crawl-to-referral in the DB (~210:1 vs OAI 85:1, Claude ~5,143:1). Hard-blocking it trades pennies of bandwidth for lost AI-answer citations. Throttle <em>training</em> bots (GPTBot, CCBot, Bytespider) instead.</p>
 <h2>Copy-paste rule</h2>
@@ -20,5 +20,6 @@ Allow: /</code></pre>
 <h2>How to confirm on your own log</h2>
 <p>Drop your log into the <a href="../">free analyzer</a> (100% client-side, .gz + multi-file supported) → open <strong>Tab 5 AI Scraper Matrix</strong> → PerplexityBot shows cyan (search-index) with its 120/min policy. Verify via vendor JSON (<code>https://docs.perplexity.ai/bot.json</code>, snapshotted in <code>data/bot-ips.json</code>).</p>
 <p><a class="btn-primary" href="../?sample=10k">Try the 1-click 10k demo</a></p>
-</div></div></body>
+</div></div><p class="crumbs">See also: <a href="./gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="./claudebot-no-ip-robots-only.html">ClaudeBot IPs</a> · <a href="./">Full bot DB</a> · <a href="../research/1gb-teardown.html">1GB proof</a></p>
+</body>
 </html>
