@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — sample-data v3 (in-app Download generator)
+
+Enterprise-realistic downloadable samples at every size (1MB–1GB, same mix):
+`genOneSample` rewrite in `js/analyzer.js` — 60+ bot categories (search
+desktop/smartphone/image/video, 16 AI-training, 8 AI search-index, 5 AI
+user-fetch, 8 SEO tools, 4 monitoring, 6 social, 5 generic scrapers, 2 faker
+shapes), faceted-nav/pagination/sort/_next/data/cart traps, thin soft-404s,
+410s, 304 revisits, 429 WAF, 500/502/503 + a fixed deploy-blip anomaly night
+(2026-07-18), diurnal + weekend shape, Pareto IPs, verified-vs-spoof IP split
+(66.249.x/13.107.x + residential fakers), IPv6 dual-stack, Host/vhost,
+EdgeColo, content-aware cache/TLS/bytes/TTFB, cf_web_bot_auth on verified
+lines, fixed 90-day window (Jun 03 → Sep 01). Scale-invariant weights:
+1MB-vs-5MB tier shares within ~1%. Suite: 116 asserts, all green.
+
 ## v2.2.0 — 2026-09-17
 
 P0 credibility pass: edge-rule threshold fix, AdsBot revenue guard, freshness 14d red, realistic fixture re-pin.

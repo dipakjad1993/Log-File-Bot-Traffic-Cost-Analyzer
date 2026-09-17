@@ -2008,96 +2008,477 @@ function randDateR(rng,startMs,endMs){
   return new Date(startMs+rng()*(endMs-startMs));
 }
 
+/* ==== O: SAMPLE DATA v3 (enterprise-realistic, deterministic mulberry32) ====
+ * Same family as tools/gen-logs.js, but built for the in-app Download button
+ * (1MB-1GB). Covers the 2026 enterprise surface from the brief:
+ *  - 40+ bot types: search (desktop/smartphone/image/video), AI training,
+ *    AI search-index, AI user-fetch, SEO tools, monitoring, social, generic
+ *    scrapers, plus FAKE Googlebot/GPTBot spoof shapes (Chrome UA or real bot
+ *    UA from residential IPs) so verification + spoof KPIs actually demo.
+ *  - Enterprise URL universe: PDP pool, faceted-nav hell (color/size/brand/
+ *    sort/page/sessionid/currency + gclid/fbclid), pagination loops, sort
+ *    variants, /_next/data/ routes, /api + /graphql, cart/add-to-cart POST
+ *    traps, thin soft-404s (200 + ~1.2KB), 410 gone products, 304 revisits,
+ *    429 WAF on aggressive training bots, 500/503 deploy-blip window.
+ *  - Full edge fields: Host/vhost, EdgeColo, CacheStatus, TLS, referrers,
+ *    tiered response times, cf_web_bot_auth on verified Googlebot lines.
+ *  - Scale-invariant: weights are constant, so 1MB and 1GB share the same
+ *    mix and the analysis converges instead of drifting with size.
+ * NOTE: Google-Extended / Applebot-Extended are robots.txt tokens, not crawler
+ * UAs — real logs never contain them, so the generator correctly omits them. */
 const SAMPLE_URLS={
-  main:['/','/about','/contact','/pricing','/products','/blog','/features','/customers','/docs','/support','/login','/signup','/demo','/careers','/press','/terms','/privacy','/sitemap.xml','/robots.txt','/health'],
+  main:['/','/about','/contact','/pricing','/products','/blog','/features','/customers','/docs','/support','/login','/signup','/demo','/careers','/press','/terms','/privacy','/health'],
+  sitemap:['/robots.txt','/sitemap.xml','/sitemap-products.xml','/sitemap-blog.xml'],
   products:['/products/widget-pro','/products/analytics-suite','/products/bot-shield','/products/crawl-monitor','/products/firewall','/products/cdn-optimizer','/products/api-gateway','/products/ai-detector'],
+  pdp:['/products/runner-air-max','/products/trek-backpack-40l','/products/wireless-earbuds-pro','/products/espresso-maker-deluxe','/products/yoga-mat-xl','/products/smartwatch-s2','/products/denim-jacket-vintage','/products/ceramic-vase-set','/products/gaming-keyboard-rgb','/products/organic-coffee-beans','/products/led-desk-lamp','/products/cast-iron-skillet','/products/noise-cancelling-headphones','/products/standing-desk-pro','/products/wool-sneakers','/products/robot-vacuum-x9','/products/silk-pillowcase','/products/titanium-bottle','/products/electric-scooter-city','/products/linen-duvet-set'],
+  category:['/category/shoes','/category/electronics','/category/home-kitchen','/category/sports'],
   blog:['/blog/seo-guide-2026','/blog/ai-scraping-impact','/blog/crawl-budget','/blog/bot-detection','/blog/edge-computing','/blog/cdn-costs','/blog/security-2026','/blog/performance-tips','/blog/cloud-migration','/blog/serverless'],
   docs:['/docs/getting-started','/docs/api-reference','/docs/authentication','/docs/webhooks','/docs/sdk','/docs/faq','/docs/changelog'],
   param:['/shop/filter?color=blue&size=xl&sort=price','/shop/filter?color=red&size=lg&brand=nike&sort=date&category=shoes&page=12','/products?category=all&price_min=50&price_max=200&sort=rating&page=3','/api/products?limit=50&offset=500&sort=created_at','/search?q=analytics&page=2&sort=relevance','/category/electronics?brand=apple&samsung&price=100-500&page=24'],
   trap:['/calendar/2026/01','/calendar/2026/02','/tag/seo','/tag/bot-detection','/author/john-smith','/archive/2025/06','/page/999','/sort?by=date&order=asc&page=100'],
-  sec:['/.env','/.git/config','/wp-admin','/wp-login.php','/phpmyadmin','/.aws/credentials','/backup.zip','/database.sql','/adminer.php','/server-status'],
-  api:['/api/v1/users?page=100','/api/v2/products?limit=1000','/graphql','/api/search?q=test&deep=true','/internal/metrics']
+  sec:['/.env','/.git/config','/wp-admin','/wp-login.php','/phpmyadmin','/.aws/credentials','/backup.zip','/database.sql','/adminer.php','/server-status','/vendor/phpunit','/actuator/env'],
+  api:['/api/v1/users?page=100','/api/v2/products?limit=1000','/graphql','/api/search?q=test&deep=true','/internal/metrics'],
+  cart:['/cart','/cart/add','/checkout','/shop?add-to-cart=123&variant=456'],
+  search:['/search?q=bot+detection','/search?q=crawl+budget+guide&utm_source=google','/search?q=wireless+earbuds&sort=price&page=3','/search?q=standing+desk&gclid=Cj0KCQiA1234567890','/search?q=espresso+maker&fbclid=IwAR1234567890'],
+  nextdata:['/_next/data/b7Xk2Q/products/widget-pro.json','/_next/data/b7Xk2Q/blog/seo-guide-2026.json','/_next/data/b7Xk2Q/category/shoes.json'],
+  assets:['/static/app.a1b2c3.js','/static/style.d4e5f6.css','/images/widget-pro-1.jpg','/images/hero-banner.webp','/_next/static/chunks/webpack-9c4a.js'],
+  thin:['/products/discontinued-old-widget','/products/out-of-stock-2019-model','/products/clearance-filler-page'],
+  gone:['/products/removed-summer-2024','/old-sale-2024','/products/recalled-charger-v1'],
+  dead:['/old-promo-2019','/p12999','/landing-test-variant-b','/deals/black-friday-2022']
 };
 
 const SAMPLE_UAS={
-  googlebot:['Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)','Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'],
+  googlebot:['Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'],
+  googlebot_mobile:['Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'],
+  googlebot_image:['Googlebot-Image/1.0'],
+  googlebot_video:['Googlebot-Video/1.0'],
+  adsbot:['AdsBot-Google (+http://www.google.com/adsbot.html)'],
   bingbot:['Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)'],
-  gptbot:['GPTBot/1.0 (+https://openai.com/gptbot)','GPTBot/1.1 (+https://openai.com/gptbot)'],
-  bytespider:['Mozilla/5.0 (Linux; Android 10) Chrome/122.0.0.0 Mobile Safari/537.36 Bytespider/5.0','Mozilla/5.0 (Linux; Android 11) Chrome/124.0.0.0 Mobile Safari/537.36 Bytespider/5.1'],
-  perplexity:['PerplexityBot/1.0 (+https://docs.perplexity.ai)','PerplexityBot/1.1 (+https://docs.perplexity.ai)'],
-  claudebot:['ClaudeBot/1.0 (+https://anthropic.com/claudebot)','ClaudeBot/1.1 (+https://anthropic.com/claudebot)'],
-  oai:['OAI-SearchBot/1.0 (+https://openai.com/searchbot)','OAI-SearchBot/1.1 (+https://openai.com/searchbot)'],
-  ccbot:['CCBot/2.0 (+https://commoncrawl.org/faq/)','CCBot/2.1 (+https://commoncrawl.org/faq/)'],
-  ahrefs:['Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)'],
-  semrush:['Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)'],
+  applebot:['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)'],
+  petalbot:['Mozilla/5.0 (compatible; PetalBot; +https://webmaster.petalsearch.com/site/petalbot)'],
   yandex:['Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)'],
   baidu:['Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)'],
+  duckduckbot:['Mozilla/5.0 (compatible; DuckDuckBot-Https/1.1; https://duckduckgo.com/duckduckbot)'],
+  gptbot:['GPTBot/1.0 (+https://openai.com/gptbot)','GPTBot/1.1 (+https://openai.com/gptbot)'],
+  bytespider:['Mozilla/5.0 (Linux; Android 10) Chrome/122.0.0.0 Mobile Safari/537.36 Bytespider/5.0','Mozilla/5.0 (Linux; Android 11) Chrome/124.0.0.0 Mobile Safari/537.36 Bytespider/5.1','ByteDanceSpotter/1.0','DouyinSpider/1.0'],
+  perplexity:['PerplexityBot/1.0 (+https://docs.perplexity.ai)','PerplexityBot/1.1 (+https://docs.perplexity.ai)'],
+  perplexity_user:['Perplexity-User/1.0 (+https://docs.perplexity.ai)'],
+  claudebot:['ClaudeBot/1.0 (+https://anthropic.com/claudebot)','ClaudeBot/1.1 (+https://anthropic.com/claudebot)','anthropic-ai/1.0 (+https://anthropic.com)'],
+  claude_search:['Claude-SearchBot/1.0 (+https://anthropic.com)'],
+  claude_user:['Claude-User/1.0 (+https://anthropic.com)'],
+  oai:['OAI-SearchBot/1.0 (+https://openai.com/searchbot)','OAI-SearchBot/1.1 (+https://openai.com/searchbot)'],
+  oai_ads:['OAI-AdsBot/1.0 (+https://openai.com/adsbot)'],
+  chatgpt_user:['ChatGPT-User/1.0 (+https://openai.com/gptbot)','ChatGPT-User/2.0 (+https://openai.com/gptbot)'],
+  ccbot:['CCBot/2.0 (+https://commoncrawl.org/faq/)','CCBot/2.1 (+https://commoncrawl.org/faq/)'],
+  cohere:['cohere-ai/1.0 (+https://cohere.com)'],
+  ai2bot:['AI2Bot/1.0 (+https://allenai.org/crawler)'],
+  googleother:['GoogleOther/1.0','GoogleOther-Image/1.0','GoogleOther-Video/1.0'],
+  metaext:['Meta-ExternalAgent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'],
+  metafetch:['meta-externalfetcher/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'],
+  amazonbot:['Amazonbot/0.1 (+https://developer.amazon.com/support/amazonbot)'],
+  deepseek:['DeepSeekBot/1.0 (+https://www.deepseek.com)'],
+  qwenbot:['QwenBot/1.0 (+https://qwen.ai)'],
+  timpibot:['Timpibot/1.0 (+https://timpi.io)'],
+  sidetiq:['Sidetiq/1.0'],
+  firecrawl:['FirecrawlAgent/1.0 (+https://www.firecrawl.dev)'],
+  brightdata:['Mozilla/5.0 (compatible; BrightData/1.0; +https://brightdata.com)'],
+  imagesift:['ImageSiftBot/1.0 (+https://imagesift.example.com)'],
+  mistral_search:['MistralAI-Search/1.0 (+https://mistral.ai)'],
+  mistral_user:['MistralAI-User/1.0 (+https://mistral.ai)'],
+  youbot:['YouBot/1.0 (+https://you.com)'],
+  bravebot:['BraveBot/1.0 (+https://brave.com)'],
+  duckassist:['DuckAssistBot/1.0 (+https://duckduckgo.com)'],
+  google_agent:['Google-Agent/1.0 (+https://google.com)'],
+  ahrefs:['Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)'],
+  semrush:['Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)'],
+  dotbot:['Mozilla/5.0 (compatible; DotBot/1.2; +https://opensiteexplorer.org/dotbot)'],
+  mj12:['MJ12bot/v1.4.8 (+http://mj12bot.com)'],
+  screamer:['Screaming Frog SEO Spider/20.0'],
+  sistrix:['Mozilla/5.0 (compatible; Sistrix/1.0; +https://www.sistrix.com/bot)'],
+  lumar:['DeepCrawl/1.0 (+https://www.lumar.io)'],
+  jetoctopus:['JetOctopus/1.0 (+https://jetoctopus.com)'],
+  pingdom:['Pingdom/1.0 (+https://www.pingdom.com)'],
+  uptimerobot:['UptimeRobot/2.0 (+https://uptimerobot.com)'],
+  gtmetrix:['GTmetrix/1.0 (+https://gtmetrix.com)'],
+  datadog:['Datadog Agent/7.50'],
   facebook:['facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'],
   twitter:['Twitterbot/1.0'],
   linkedin:['LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)'],
-  mozilla:['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15','Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0','Mozilla/5.0 (Linux; Android 14) Chrome/125.0.0.0 Mobile Safari/537.36','Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1']
+  slackbot:['Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'],
+  discordbot:['Discordbot/2.0'],
+  pyreq:['python-requests/2.31.0'],
+  curl:['curl/8.5.0'],
+  wget:['Wget/1.21.4 (linux-gnu)'],
+  scrapy:['Scrapy/2.11.0 (+https://scrapy.org)'],
+  headless:['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/126.0.0.0 Safari/537.36'],
+  mozilla:['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15','Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36','Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0','Mozilla/5.0 (Linux; Android 14) Chrome/125.0.0.0 Mobile Safari/537.36','Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0']
 };
 
+/* Mix weights are constant across file sizes (scale-invariant) — 1MB and 1GB
+ * carry the same traffic shape so analysis converges instead of drifting.
+ * grp drives behavior: human|search|training|searchidx|userfetch|seo|monitor|
+ * social|suspicious|faker. ver = verified-shape IPs for that bot. */
+const SAMPLE_VERIFIED_GOOGLE=['66.249.66.1','66.249.66.45','66.249.66.128','66.249.68.10','66.249.64.5','66.249.64.20'];
+const SAMPLE_VERIFIED_BING=['13.107.21.200','13.107.21.201','204.79.180.10','204.79.180.11'];
+const SAMPLE_VERIFIED_YANDEX=['77.88.55.10','93.158.161.10'];
+const SAMPLE_VERIFIED_BAIDU=['180.76.15.10','220.181.38.10'];
 const SAMPLE_CATS=[
-  {c:'googlebot',w:.12,ipCount:80,ua:'googlebot'},
-  {c:'bingbot',w:.035,ipCount:40,ua:'bingbot'},
-  {c:'gptbot',w:.055,ipCount:30,ua:'gptbot'},
-  {c:'bytespider',w:.045,ipCount:50,ua:'bytespider'},
-  {c:'perplexity',w:.025,ipCount:20,ua:'perplexity'},
-  {c:'claudebot',w:.018,ipCount:15,ua:'claudebot'},
-  {c:'oai',w:.012,ipCount:12,ua:'oai'},
-  {c:'ccbot',w:.03,ipCount:25,ua:'ccbot'},
-  {c:'ahrefs',w:.02,ipCount:15,ua:'ahrefs'},
-  {c:'semrush',w:.015,ipCount:12,ua:'semrush'},
-  {c:'yandex',w:.02,ipCount:20,ua:'yandex'},
-  {c:'baidu',w:.01,ipCount:15,ua:'baidu'},
-  {c:'facebook',w:.015,ipCount:10,ua:'facebook'},
-  {c:'twitter',w:.008,ipCount:8,ua:'twitter'},
-  {c:'linkedin',w:.005,ipCount:6,ua:'linkedin'},
-  {c:'human',w:.577,ipCount:500,ua:'mozilla'}
+  {c:'googlebot',w:.070,ipCount:80,ua:'googlebot',grp:'search',ver:SAMPLE_VERIFIED_GOOGLE,verFrac:.25},
+  {c:'googlebot_mobile',w:.042,ipCount:60,ua:'googlebot_mobile',grp:'search',ver:SAMPLE_VERIFIED_GOOGLE,verFrac:.25},
+  {c:'googlebot_image',w:.008,ipCount:20,ua:'googlebot_image',grp:'search',ver:SAMPLE_VERIFIED_GOOGLE,verFrac:.25},
+  {c:'googlebot_video',w:.004,ipCount:12,ua:'googlebot_video',grp:'search',ver:SAMPLE_VERIFIED_GOOGLE,verFrac:.25},
+  {c:'adsbot',w:.004,ipCount:10,ua:'adsbot',grp:'search',ver:SAMPLE_VERIFIED_GOOGLE,verFrac:.3},
+  {c:'bingbot',w:.028,ipCount:40,ua:'bingbot',grp:'search',ver:SAMPLE_VERIFIED_BING,verFrac:.3},
+  {c:'applebot',w:.008,ipCount:15,ua:'applebot',grp:'search'},
+  {c:'petalbot',w:.003,ipCount:10,ua:'petalbot',grp:'search'},
+  {c:'yandex',w:.008,ipCount:20,ua:'yandex',grp:'search',ver:SAMPLE_VERIFIED_YANDEX,verFrac:.2},
+  {c:'baidu',w:.006,ipCount:15,ua:'baidu',grp:'search',ver:SAMPLE_VERIFIED_BAIDU,verFrac:.2},
+  {c:'duckduckbot',w:.004,ipCount:10,ua:'duckduckbot',grp:'search'},
+  {c:'gptbot',w:.028,ipCount:30,ua:'gptbot',grp:'training'},
+  {c:'claudebot',w:.013,ipCount:15,ua:'claudebot',grp:'training'},
+  {c:'ccbot',w:.020,ipCount:25,ua:'ccbot',grp:'training'},
+  {c:'bytespider',w:.026,ipCount:50,ua:'bytespider',grp:'training'},
+  {c:'cohere',w:.006,ipCount:10,ua:'cohere',grp:'training'},
+  {c:'ai2bot',w:.004,ipCount:8,ua:'ai2bot',grp:'training'},
+  {c:'googleother',w:.010,ipCount:15,ua:'googleother',grp:'training'},
+  {c:'metaext',w:.008,ipCount:12,ua:'metaext',grp:'training'},
+  {c:'deepseek',w:.008,ipCount:12,ua:'deepseek',grp:'training'},
+  {c:'qwenbot',w:.006,ipCount:10,ua:'qwenbot',grp:'training'},
+  {c:'timpibot',w:.005,ipCount:10,ua:'timpibot',grp:'training'},
+  {c:'sidetiq',w:.004,ipCount:8,ua:'sidetiq',grp:'training'},
+  {c:'firecrawl',w:.006,ipCount:10,ua:'firecrawl',grp:'training'},
+  {c:'brightdata',w:.004,ipCount:12,ua:'brightdata',grp:'training'},
+  {c:'imagesift',w:.003,ipCount:8,ua:'imagesift',grp:'training'},
+  {c:'oai',w:.012,ipCount:12,ua:'oai',grp:'searchidx'},
+  {c:'perplexity',w:.014,ipCount:20,ua:'perplexity',grp:'searchidx'},
+  {c:'claude_search',w:.006,ipCount:10,ua:'claude_search',grp:'searchidx'},
+  {c:'duckassist',w:.004,ipCount:8,ua:'duckassist',grp:'searchidx'},
+  {c:'youbot',w:.003,ipCount:8,ua:'youbot',grp:'searchidx'},
+  {c:'bravebot',w:.003,ipCount:8,ua:'bravebot',grp:'searchidx'},
+  {c:'amazonbot',w:.005,ipCount:10,ua:'amazonbot',grp:'searchidx'},
+  {c:'mistral_search',w:.003,ipCount:8,ua:'mistral_search',grp:'searchidx'},
+  {c:'chatgpt_user',w:.008,ipCount:12,ua:'chatgpt_user',grp:'userfetch'},
+  {c:'perplexity_user',w:.005,ipCount:10,ua:'perplexity_user',grp:'userfetch'},
+  {c:'claude_user',w:.003,ipCount:8,ua:'claude_user',grp:'userfetch'},
+  {c:'mistral_user',w:.002,ipCount:6,ua:'mistral_user',grp:'userfetch'},
+  {c:'google_agent',w:.002,ipCount:6,ua:'google_agent',grp:'userfetch'},
+  {c:'oai_ads',w:.003,ipCount:8,ua:'oai_ads',grp:'search'},
+  {c:'metafetch',w:.004,ipCount:10,ua:'metafetch',grp:'social'},
+  {c:'ahrefs',w:.012,ipCount:15,ua:'ahrefs',grp:'seo'},
+  {c:'semrush',w:.009,ipCount:12,ua:'semrush',grp:'seo'},
+  {c:'dotbot',w:.005,ipCount:10,ua:'dotbot',grp:'seo'},
+  {c:'mj12',w:.004,ipCount:10,ua:'mj12',grp:'seo'},
+  {c:'screamer',w:.004,ipCount:6,ua:'screamer',grp:'seo'},
+  {c:'sistrix',w:.003,ipCount:8,ua:'sistrix',grp:'seo'},
+  {c:'lumar',w:.002,ipCount:6,ua:'lumar',grp:'seo'},
+  {c:'jetoctopus',w:.002,ipCount:6,ua:'jetoctopus',grp:'seo'},
+  {c:'pingdom',w:.004,ipCount:8,ua:'pingdom',grp:'monitor'},
+  {c:'uptimerobot',w:.003,ipCount:6,ua:'uptimerobot',grp:'monitor'},
+  {c:'gtmetrix',w:.002,ipCount:6,ua:'gtmetrix',grp:'monitor'},
+  {c:'datadog',w:.002,ipCount:6,ua:'datadog',grp:'monitor'},
+  {c:'facebook',w:.010,ipCount:10,ua:'facebook',grp:'social'},
+  {c:'twitter',w:.005,ipCount:8,ua:'twitter',grp:'social'},
+  {c:'linkedin',w:.004,ipCount:6,ua:'linkedin',grp:'social'},
+  {c:'slackbot',w:.003,ipCount:6,ua:'slackbot',grp:'social'},
+  {c:'discordbot',w:.002,ipCount:6,ua:'discordbot',grp:'social'},
+  {c:'pyreq',w:.006,ipCount:15,ua:'pyreq',grp:'suspicious'},
+  {c:'curl',w:.004,ipCount:10,ua:'curl',grp:'suspicious'},
+  {c:'wget',w:.002,ipCount:8,ua:'wget',grp:'suspicious'},
+  {c:'scrapy',w:.003,ipCount:10,ua:'scrapy',grp:'suspicious'},
+  {c:'headless',w:.004,ipCount:12,ua:'headless',grp:'suspicious'},
+  {c:'faker_google',w:.006,ipCount:0,ua:'googlebot',grp:'faker',fakeTLS:'TLSv1.2'},
+  {c:'faker_gpt',w:.004,ipCount:0,ua:'gptbot',grp:'faker'},
+  {c:'human',w:.560,ipCount:500,ua:'mozilla',grp:'human'}
 ];
 const SAMPLE_REF=['https://www.google.com/','https://www.bing.com/','https://duckduckgo.com/','https://www.facebook.com/','https://t.co/','https://www.linkedin.com/','https://www.reddit.com/','https://news.ycombinator.com/'];
-const SAMPLE_METHODS=['GET','GET','GET','GET','GET','GET','POST','HEAD','PUT','DELETE'];
-const SAMPLE_TLS=['TLSv1.3','TLSv1.2','TLSv1.3','TLSv1.3'];
+const SAMPLE_GOOGLE_QS=['https://www.google.com/search?q=wireless+earbuds+review','https://www.google.com/search?q=best+standing+desk+2026','https://www.google.com/search?q=bot+traffic+cost+analyzer','https://www.google.com/search?q=espresso+maker+deluxe+price','https://www.google.com/search?q=crawl+budget+faceted+navigation','https://www.google.com/search?q=yoga+mat+xl+non+slip','https://www.google.com/search?q=robot+vacuum+compare','https://www.google.com/search?q=organic+coffee+beans+1kg'];
+const SAMPLE_HOSTS=['www.example.com','www.example.com','www.example.com','shop.example.com','blog.example.com','api.example.com','support.example.com','m.example.com'];
+const SAMPLE_COLOS=['IAD','ORD','DFW','SEA','LHR','FRA','AMS','SIN','NRT','SYD'];
+const SAMPLE_COLO_W=[.18,.14,.12,.08,.12,.10,.06,.08,.07,.05];
+const SAMPLE_TLS=['TLSv1.3','TLSv1.2','TLSv1.3','TLSv1.3','TLSv1.3','TLSv1.3','TLSv1.3'];
 const SAMPLE_CIPHERS=['TLS_AES_256_GCM_SHA384','TLS_CHACHA20_POLY1305_SHA256','TLS_AES_128_GCM_SHA256'];
-const SAMPLE_CACHE=['HIT','MISS','MISS','EXPIRED','BYPASS','HIT','MISS'];
+/* Weighted pick + Pareto IP + diurnal hour (same shapes as tools/gen-logs.js
+ * v2.1 so both generators tell the same traffic story). */
+function wpickR(rng,arr,weights){
+  let r=rng(),acc=0;
+  for(let i=0;i<arr.length;i++){acc+=weights[i];if(r<=acc)return arr[i];}
+  return arr[arr.length-1];
+}
+function paretoIpR(rng,pool){
+  if(!pool||!pool.length)return randIPR(rng);
+  const r=rng();
+  if(r<0.12)return pool[0];
+  if(r<0.36)return pool[1+Math.floor(rng()*Math.min(4,pool.length-1))];
+  return pool[Math.min(pool.length-1,5+Math.floor(rng()*Math.max(1,pool.length-5)))];
+}
+const SAMPLE_HOUR_W=(()=>{const w=[];for(let h=0;h<24;h++)w.push(1+2.2*Math.exp(-((h-13)**2)/(2*3.2**2)));return w;})();
+const SAMPLE_HOUR_SUM=SAMPLE_HOUR_W.reduce((a,b)=>a+b,0);
+function diurnalHourR(rng){
+  let r=rng(),acc=0;
+  for(let h=0;h<24;h++){acc+=SAMPLE_HOUR_W[h]/SAMPLE_HOUR_SUM;if(r<=acc)return h;}
+  return 13;
+}
+function randIPv6R(rng){
+  // Global-unicast-shaped client addresses (2000::/3), dual-stack realism.
+  const h=()=>Math.floor(rng()*65536).toString(16).padStart(4,'0');
+  return `2${Math.floor(rng()*4).toString(16)}${h().slice(1)}:${h()}:${h()}:${h()}:${h()}:${h()}:${h()}:${h()}`;
+}
+const FACET_COLORS=['red','blue','green','black','white','navy'];
+const FACET_SIZES=['xs','s','m','l','xl','9','10','11'];
+const FACET_BRANDS=['nike','adidas','apple','samsung','sony'];
+const FACET_SORTS=['price','date','rating','popularity'];
+function facetUrlR(rng){
+  const base=randChoiceR(rng,SAMPLE_URLS.category);
+  const parts=[`color=${randChoiceR(rng,FACET_COLORS)}`,`size=${randChoiceR(rng,FACET_SIZES)}`];
+  if(rng()<0.7)parts.push(`brand=${randChoiceR(rng,FACET_BRANDS)}`);
+  if(rng()<0.8)parts.push(`sort=${randChoiceR(rng,FACET_SORTS)}`);
+  if(rng()<0.6)parts.push(`page=${1+Math.floor(rng()*48)}`);
+  if(rng()<0.25)parts.push(`sessionid=abc${Math.floor(rng()*99999)}`);
+  if(rng()<0.15)parts.push(`currency=${rng()<0.5?'EUR':'GBP'}`);
+  if(rng()<0.10)parts.push(rng()<0.5?`gclid=Cj0KCQiA${Math.floor(rng()*1e9)}`:`fbclid=IwAR${Math.floor(rng()*1e9)}`);
+  let q=parts.join('&');
+  if(rng()<0.10)q=q.replace('sort=','Sort='); // case-variant crawl waste
+  return `${base}?${q}`;
+}
+function sampleContentType(path){
+  const p=String(path||'/');
+  if(p.startsWith('/.'))return 'sec';
+  if(p.includes('wp-')||p.includes('phpmyadmin')||p.includes('adminer')||p.includes('.aws/')||p.includes('vendor/phpunit')||p.includes('actuator/')||p.includes('server-status')||p.endsWith('.env')||p.endsWith('.sql')||p.endsWith('.zip'))return 'sec';
+  if(p.startsWith('/_next/data/'))return 'nextdata';
+  if(p==='/graphql')return 'graphql';
+  if(p.startsWith('/api/'))return 'api';
+  if(p.startsWith('/static/')||p.startsWith('/_next/static/'))return p.endsWith('.js')?'asset-js':'asset-css';
+  if(/\.(jpg|jpeg|png|webp|gif|avif)(\?|$)/i.test(p))return 'asset-img';
+  if(p==='/health')return 'health';
+  if(p==='/robots.txt'||p.includes('sitemap'))return 'sitemap';
+  if(SAMPLE_URLS.thin.includes(p))return 'thin';
+  if(SAMPLE_URLS.gone.includes(p))return 'gone';
+  if(SAMPLE_URLS.dead.includes(p))return 'dead';
+  if(p.startsWith('/cart')||p.includes('add-to-cart')||p==='/checkout')return 'cart';
+  if(p.startsWith('/search'))return 'search';
+  if(p.startsWith('/calendar/')||p.startsWith('/tag/')||p.startsWith('/author/')||p.startsWith('/archive/')||p.startsWith('/page/')||p.startsWith('/sort?'))return 'trap';
+  if(p.startsWith('/category/'))return 'category';
+  if(p.startsWith('/products/'))return 'pdp';
+  return 'html';
+}
 function buildSamplePools(rng){
-  const ipPools={};
+  const ipPools={residential:[],v6:[]};
   for(const cat of SAMPLE_CATS){
     ipPools[cat.c]=[];
     for(let i=0;i<cat.ipCount;i++)ipPools[cat.c].push(randIPR(rng));
   }
+  for(let i=0;i<800;i++)ipPools.residential.push(randIPR(rng));
+  for(let i=0;i<80;i++)ipPools.v6.push(randIPv6R(rng));
   return ipPools;
 }
+/* Fixed 90-day window ending 2026-09-01 (matches the Jun 03 → Sep 01 story in
+ * every CFO report) — same window at every file size, so period comparisons
+ * and tier shares are stable from 1MB to 1GB. */
 function sampleTimeRange(rng){
-  const durations=[1,7,30,90];
-  const durationDays=randChoiceR(rng,durations);
-  // Deterministic anchor (not `new Date()`): same seed => identical timestamps.
-  const endTime=new Date(Date.UTC(2026,8,1)+Math.floor(rng()*86400000));
-  return{startTime:new Date(endTime.getTime()-durationDays*24*3600*1000),endTime};
+  void rng;
+  return{startTime:new Date(Date.UTC(2026,5,3,0,0,0)),endTime:new Date(Date.UTC(2026,8,1,0,0,0))};
+}
+/* One deploy-blip night (2026-07-18 02:00-08:00 UTC): elevated 500/503 + slow
+ * origin on /api. Gives anomaly detection something TRUE to find. */
+function sampleBlip(ts){
+  const d=new Date(ts);
+  return d.getUTCFullYear()===2026&&d.getUTCMonth()===6&&d.getUTCDate()===18&&d.getUTCHours()>=2&&d.getUTCHours()<8;
+}
+function samplePathR(rng,grp,cat){
+  const pr=rng();
+  if(grp==='human'){
+    if(pr<.28)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(pr<.50)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(pr<.60)return randChoiceR(rng,SAMPLE_URLS.category);
+    if(pr<.68)return randChoiceR(rng,SAMPLE_URLS.blog);
+    if(pr<.74)return randChoiceR(rng,SAMPLE_URLS.search);
+    if(pr<.78)return randChoiceR(rng,SAMPLE_URLS.cart);
+    if(pr<.82)return randChoiceR(rng,SAMPLE_URLS.docs);
+    if(pr<.87)return randChoiceR(rng,SAMPLE_URLS.assets);
+    if(pr<.90)return facetUrlR(rng);
+    if(pr<.93)return randChoiceR(rng,SAMPLE_URLS.nextdata);
+    if(pr<.95)return randChoiceR(rng,SAMPLE_URLS.trap);
+    if(pr<.96)return randChoiceR(rng,SAMPLE_URLS.thin);
+    if(pr<.965)return randChoiceR(rng,SAMPLE_URLS.gone);
+    if(pr<.975)return randChoiceR(rng,SAMPLE_URLS.dead);
+    return randChoiceR(rng,SAMPLE_URLS.api);
+  }
+  if(grp==='search'){
+    if(pr<.06)return randChoiceR(rng,SAMPLE_URLS.sitemap);
+    if(pr<.26)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(pr<.48)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(pr<.60)return randChoiceR(rng,SAMPLE_URLS.category);
+    if(pr<.70)return randChoiceR(rng,SAMPLE_URLS.blog);
+    if(pr<.76)return randChoiceR(rng,SAMPLE_URLS.docs);
+    if(pr<.84)return facetUrlR(rng);
+    if(pr<.88)return `/category/shoes?page=${2+Math.floor(rng()*58)}`;
+    if(pr<.91)return randChoiceR(rng,SAMPLE_URLS.assets);
+    if(pr<.93)return randChoiceR(rng,SAMPLE_URLS.thin);
+    if(pr<.94)return randChoiceR(rng,SAMPLE_URLS.gone);
+    return randChoiceR(rng,SAMPLE_URLS.param);
+  }
+  if(grp==='training'){
+    if(pr<.08)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(pr<.22)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(pr<.32)return randChoiceR(rng,SAMPLE_URLS.category);
+    if(pr<.46)return facetUrlR(rng);
+    if(pr<.56)return randChoiceR(rng,SAMPLE_URLS.param.concat(SAMPLE_URLS.search));
+    if(pr<.66)return randChoiceR(rng,SAMPLE_URLS.api.concat(SAMPLE_URLS.nextdata));
+    if(pr<.76)return randChoiceR(rng,SAMPLE_URLS.trap);
+    if(pr<.80)return randChoiceR(rng,SAMPLE_URLS.sec);
+    if(pr<.86)return randChoiceR(rng,SAMPLE_URLS.blog);
+    if(pr<.90)return randChoiceR(rng,SAMPLE_URLS.docs);
+    if(pr<.94)return randChoiceR(rng,SAMPLE_URLS.assets);
+    if(pr<.96)return randChoiceR(rng,SAMPLE_URLS.gone);
+    return randChoiceR(rng,SAMPLE_URLS.dead);
+  }
+  if(grp==='searchidx'){
+    if(pr<.10)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(pr<.32)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(pr<.46)return randChoiceR(rng,SAMPLE_URLS.category);
+    if(pr<.56)return facetUrlR(rng);
+    if(pr<.64)return randChoiceR(rng,SAMPLE_URLS.param);
+    if(pr<.78)return randChoiceR(rng,SAMPLE_URLS.blog);
+    if(pr<.86)return randChoiceR(rng,SAMPLE_URLS.docs);
+    if(pr<.92)return randChoiceR(rng,SAMPLE_URLS.assets);
+    return randChoiceR(rng,SAMPLE_URLS.search);
+  }
+  if(grp==='userfetch'){
+    if(pr<.30)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(pr<.50)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(pr<.65)return randChoiceR(rng,SAMPLE_URLS.blog);
+    if(pr<.80)return randChoiceR(rng,SAMPLE_URLS.category);
+    if(pr<.90)return randChoiceR(rng,SAMPLE_URLS.docs);
+    return randChoiceR(rng,SAMPLE_URLS.search);
+  }
+  if(grp==='seo'){
+    if(pr<.10)return randChoiceR(rng,SAMPLE_URLS.sitemap);
+    if(pr<.30)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(pr<.50)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(pr<.62)return randChoiceR(rng,SAMPLE_URLS.blog);
+    if(pr<.72)return facetUrlR(rng);
+    if(pr<.80)return randChoiceR(rng,SAMPLE_URLS.param);
+    return randChoiceR(rng,SAMPLE_URLS.docs);
+  }
+  if(grp==='monitor'){
+    if(rng()<0.7)return '/health';
+    return randChoiceR(rng,SAMPLE_URLS.main);
+  }
+  if(grp==='social'){
+    const q=rng();
+    if(q<.35)return randChoiceR(rng,SAMPLE_URLS.main);
+    if(q<.65)return randChoiceR(rng,SAMPLE_URLS.pdp);
+    if(q<.85)return randChoiceR(rng,SAMPLE_URLS.blog);
+    return randChoiceR(rng,SAMPLE_URLS.assets.filter(a=>/\.(jpg|webp|png)/.test(a)));
+  }
+  if(grp==='faker')return samplePathR(rng,cat==='faker_google'?'search':'training',cat);
+  /* suspicious: probes + API abuse */
+  const q=rng();
+  if(q<.25)return randChoiceR(rng,SAMPLE_URLS.api.concat(['/graphql']));
+  if(q<.45)return randChoiceR(rng,SAMPLE_URLS.sec);
+  if(q<.60)return randChoiceR(rng,SAMPLE_URLS.param);
+  if(q<.70)return randChoiceR(rng,SAMPLE_URLS.nextdata);
+  if(q<.78)return randChoiceR(rng,SAMPLE_URLS.main);
+  if(q<.88)return randChoiceR(rng,SAMPLE_URLS.pdp);
+  return randChoiceR(rng,SAMPLE_URLS.docs);
 }
 function genOneSample(ipPools,startTime,endTime,rng){
-  let r=rng(),cum=0,cat=SAMPLE_CATS[0];
-  for(const x of SAMPLE_CATS){cum+=x.w;if(r<=cum){cat=x.c;break}}
-  const ua=randChoiceR(rng,SAMPLE_UAS[cat]||SAMPLE_UAS.mozilla);
-  const ip=randChoiceR(rng,ipPools[cat]);
-  const pr=rng();
-  let path;
-  if(cat==='human')path=pr<.45?randChoiceR(rng,SAMPLE_URLS.main):pr<.65?randChoiceR(rng,SAMPLE_URLS.products):pr<.82?randChoiceR(rng,SAMPLE_URLS.blog):pr<.92?randChoiceR(rng,SAMPLE_URLS.docs):pr<.97?randChoiceR(rng,SAMPLE_URLS.param):randChoiceR(rng,SAMPLE_URLS.api);
-  else if(cat==='googlebot'||cat==='bingbot')path=pr<.3?randChoiceR(rng,SAMPLE_URLS.main):pr<.5?randChoiceR(rng,SAMPLE_URLS.products):pr<.68?randChoiceR(rng,SAMPLE_URLS.blog):pr<.82?randChoiceR(rng,SAMPLE_URLS.docs):pr<.92?randChoiceR(rng,SAMPLE_URLS.param):randChoiceR(rng,SAMPLE_URLS.api);
-  else path=pr<.1?randChoiceR(rng,SAMPLE_URLS.main):pr<.25?randChoiceR(rng,SAMPLE_URLS.products):pr<.4?randChoiceR(rng,SAMPLE_URLS.blog):pr<.55?randChoiceR(rng,SAMPLE_URLS.docs):pr<.7?randChoiceR(rng,SAMPLE_URLS.param):pr<.85?randChoiceR(rng,SAMPLE_URLS.trap):pr<.93?randChoiceR(rng,SAMPLE_URLS.sec):randChoiceR(rng,SAMPLE_URLS.api);
+  let r=rng(),cum=0,entry=SAMPLE_CATS[SAMPLE_CATS.length-1];
+  for(const x of SAMPLE_CATS){cum+=x.w;if(r<=cum){entry=x;break}}
+  const cat=entry.c,grp=entry.grp||'human';
+  const ua=randChoiceR(rng,SAMPLE_UAS[entry.ua]||SAMPLE_UAS.mozilla);
+  /* IP: verified-shape for real crawlers, residential for humans + fakers,
+   * Pareto-skewed pools, IPv6 dual-stack sprinkle. */
+  let ip;
+  if(entry.ver&&rng()<(entry.verFrac||0))ip=randChoiceR(rng,entry.ver);
+  else if(grp==='faker'||grp==='human')ip=paretoIpR(rng,ipPools.residential);
+  else ip=paretoIpR(rng,ipPools[cat]&&ipPools[cat].length?ipPools[cat]:ipPools.residential);
+  if(rng()<(grp==='human'?0.08:0.02))ip=randChoiceR(rng,ipPools.v6);
+  const path=samplePathR(rng,grp,cat);
+  const ct=sampleContentType(path);
+  /* Timestamp: diurnal shape + weekend thinning + ms precision. */
+  const spanMs=endTime.getTime()-startTime.getTime();
+  const dayMs=86400000;
+  let dayIdx=Math.floor(rng()*(spanMs/dayMs));
+  const dow=new Date(startTime.getTime()+dayIdx*dayMs).getUTCDay();
+  if((dow===0||dow===6)&&rng()<0.3)dayIdx=Math.max(0,dayIdx-(dow===0?2:1));
+  const hour=diurnalHourR(rng);
+  const ts=new Date(startTime.getTime()+dayIdx*dayMs+hour*3600000+Math.floor(rng()*3600000));
+  const inBlip=sampleBlip(ts);
+  /* Method: enterprise mix; bot POSTs are form/cart traps. */
+  const mr=rng();
+  const method=mr<0.935?'GET':mr<0.97?'HEAD':mr<0.992?'POST':mr<0.996?'OPTIONS':randChoiceR(rng,['PUT','DELETE','PATCH']);
+  /* Status: every code tells a story. */
   const sr=rng();
   let st;
-  if(path.startsWith('/.'))st=404;else if(path.includes('wp-')||path.includes('phpmyadmin')||path.includes('adminer'))st=sr<.7?404:403;
-  else if(sr<.72)st=200;else if(sr<.82)st=301;else if(sr<.88)st=304;else if(sr<.93)st=404;else if(sr<.96)st=429;else if(sr<.98)st=500;else st=403;
-  const bytes=st===304?0:st===301?200:Math.floor(500+rng()*150000);
-  const rtBase=cat==='human'?.03:cat==='googlebot'||cat==='bingbot'?.07:cat==='gptbot'||cat==='bytespider'?.2:.12;
-  const rt=rtBase+rng()*(cat==='human'?.2:1.2);
-  const ts=randDateR(rng,startTime.getTime(),endTime.getTime());
-  return{ClientIP:ip,Timestamp:ts.toISOString(),RequestURI:path,RequestMethod:randChoiceR(rng,SAMPLE_METHODS),HttpStatus:st,Bytes:bytes,UserAgent:ua,Referer:cat==='human'?randChoiceR(rng,SAMPLE_REF):'',RequestTime:+rt.toFixed(3),CacheStatus:randChoiceR(rng,SAMPLE_CACHE),TLSProtocol:randChoiceR(rng,SAMPLE_TLS),TLSCipher:randChoiceR(rng,SAMPLE_CIPHERS)};
+  if(ct==='sec')st=sr<0.8?404:403;
+  else if(ct==='thin')st=200;
+  else if(ct==='gone')st=410;
+  else if(ct==='health')st=sr<0.995?200:503;
+  else if(ct==='sitemap')st=200;
+  else if(method==='POST'&&(ct==='cart'))st=grp==='human'?302:(sr<0.6?403:200);
+  else if(method!=='GET'&&method!=='HEAD')st=sr<0.7?200:405;
+  else if((grp==='training'||grp==='faker')&&(ct==='api'||ct==='nextdata'||ct==='graphql')&&sr<0.045)st=429;
+  else if(inBlip&&(ct==='api'||ct==='graphql'||ct==='nextdata'))st=sr<0.30?500:sr<0.45?503:sr<0.50?502:200;
+  else if(inBlip)st=sr<0.08?500:sr<0.10?503:200;
+  else if(sr<0.004)st=500;
+  else if(sr<0.0055)st=502;
+  else if(sr<0.008)st=503;
+  else if(sr<0.016)st=403;
+  else if(sr<0.022)st=429;
+  else if(ct==='dead'||sr<0.075)st=ct==='dead'?404:(sr<0.055?404:200);
+  else if(sr<0.135)st=/page=\d+|Sort=/.test(path)?301:200;
+  else if(sr<0.19&&(grp==='search'||grp==='searchidx')&&/GET/.test(method))st=304;
+  else if(sr<0.20&&ct==='asset-img')st=206;
+  else st=200;
+  if(st===200&&(grp==='search'||grp==='searchidx')&&method==='GET'&&(ct==='html'||ct==='pdp'||ct==='category'||ct==='blog')&&rng()<0.05)st=304;
+  /* Bytes: content-aware (thin soft-404s, zero-byte 304s, fat faceted HTML). */
+  let bytes;
+  const skew=()=>rng()*rng();
+  if(st===304)bytes=0;
+  else if(st===301||st===302)bytes=180+Math.floor(rng()*80);
+  else if(st===429||st===403||st===405)bytes=400+Math.floor(rng()*800);
+  else if(st===410)bytes=1000+Math.floor(rng()*1200);
+  else if(st===404)bytes=1500+Math.floor(rng()*1800);
+  else if(st>=500)bytes=2000+Math.floor(rng()*3000);
+  else if(ct==='thin')bytes=1150+Math.floor(rng()*150);
+  else if(ct==='asset-js')bytes=30000+Math.floor(skew()*170000);
+  else if(ct==='asset-css')bytes=20000+Math.floor(skew()*60000);
+  else if(ct==='asset-img')bytes=st===206?60000+Math.floor(rng()*120000):80000+Math.floor(skew()*420000);
+  else if(ct==='nextdata')bytes=5000+Math.floor(skew()*35000);
+  else if(ct==='api'||ct==='graphql')bytes=2000+Math.floor(skew()*28000);
+  else if(ct==='pdp')bytes=40000+Math.floor(skew()*80000);
+  else if(ct==='category')bytes=/\?/.test(path)?50000+Math.floor(skew()*100000):30000+Math.floor(skew()*50000);
+  else if(ct==='search')bytes=25000+Math.floor(skew()*45000);
+  else bytes=15000+Math.floor(skew()*45000);
+  /* Response time: tiered log-normal-ish; cache HIT short-circuits; blip slows. */
+  const rtBase=grp==='human'?0.09:grp==='search'?0.22:grp==='searchidx'?0.3:grp==='training'?0.55:grp==='userfetch'?0.4:grp==='seo'?0.35:grp==='monitor'?0.05:grp==='social'?0.25:0.12;
+  let rt=rtBase*Math.exp((rng()+rng()+rng()-1.5)*0.9);
+  if(st>=500)rt+=1.5+rng()*3;
+  if(inBlip&&(ct==='api'||ct==='graphql'))rt*=2+rng()*3;
+  /* Cache: content-aware (bots burn MISS on traps; statics HIT). */
+  const cr=rng();
+  let cache;
+  if(ct==='asset-js'||ct==='asset-css'||ct==='asset-img')cache=cr<0.85?'HIT':cr<0.95?'MISS':'EXPIRED';
+  else if(ct==='api'||ct==='graphql'||ct==='cart')cache=cr<0.7?'BYPASS':'MISS';
+  else if(ct==='sitemap'||ct==='health')cache=cr<0.5?'HIT':'MISS';
+  else cache=cr<0.28?'HIT':cr<0.88?'MISS':cr<0.96?'EXPIRED':'STALE';
+  if(cache==='HIT')rt*=0.35;
+  /* TLS: fakers lag on 1.2 (verification signal); real Googlebot is 1.3. */
+  const tls=grp==='faker'&&entry.fakeTLS?entry.fakeTLS:(grp==='search'&&entry.ver? 'TLSv1.3':randChoiceR(rng,SAMPLE_TLS));
+  const host=ct==='api'||ct==='graphql'?randChoiceR(rng,['api.example.com','api.example.com','www.example.com']):randChoiceR(rng,SAMPLE_HOSTS);
+  const colo=wpickR(rng,SAMPLE_COLOS,SAMPLE_COLO_W);
+  let referer='';
+  if(grp==='human'){
+    const rr=rng();
+    referer=rr<0.50?'':rr<0.78?randChoiceR(rng,SAMPLE_GOOGLE_QS):rr<0.83?'https://www.bing.com/search?q=log+analyzer':rr<0.90?randChoiceR(rng,SAMPLE_REF.slice(3)):rr<0.96?`https://www.example.com${randChoiceR(rng,SAMPLE_URLS.blog)}`:randChoiceR(rng,SAMPLE_REF);
+  }else if(ct==='asset-img'&&rng()<0.25)referer='https://www.google.com/imgres?q=earbuds';
+  /* Web Bot Auth attestation on verified Googlebot lines (demos Module 2). */
+  const wba=(entry.ver&&SAMPLE_VERIFIED_GOOGLE.includes(ip))&&rng()<0.5?'pass':'';
+  return{ClientIP:ip,Timestamp:ts.toISOString(),RequestURI:path,RequestMethod:method,HttpStatus:st,Bytes:bytes,UserAgent:ua,Referer:referer,RequestTime:+Math.max(0.005,rt).toFixed(3),CacheStatus:cache,TLSProtocol:tls,TLSCipher:randChoiceR(rng,SAMPLE_CIPHERS),Host:host,EdgeColo:colo,cf_web_bot_auth:wba};
 }
 function sampleTargetRecords(targetSizeMB){
-  const avgRecordSize=400; // measured compact-NDJSON bytes/record (long bot UAs)
+  const avgRecordSize=450; // measured enterprise-NDJSON bytes/record (richer fields + long bot UAs)
   return Math.max(100,Math.round((targetSizeMB*1024*1024)/avgRecordSize));
 }
 /* Chunked NDJSON generator — never builds one giant string, so >100MB downloads

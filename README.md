@@ -28,6 +28,10 @@ No upload — files never leave your machine. Verified: no XHR/WebSocket in audi
 - **P0 edge-rule safety fix:** `genEdgeRules` no longer slices observed UAs to 40 chars for BLOCK rules (that emitted `contains "Mozilla/5.0 (Linux; Android 10) Chrome/1"` for Bytespider — would block real Android Chrome users — and truncated ClaudeBot mid-URL). It now emits the canonical bot-name token (`Bytespider`, `GPTBot`, …) which can never match real browsers, and downgrades browser-generic UAs to CHALLENGE + verify. All prior BLOCK-count contracts (`count>=2` fires, AdsBot never blocked) still hold.
 - **116 asserts** (`npm test`): 111 existing + 5 new (PDF bytes/model/stream + 2× rule-safety).
 
+## What's new: sample-data v3 (enterprise-realistic downloads, 1MB–1GB same mix)
+
+- **In-app Download generator rewritten (`genOneSample`):** 60+ bot categories (search desktop/smartphone/image/video, 16 AI-training, 8 AI search-index, 5 AI user-fetch, 8 SEO tools, 4 monitoring, 6 social, 5 generic scrapers, 2 faker shapes), faceted-nav/pagination/sort/`_next/data`/cart traps, thin soft-404s, 410s, 304 revisits, 429 WAF, 500/502/503 plus a fixed deploy-blip night (2026-07-18 02:00–08:00 UTC), diurnal + weekend shape, Pareto IPs, verified-vs-spoof split (`66.249.x`/`13.107.x` vs residential fakers), IPv6 dual-stack, Host/vhost, EdgeColo, content-aware cache/TLS/bytes/TTFB, `cf_web_bot_auth` on verified lines, fixed 90-day window (Jun 03 → Sep 01). Weights are constant across sizes — 1MB-vs-5MB tier shares agree within ~1%, so analysis converges instead of drifting. Note: Google-Extended / Applebot-Extended are robots.txt tokens, never crawler UAs — correctly absent from generated traffic.
+
 ---
 
 ## What's new in v2.2.0 (P0 credibility pass + realistic fixture)
@@ -284,7 +288,7 @@ tools/gen-bots-page.js      # builds the searchable bots/index.html from the liv
 BOTS.md                     # open bot DB: training vs search-index vs user-triggered
 METHOD.md                   # sampling/cost/verify/limits — read before quoting numbers
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
-sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
+sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md (tools/gen-logs.js fixture); in-app Download samples (1MB–1GB, v3 enterprise mix) generate client-side in js/analyzer.js §O
 tests/                      # 116 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness+fallback/spoof/js-shell/anomaly/v2/p0verdict/cfo-pdf)
 llms.txt / llms-full.txt    # repo-root AI-use policy + full 127-sig grounding dump (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
