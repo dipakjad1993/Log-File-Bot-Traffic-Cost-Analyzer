@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyze 1GB Cloudflare Logpush Logs Free, No Upload (2026)</title>
+<meta name="description" content="Stream 3.2M-line / 1GB Cloudflare Logpush + ALB + Nginx logs in-browser: 8MB slices, Web Worker, .gz, systematic sampling disclosed on-screen. Free, private, no upload.">
+<link rel="canonical" href="https://log-bot-analyzer.pages.dev/guides/cloudflare-logpush-1gb-analysis-free.html">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card">
+<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<h1>Analyze 1GB Cloudflare Logpush logs free — no upload</h1>
+<p>Cloudflare Logpush fields, AWS ALB, Nginx/Apache Combined and W3C Extended auto-detect per line. Files stream in <strong>8MB slices</strong> with <strong>.gz + multi-file rotation</strong> support. Above ~300k lines a labeled systematic sample is analyzed (stride + counts + timing on-screen); 500MB+ exact totals → CLI in the repo.</p>
+<h2>Measured, not marketing</h2>
+<ul>
+<li><strong>1.02 GB / 3,200,000 lines</strong> → 320,000 kept (1-in-10) in <strong>6.6 s read, 13.0 s wall</strong> (headless Chromium).</li>
+<li><strong>$2.61 total, $0.25 blockable</strong>, 19,272 threats, 427 verification warnings, 18% trap waste.</li>
+<li>10k fixture: $0.08 → $0.04 total, byte-identical counts — pinned in <code>sample-data/EXPECTED.md</code>, re-verified by CI.</li>
+</ul>
+<h2>Steps</h2>
+<ol>
+<li>Export Logpush (JSON/JSONL) — .gz is fine, it decompresses in-browser.</li>
+<li>Drop it into the <a href="../">analyzer</a> — progress reads locally, worker kicks in past 20k rows.</li>
+<li>Read Tab 3 crawl budget (16 traps incl. gclid, /filter/, _next/data), Tab 4 cost split, Tab 6 edge rules.</li>
+<li>Files &gt;50MB on mobile trigger a guard; 500MB+ use <code>node tools/gen-logs.js</code> + local analyze or the Colab path.</li>
+</ol>
+<p><img src="../assets/screenshots/08-sample-banner.png" alt="Sampling banner disclosing stride" style="max-width:100%"></p>
+<p><a class="btn-primary" href="../">Analyze your Logpush file now</a></p>
+</div></div></body>
+</html>

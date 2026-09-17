@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PerplexityBot: Block or Allow? 210:1 Says Allow (2026)</title>
+<meta name="description" content="PerplexityBot crawl-to-referral is ~210:1 — the best ROI in class. Allow at 120/min, throttle training bots instead. Free client-side check, no upload.">
+<link rel="canonical" href="https://log-bot-analyzer.pages.dev/bots/perplexitybot-block-or-allow.html">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card">
+<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<h1>PerplexityBot: block or allow?</h1>
+<p><strong>Allow — at 120/min.</strong> PerplexityBot is search-index with the best measured crawl-to-referral in the DB (~210:1 vs OAI 85:1, Claude ~5,143:1). Hard-blocking it trades pennies of bandwidth for lost AI-answer citations. Throttle <em>training</em> bots (GPTBot, CCBot, Bytespider) instead.</p>
+<h2>Copy-paste rule</h2>
+<pre><code># robots.txt
+User-agent: PerplexityBot
+Allow: /</code></pre>
+<pre><code>// Cloudflare: PerplexityBot 120/min/IP, 429 + Retry-After on excess
+// Perplexity-User (user-triggered): do NOT throttle</code></pre>
+<h2>How to confirm on your own log</h2>
+<p>Drop your log into the <a href="../">free analyzer</a> (100% client-side, .gz + multi-file supported) → open <strong>Tab 5 AI Scraper Matrix</strong> → PerplexityBot shows cyan (search-index) with its 120/min policy. Verify via vendor JSON (<code>https://docs.perplexity.ai/bot.json</code>, snapshotted in <code>data/bot-ips.json</code>).</p>
+<p><a class="btn-primary" href="../?sample=10k">Try the 1-click 10k demo</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1.02GB / 3.2M Lines in Browser: $2.61 Cost Teardown (Measured)</title>
+<meta name="description" content="Real 1.02GB NDJSON run: 320k sampled in 6.6s, 70% human, $2.61 total, $0.25 blockable, 19,272 threats, 18% trap waste. Every number measured, with screenshots.">
+<link rel="canonical" href="https://log-bot-analyzer.pages.dev/research/1gb-teardown.html">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card">
+<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<h1>I streamed 3.2M log lines in-browser: $2.61, $0.25 blockable</h1>
+<p>Not a toy demo. On 2026-09-11 the tool ran end-to-end in headless Chromium against a <strong>real 1.02 GB NDJSON log (3,200,000 lines, seed 7)</strong>. Every number below is measured.</p>
+<table>
+<tr><th>Measurement</th><th>Result</th></tr>
+<tr><td>File</td><td><code>oneGB.jsonl</code>, 1.02 GB, 3,200,000 lines</td></tr>
+<tr><td>Read + parsed + analyzed</td><td>320,000 of 3,200,000 (1-in-10) in <strong>6.6 s</strong>, 13.0 s wall</td></tr>
+<tr><td>Records / bandwidth (sample)</td><td>320,000 records, 10.92 GB, 223,878 unique IPs</td></tr>
+<tr><td>Traffic split</td><td><strong>70.0% human</strong>, 15 categories</td></tr>
+<tr><td>Cost (CloudFront defaults)</td><td><strong>$2.61 total, $0.25 blockable</strong> (training only)</td></tr>
+<tr><td>Response profile</td><td>avg 799 ms, P95 1,474 ms, P99 1,535 ms</td></tr>
+<tr><td>Threats / warnings</td><td><strong>19,272</strong> suspicious, 427 verification warnings</td></tr>
+<tr><td>Trap waste</td><td>18% trap bandwidth</td></tr>
+</table>
+<p><img src="../assets/screenshots/06-kpi-strip.png" alt="KPI strip from the 1GB run" style="max-width:100%"></p>
+<p><img src="../assets/screenshots/12-tab4-cost.png" alt="Cost analysis $2.61 total" style="max-width:100%"></p>
+<h2>What fired</h2>
+<p>9 Cloudflare rules fired on the sample. 75 signatures classified, 4-layer verification surfaced (not hid) 427 unusual checks. The on-screen banner states sampling honestly — figures describe the sample and scale ~10×.</p>
+<h2>Run your own log</h2>
+<p><a class="btn-primary" href="../">Run your own log — no upload, files never leave your machine</a> · <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">GitHub + EXPECTED.md</a></p>
+</div></div></body>
+</html>

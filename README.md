@@ -1,17 +1,21 @@
 # Log File Bot Traffic Cost Analyzer
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-bot-analyzer.pages.dev)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
+[![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-bot-analyzer.pages.dev)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.13-orange)](data/bot-ips.json)
-[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer-1.onrender.com)
+[![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-bot-analyzer.pages.dev)
 [![v1.3.0](https://img.shields.io/badge/Version-1.3.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
 Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log leaves your machine.
 
-**[Try Live](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer-1.onrender.com/?sample=10k) · [1GB proof test](#1-proven-on-a-real-102-gb--32m-line-log-file)**
+**[Try Live](https://log-bot-analyzer.pages.dev) · [1-click 10k demo](https://log-bot-analyzer.pages.dev/?sample=10k) · [1GB proof test](#1-proven-on-a-real-102-gb--32m-line-log-file)**
+
+No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
+
+> Fallback (legacy, sleeps): [Render mirror](https://log-file-bot-traffic-cost-analyzer-1.onrender.com) · Backup: GitHub Pages (enable in repo Settings → Pages, branch `main`, folder `/ (root)`).
 
 > [!NOTE]
 > `main` branch. v1.3.0 · Bot DB v2026.09.13 (75 signatures) · IP JSON 2026-09-13 (full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md).
@@ -178,11 +182,23 @@ Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fi
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 70+ asserts: bots, traps, costs, streaming samples, upload parsing, .gz, CIDR/IPv6
+npm test          # 69 asserts: bots, traps, costs, streaming samples, upload parsing, .gz, CIDR/IPv6
 npm run lint      # node --check across engine/worker/server/tools
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
 ```
+
+## 7b. Deploy (free, static — no server needed)
+
+The app is 100% client-side, so it hosts as pure static files. `server.js` + `Dockerfile` are local-dev only and ignored by the hosts.
+
+**Primary — Cloudflare Pages (never sleeps, free SSL/Brotli):** Dash → Workers & Pages → Create → **Pages** (not Worker) → Connect to Git → select this repo. Framework preset `None`, build command empty, build output + root directory empty, production branch `main`. Live at `https://log-bot-analyzer.pages.dev`. Security/cache headers come from [`_headers`](_headers).
+
+**Backup — GitHub Pages:** repo Settings → Pages → Deploy from branch → `main`, folder `/ (root)`. (Ignores `_headers`; fine for a backup.)
+
+**Bot DB stays fresh:** [`.github/workflows/fetch-ips.yml`](.github/workflows/fetch-ips.yml) runs `npm run fetch-ips` + `npm test` every Monday 2am UTC and auto-commits `data/bot-ips.json`. Pages redeploys on every push.
+
+**Docs on the site:** [BOTS.md](BOTS.md) (open 75-sig DB) · `bots/gptbot-vs-oai-searchbot.html` · `bots/perplexitybot-block-or-allow.html` · `bots/claudebot-no-ip-robots-only.html` · `guides/block-training-bots-cloudflare-without-losing-citations.html` · `guides/cloudflare-logpush-1gb-analysis-free.html` · `research/1gb-teardown.html` — all listed in [`sitemap.xml`](sitemap.xml).
 
 ---
 
@@ -199,13 +215,17 @@ npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs 
 
 ```
 index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets)
-server.js                   # static server: gzip, CSP/nosniff/DENY, traversal guard
+_headers                    # Cloudflare Pages headers: CSP/nosniff/DENY + cache rules (replaces server.js headers)
+server.js                   # LOCAL DEV ONLY: static server with gzip + headers (Pages ignores it)
 js/analyzer.js              # engine: 75-signature DB, 4-layer verify, 14-step analyze, 10 renderers
 js/worker.js                # off-main-thread analyze() for 20k+ rows
 data/bot-ips.json           # dated vendor IP JSON snapshot, full CIDRs + IPv6 (refresh: npm run fetch-ips)
+.github/workflows/fetch-ips.yml  # free weekly Bot DB refresh (Mon 2am UTC) + test + auto-commit
+bots/ guides/ research/     # static SEO/docs pages, listed in sitemap.xml
+BOTS.md                     # open bot DB: training vs search-index vs user-triggered
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 70+ asserts (bots/traps/costs/samples/upload/.gz/CIDR)
+tests/                      # 69 asserts (bots/traps/costs/samples/upload/.gz/CIDR)
 llms.txt                    # repo-root AI-use policy (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
@@ -217,7 +237,7 @@ See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). Measured r
 
 ## Resume bullet
 
-> Log-File Analyzer (JS, 10 tabs, 75 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export. Proven on 3.2M-line log. Live: log-file-bot-traffic-cost-analyzer-1.onrender.com
+> Log-File Analyzer (JS, 10 tabs, 75 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export. Proven on 3.2M-line log. Live: https://log-bot-analyzer.pages.dev
 
 ## Contributing / Security / License
 

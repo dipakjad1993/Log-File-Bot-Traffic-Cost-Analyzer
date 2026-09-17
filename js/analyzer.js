@@ -1539,7 +1539,7 @@ function processRecords(records,file,meta){
       // Web Worker path if available (js/worker.js), else main thread
       try{
         if(records.length>20000&&typeof Worker!=='undefined'){
-          const w=new Worker('js/worker.js?v=1.2.1');
+          const w=new Worker('./js/worker.js?v=1.3.0');
           w.onmessage=ev=>{const{type,pct,msg,result,error}=ev.data||{};if(type==='progress'){document.getElementById('progress-fill').style.width=pct+'%';document.getElementById('progress-label').textContent=msg;}else if(type==='done'){w.terminate();currentAnalysis=result;if(!currentAnalysis._urlSet||!currentAnalysis._urlSet.length){currentAnalysis._urlSet=[...new Set(records.map(r=>{try{return norm(r).uri.split('?')[0]}catch(e){return null}}).filter(Boolean))].slice(0,100000);}document.getElementById('progress-wrap').classList.add('hidden');document.getElementById('results').classList.remove('hidden');renderAll(currentAnalysis);if(meta.stride>1)showSampleBanner(meta.stride,records.length,meta.totalLines,meta.readMs||0);if(meta.lowConfidence&&meta.lowConfidence['w3c-guess'])showGuessWarning(meta.lowConfidence['w3c-guess']);wireExportButtons();}else if(type==='error'){w.terminate();run();}};
           w.onerror=()=>{try{w.terminate()}catch(e){}run();};
           w.postMessage({records,cfg:currentCfg});
@@ -1655,7 +1655,7 @@ function setLive(on){
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',function(){
   renderAbout();renderHowto();
   const prm=new URLSearchParams(location.search);
-  if(prm.get('sample')==='10k'){fetch('sample-data/sample-10k.jsonl').then(r=>r.text()).then(t=>{const recs=t.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);document.getElementById('upload-panel').classList.add('hidden');document.getElementById('progress-wrap').classList.remove('hidden');lastRecords=recs;processRecords(recs,{name:'sample-10k.jsonl',size:t.length});}).catch(()=>{});}
+  if(prm.get('sample')==='10k'){fetch('./sample-data/sample-10k.jsonl').then(r=>r.text()).then(t=>{const recs=t.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);document.getElementById('upload-panel').classList.add('hidden');document.getElementById('progress-wrap').classList.remove('hidden');lastRecords=recs;processRecords(recs,{name:'sample-10k.jsonl',size:t.length});}).catch(()=>{});}
   document.querySelectorAll('.sb-btn').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.section)));
   document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
   // pricing presets + save/reset wiring

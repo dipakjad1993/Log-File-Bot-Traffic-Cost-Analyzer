@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPTBot vs OAI-SearchBot: Cost Split, Different Rules (2026)</title>
+<meta name="description" content="GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citations in 1-2 weeks. Free client-side log check, no upload.">
+<link rel="canonical" href="https://log-bot-analyzer.pages.dev/bots/gptbot-vs-oai-searchbot.html">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card">
+<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<h1>GPTBot vs OAI-SearchBot: same vendor, opposite rules</h1>
+<p><strong>GPTBot</strong> trains models — zero live citation loss if you block it. <strong>OAI-SearchBot</strong> powers ChatGPT Search citations (crawl-to-referral ~85:1). Block it and citation share drops in 1–2 weeks. The analyzer splits them automatically across 75 signatures and prices each side separately.</p>
+<h2>The rule that gets it right</h2>
+<pre><code># robots.txt — training blocked, search allowed
+User-agent: GPTBot
+Disallow: /
+User-agent: OAI-SearchBot
+Allow: /</code></pre>
+<pre><code>// Cloudflare WAF custom rule: challenge training only
+(http.user_agent contains "GPTBot") // Block / Managed Challenge, 60/min
+# OAI-SearchBot: ALLOW at 120/min, 429 + Retry-After only — never hard block</code></pre>
+<h2>Proof from a real log</h2>
+<p>On a 1.02&nbsp;GB / 3.2M-line run the tool streamed a systematic 1-in-10 sample (320,000 lines in 6.6&nbsp;s), measured <strong>$2.61 total</strong> with <strong>$0.25 blockable (training only)</strong>. Search-index and user-fetch are never counted as blockable — asserted in tests. <a href="../?sample=10k">Run the 1-click 10k demo</a> and check the AI Scraper Matrix tab (red = training, cyan = search-index, blue = user-triggered).</p>
+<p><img src="../assets/screenshots/13-tab5-ai-matrix.png" alt="AI Matrix red training vs cyan search-index" style="max-width:100%"></p>
+<h2>Edge cases (2026)</h2>
+<ul>
+<li><strong>OAI-AdsBot:</strong> allow-listed — blocking breaks ChatGPT shopping revenue checks.</li>
+<li><strong>ChatGPT-User:</strong> user-triggered, ignores robots ~54% — do NOT throttle (300/min abuse ceiling only).</li>
+<li><strong>Verify:</strong> vendor IP JSON (<code>data/bot-ips.json</code>, dated 2026-09-13, full CIDRs + IPv6) = VERIFIED; prefix-only = heuristic low-confidence.</li>
+</ul>
+<p><a class="btn-primary" href="../">Analyze your log free — files never leave your machine</a></p>
+</div></div></body>
+</html>

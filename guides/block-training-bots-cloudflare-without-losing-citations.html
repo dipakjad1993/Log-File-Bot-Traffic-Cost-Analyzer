@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Block Training Bots in Cloudflare Without Losing AI Citations (2026)</title>
+<meta name="description" content="Block GPTBot, CCBot, Bytespider, DeepSeekBot and 70+ training bots at the edge while keeping OAI-SearchBot, PerplexityBot and user-fetch allowed. Copy-paste Cloudflare rules + robots split.">
+<link rel="canonical" href="https://log-bot-analyzer.pages.dev/guides/block-training-bots-cloudflare-without-losing-citations.html">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card">
+<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<h1>Block training bots without losing AI citations</h1>
+<p>The mistake: one rule blocks "AI bots" and kills ChatGPT/Perplexity citations for 2 weeks. The fix: split <strong>training (block)</strong> vs <strong>search-index (allow 120/min)</strong> vs <strong>user-triggered (never throttle)</strong> — exactly what the analyzer's 75-signature DB does.</p>
+<h2>1. robots.txt split (RFC 9309 most-specific-wins)</h2>
+<pre><code>User-agent: GPTBot
+Disallow: /
+User-agent: ClaudeBot
+Disallow: /
+User-agent: CCBot
+Disallow: /
+User-agent: Bytespider
+Disallow: /
+User-agent: Google-Extended
+Disallow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: *
+Allow: /</code></pre>
+<h2>2. Cloudflare WAF rules</h2>
+<pre><code># Rule 1 — training bots: Managed Challenge, 60/min (20 aggressive)
+(http.user_agent contains "GPTBot") or (http.user_agent contains "ClaudeBot")
+or (http.user_agent contains "CCBot") or (http.user_agent contains "Bytespider")
+# Rule 2 — search-index: ALLOW, rate-limit 120/min, 429 + Retry-After only
+# Rule 3 — user-triggered (ChatGPT-User, Perplexity-User): DO NOT throttle</code></pre>
+<h2>3. Measure before/after on your own log</h2>
+<p>Run your log through the <a href="../">free analyzer</a> → Tab 4 Cost shows blockable = training + suspicious only ($0.25 on the 1.02&nbsp;GB sample) → Tab 6 Edge Rules generates the exact rule set with copy buttons. No log leaves your machine — verified: no XHR/WebSocket, only the demo file loads on click.</p>
+<p><img src="../assets/screenshots/14-tab6-edge-rules.png" alt="Edge rules tab with copy buttons" style="max-width:100%"></p>
+<p><a class="btn-primary" href="../?sample=10k">Test on the 10k demo first</a></p>
+</div></div></body>
+</html>

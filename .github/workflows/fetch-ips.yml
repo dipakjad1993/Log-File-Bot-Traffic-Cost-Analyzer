@@ -1,0 +1,19 @@
+name: fetch-bot-ips-weekly
+on:
+  schedule:
+    - cron: '0 2 * * 1' # Monday 2am UTC
+  workflow_dispatch:
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run fetch-ips
+      - run: npm test
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: weekly bot-ips refresh"
+          file_pattern: data/bot-ips.json CHANGELOG.md

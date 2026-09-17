@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaudeBot Has No IP List: Robots-Only Verification (2026)</title>
+<meta name="description" content="Anthropic publishes no IP list — ClaudeBot and Claude-SearchBot verify via robots.txt compliance only. Never trust IP verdicts for Claude. Free client-side checker.">
+<link rel="canonical" href="https://log-bot-analyzer.pages.dev/bots/claudebot-no-ip-robots-only.html">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body><div class="main-wrap"><div class="card">
+<p><a href="../">← Back to free analyzer (no upload)</a></p>
+<h1>ClaudeBot: no IP list — robots.txt only</h1>
+<p>Anthropic publishes <strong>no IP allowlist</strong>. Any tool that shows "VERIFIED ClaudeBot via IP" is guessing. This analyzer labels Claude verification as <em>robots.txt only</em> by design and never invents an IP list.</p>
+<h2>What to do instead</h2>
+<pre><code># robots.txt — block training, allow search
+User-agent: ClaudeBot
+Disallow: /
+User-agent: Claude-SearchBot
+Allow: /</code></pre>
+<ul>
+<li><strong>ClaudeBot</strong> (training): throttle/block freely, 60/min.</li>
+<li><strong>Claude-SearchBot</strong> (search-index): allow at 120/min — worst crawl-to-referral in class (~5,143:1) but still citation-bearing.</li>
+<li><strong>Claude-User</strong> (user-triggered): never throttle.</li>
+<li>Confirm spoofing server-side with reverse DNS before blocking — the tool exports an rDNS checklist.</li>
+</ul>
+<p><a class="btn-primary" href="../">Check your log free — no upload</a></p>
+</div></div></body>
+</html>

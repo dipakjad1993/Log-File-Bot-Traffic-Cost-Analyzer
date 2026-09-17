@@ -38,3 +38,5 @@ Allow: /
 # Junior pitfall: deleting the specific groups and keeping only '*' opens training crawlers.
 User-agent: *
 Allow: /
+
+Sitemap: https://log-bot-analyzer.pages.dev/sitemap.xml
