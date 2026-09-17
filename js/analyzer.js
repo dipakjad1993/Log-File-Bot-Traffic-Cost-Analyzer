@@ -891,17 +891,37 @@ function security(records){
  * 429-only (never block); user-fetch >=1 observe-only. */
 function genEdgeRules(botData,sec,durationMs){
   const r={cloudflare:[],fastly:[],aws:[],robots:'',cfAICrawl:'',decision:''};
-  const escQ=s=>String(s||'').replace(/"/g,'\\"').substring(0,60);
+  // SAFE token extraction (P0 fix): never slice a generic Mozilla/Chrome UA to
+  // 40 chars for a BLOCK — that nukes real users. Use the canonical bot-name
+  // token (GPTBot, Bytespider…) which can never match real Chrome traffic.
+  // Only downgrade to CHALLENGE when even the NAME is browser-generic.
+  const GENERIC_TOKENS=/^(mozilla|applewebkit|chrome|safari|linux|windows|android|like|gecko|version|cpu|iphone|macintosh|compatible|khtml|mobile|tablet)$/i;
+  const safeToken=(name,ua)=>{
+    const nm=String(name||'').split(' ')[0].split('/')[0].split('(')[0].trim();
+    if(nm.length>=3&&!GENERIC_TOKENS.test(nm))return nm.substring(0,80);
+    const u=String(ua||'');
+    const cands=u.split(/[^A-Za-z0-9_.\/-]+/).filter(t=>t.length>=6&&/[A-Za-z]/.test(t)&&!GENERIC_TOKENS.test(t));
+    const botLike=cands.find(t=>/(bot|crawl|spider|scrape|fetch|gpt|claude|anthropic|bytespider|bytedance|cohere|perplexity|firecrawl|timpibot|sidetiq|deepseek|qwen)/i.test(t));
+    if(botLike)return botLike.substring(0,80);
+    return null; // generic browser UA — caller must NOT block on this
+  };
+  const escQ=s=>String(s||'').replace(/"/g,'\\"').substring(0,120);
   const winMin=(durationMs&&durationMs>=60000)?durationMs/60000:null;
   const ratePerMinIP=bd=>(winMin&&bd.uniqueIPCount)?(bd.count/bd.uniqueIPCount/winMin):null;
   const rateTxt=bd=>{const v=ratePerMinIP(bd);return v==null?fmtN(bd.count)+' req (window unknown — confirm rate before enforcing)':v.toFixed(3)+' req/min/IP over '+winMin.toFixed(1)+' min window ('+fmtN(bd.count)+' total)';};
   const trainingHit=bd=>bd.count>=2||(ratePerMinIP(bd)!=null&&ratePerMinIP(bd)>=0.5);
   for(const[name,bd] of Object.entries(botData)){
     if(bd.tier==='ai_training'&&trainingHit(bd)){
-      const u=bd.topUAList?.[0]?.[0]||name;
-      r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${rateTxt(bd)}, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${u.substring(0,40)}") { action: "block"; }`});
-      r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${u.substring(0,40)}") { error 403 "Blocked"; }`});
-      r.aws.push({name:`Block ${name}`,act:'BLOCK',rule:`{ "Statement": { "ByteMatchStatement": { "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } }, "PositionalConstraint": "CONTAINS", "SearchString": "${u.substring(0,40)}" } }, "Action": { "Block": {} } }`});
+      const uFull=bd.topUAList?.[0]?.[0]||name;
+      const tok=safeToken(name,uFull);
+      if(!tok){
+        // Generic browser-shaped UA with no bot telltale: NEVER block — challenge + verify.
+        r.cloudflare.push({name:`Challenge ${name} (unverified UA)`,act:'CHALLENGE',desc:`${rateTxt(bd)}, ${fmtB(bd.totalBytes)} consumed. UA looks like generic browser — verify via rDNS + vendor IP JSON before any block.`,rule:`(http.user_agent contains "${escQ(name.split(' ')[0])}") -> Managed Challenge; 60 req/min. Full UA for audit: ${escQ(uFull)}`});
+      }else{
+        r.cloudflare.push({name:`Block ${name}`,act:'BLOCK',desc:`${rateTxt(bd)}, ${fmtB(bd.totalBytes)} consumed, zero conversion value`,rule:`(http.user_agent contains "${tok}") { action: "block"; }`});
+        r.fastly.push({name:`Block ${name}`,act:'BLOCK',rule:`if (req.http.user-agent ~ "${tok}") { error 403 "Blocked"; }`});
+        r.aws.push({name:`Block ${name}`,act:'BLOCK',rule:`{ "Statement": { "ByteMatchStatement": { "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } }, "PositionalConstraint": "CONTAINS", "SearchString": "${tok}" } }, "Action": { "Block": {} } }`});
+      }
     }
     if(normalizeTier(bd.tier)==='ai_search_index'&&bd.count>=2){
       const u2=bd.topUAList?.[0]?.[0]||name;
@@ -1704,13 +1724,26 @@ function exportLogsBQCSV(A){downloadFile('logs.csv',exportLogsCSV(A),'text/csv')
 function exportPromptListFile(A){downloadFile('prompt-test-list.txt',genPromptList(A),'text/plain');}
 function exportLlmsFile(A){downloadFile('llms.txt',genLlmsTxt(A),'text/plain');}
 function exportCfJsonFile(A){downloadFile('cf-ai-crawl-control.json',genCfAICrawlJSON(A.botData),'application/json');}
-function exportCFOPDF(A){
-  // One-click CFO 1-pager: print-friendly window (client-side, no deps) — user prints to PDF
+function exportCFOPDF(A, opts){
+  // Enterprise real-PDF download (zero-dep, client-side, no window.print()).
+  // Uses js/cfo-pdf.js when loaded; falls back to the embedded writer otherwise.
+  try{
+    const engine=(typeof window!=='undefined'&&window.CFOPDF)||(typeof globalThis!=='undefined'&&globalThis.CFOPDF)||null;
+    const domain=(()=>{try{
+      const u=(A&&A._urlSet&&A._urlSet[0])||''; return (opts&&opts.domain)||'';
+    }catch(e){return (opts&&opts.domain)||'';}})();
+    const fileName=(()=>{try{
+      const ib=document.getElementById('ib-file'); const t=ib?ib.textContent:'';
+      return (t&&t!=='--')?t:'';
+    }catch(e){return '';}})();
+    if(engine&&engine.downloadCFOPDF){ return engine.downloadCFOPDF(A,{domain:domain||undefined,file:fileName||undefined}); }
+  }catch(e){}
+  // Fallback: legacy print view only if engine missing (should not happen — index.html loads cfo-pdf.js).
   const c=A.costs,s=A.summary;
   const traps=Object.entries(A.traps).sort((a,b)=>b[1].count-a[1].count).slice(0,3).map(([n,t])=>`<li>${n}: ${t.count.toLocaleString()} req, ${(t.bytes/1048576).toFixed(1)} MB</li>`).join('');
-  const rules=A.edgeRules.cloudflare.slice(0,3).map(r=>`<li><b>${r.name}</b> — ${r.act}: <code>${r.rule.substring(0,120)}</code></li>`).join('');
+  const rules=A.edgeRules.cloudflare.slice(0,3).map(r=>`<li><b>${r.name}</b> — ${r.act}: <code>${String(r.rule||'').substring(0,200)}</code></li>`).join('');
   const w=window.open('','_blank','width=800,height=900');
-  w.document.write(`<html><head><title>CFO 1-pager — Bot Traffic Cost</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:13px}code{background:#f4f4f4;padding:2px 4px;font-size:12px}</style></head><body><h1>Bot Traffic Cost — CFO 1-pager</h1><p>Total: <b>$${c.total.all.toFixed(2)}</b> | Blockable: <b>$${c.savings.botBlocking.toFixed(2)}</b> | Records: ${s.totalRecords.toLocaleString()} | Period: ${(s.dateRange.start||'').toString().slice(0,10)} → ${(s.dateRange.end||'').toString().slice(0,10)}</p><h3>Top 3 traps</h3><ul>${traps||'<li>none</li>'}</ul><h3>Top 3 edge rules</h3><ul>${rules||'<li>none</li>'}</ul><h3>robots.txt</h3><pre>${(A.edgeRules.robots||'').substring(0,1200)}</pre><p><i>100% client-side. Method: measured bytes × configured CDN pricing. Print → Save as PDF.</i></p><script>window.print()<\/script></body></html>`);
+  w.document.write(`<html><head><title>CFO 1-pager — Bot Traffic Cost</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:13px}code{background:#f4f4f4;padding:2px 4px;font-size:12px}</style></head><body><h1>Bot Traffic Cost — CFO 1-pager</h1><p>Total: <b>$${c.total.all.toFixed(2)}</b> | Blockable: <b>$${c.savings.botBlocking.toFixed(2)}</b> | Records: ${s.totalRecords.toLocaleString()} | Period: ${(s.dateRange.start||'').toString().slice(0,10)} → ${(s.dateRange.end||'').toString().slice(0,10)}</p><h3>Top 3 traps</h3><ul>${traps||'<li>none</li>'}</ul><h3>Top 3 edge rules</h3><ul>${rules||'<li>none</li>'}</ul><p><i>Real PDF engine failed to load — this legacy print view is a fallback only.</i></p></body></html>`);
   w.document.close();
 }
 /* AWS ALB space-delimited access logs:
@@ -2589,7 +2622,7 @@ function recordHistory(records,file){
 function wireExportButtons(){
   const add=(id,label,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=label||id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};
   add('export-csv-btn','Download CSV',()=>currentAnalysis&&exportBotCSV(currentAnalysis));
-  add('export-cfo-btn','CFO 1-pager',()=>currentAnalysis&&exportCFOPDF(currentAnalysis));
+  add('export-cfo-btn','CFO PDF ↓',()=>currentAnalysis&&exportCFOPDF(currentAnalysis));
   add('export-logs-btn','Logs CSV (BQ)',()=>currentAnalysis&&exportLogsBQCSV(currentAnalysis));
   add('export-prompts-btn','Prompt list',()=>currentAnalysis&&exportPromptListFile(currentAnalysis));
   add('export-llms-btn','llms.txt',()=>currentAnalysis&&exportLlmsFile(currentAnalysis));
@@ -2597,7 +2630,7 @@ function wireExportButtons(){
   add('export-slack-btn','Slack digest',()=>currentAnalysis&&exportSlackDigest(currentAnalysis));
   add('export-summary-btn','summary.json',()=>currentAnalysis&&exportSummaryJSON(currentAnalysis));
   const ib=document.getElementById('info-bar');
-  if(ib&&!document.getElementById('export-csv-btn')){const b1=document.createElement('button');b1.id='export-csv-btn';b1.className='btn-sm';b1.textContent='Download CSV';b1.onclick=()=>currentAnalysis&&exportBotCSV(currentAnalysis);ib.appendChild(b1);const b2=document.createElement('button');b2.id='export-cfo-btn';b2.className='btn-sm';b2.textContent='CFO 1-pager';b2.onclick=()=>currentAnalysis&&exportCFOPDF(currentAnalysis);ib.appendChild(b2);}
+  if(ib&&!document.getElementById('export-csv-btn')){const b1=document.createElement('button');b1.id='export-csv-btn';b1.className='btn-sm';b1.textContent='Download CSV';b1.onclick=()=>currentAnalysis&&exportBotCSV(currentAnalysis);ib.appendChild(b1);const b2=document.createElement('button');b2.id='export-cfo-btn';b2.className='btn-sm';b2.textContent='CFO PDF ↓';b2.onclick=()=>currentAnalysis&&exportCFOPDF(currentAnalysis);ib.appendChild(b2);}
 }
 let liveTimer=null,lastRecords=null,lastLiveSig='';
 /* Pricing badge: one line in the info bar naming the active preset + rates, so a

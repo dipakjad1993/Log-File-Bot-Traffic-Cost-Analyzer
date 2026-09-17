@@ -16,9 +16,17 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
 
 > [!NOTE]
-> `main` branch. v2.2.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (14 sources incl. BotBase taxonomy, full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
+> `main` branch. v2.2.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (14 sources incl. BotBase taxonomy, full CIDRs + IPv6). CFO export is now a **real PDF download** (`js/cfo-pdf.js`, zero-dependency, no print dialog). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
 
 ![Upload screen](assets/screenshots/01-hero-upload.png)
+
+---
+
+## What's new: enterprise CFO PDF (real download, no Ctrl+P) + safe edge-rule tokens
+
+- **Real PDF, not `window.print()`:** the `CFO PDF ↓` button downloads `cfo-bot-traffic-cost-<start>-to-<end>.pdf` generated 100% client-side by new zero-dependency engine `js/cfo-pdf.js` (PDF 1.4, Helvetica only — no CDN, no fonts, no network, offline/privacy audit stays green). Contents: brand header + EXACT/SAMPLED badge, executive recommendation, 4 KPI cards (period total, blockable + %, monthly + annual run-rate with 95% CI), cost-by-tier table, top-8 bots + bar chart, traps priced in $, finance-safe actions (Bot/Action/Saving/Risk — no raw regex dump), Do-NOT-Block guardrails (search-index + user-fetch + OAI-AdsBot), verification + methodology + sign-off line, page footers. Covered by `tests/cfo-pdf.test.js` (real `%PDF-1.4` header, annualization, guardrails, no print hack).
+- **P0 edge-rule safety fix:** `genEdgeRules` no longer slices observed UAs to 40 chars for BLOCK rules (that emitted `contains "Mozilla/5.0 (Linux; Android 10) Chrome/1"` for Bytespider — would block real Android Chrome users — and truncated ClaudeBot mid-URL). It now emits the canonical bot-name token (`Bytespider`, `GPTBot`, …) which can never match real browsers, and downgrades browser-generic UAs to CHALLENGE + verify. All prior BLOCK-count contracts (`count>=2` fires, AdsBot never blocked) still hold.
+- **115 asserts** (`npm test`): 111 existing + 4 new (PDF bytes/model + 2× rule-safety).
 
 ---
 
@@ -186,7 +194,7 @@ Traversal, `.git/HEAD`, `.aws/credentials`, actuator + Spring/env probes, `.well
 ![Security](assets/screenshots/17-tab9-security.png)
 
 ### Module 10 — CFO / FinOps
-Measured totals, blockable waste ($0.25 on the sample), projections, one-click CSV + print-to-PDF 1-pager.
+Measured totals, blockable waste ($0.25 on the sample), projections, one-click CSV + real PDF download (`CFO PDF ↓` → `cfo-bot-traffic-cost-<start>-to-<end>.pdf`, zero-dependency client-side engine in `js/cfo-pdf.js`, no print dialog).
 
 ![CFO dashboard](assets/screenshots/18-tab10-cfo.png)
 ![CFO close-up](assets/screenshots/29-cfo-viewport.png)
@@ -226,8 +234,8 @@ Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fi
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 111 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness+fallback, spoof, js-shell, anomaly/diff/edge/BQ + 10 v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, MCP, guards) + 6 P0-verdict (edge ≥2, AdsBot guard, anomaly, 14d red)
-npm run lint      # node --check across engine/worker/dev-server/tools (incl. mcp-server)
+npm test          # 115 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness+fallback, spoof, js-shell, anomaly/diff/edge/BQ + 10 v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, MCP, guards) + 6 P0-verdict (edge ≥2, AdsBot guard, anomaly, 14d red) + 4 CFO-PDF (real PDF bytes/model, rule-safety)
+npm run lint      # node --check across engine/worker/cfo-pdf/dev-server/tools (incl. mcp-server)
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --days 30 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
 ```
@@ -263,7 +271,8 @@ Pages-only. No Render mirror — speed is trust (a sleeping mirror costs convers
 index.html                  # dashboard + 10 thinned tabs + join UI (?v= cache-busted assets)
 _headers                    # Cloudflare Pages headers: CSP/nosniff/DENY + cache rules (replaces dev-server.js headers)
 dev-server.js               # LOCAL DEV ONLY (NEVER deploy to Pages): static server with gzip + headers (Pages ignores it)
-js/analyzer.js              # engine: 127-signature DB, 4-layer verify, 14-step analyze, 10 renderers + Render Gap/spoof/anomaly/diff/edge/BQ/triple-join + v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, guards)
+js/analyzer.js              # engine: 127-signature DB, 4-layer verify, 14-step analyze, 10 renderers + Render Gap/spoof/anomaly/diff/edge/BQ/triple-join + v2 (Sept defaults, PPC v2, batch verify, bundle, gap, dynamics, streaming, guards); safe edge-rule tokens, real-PDF export hook
+js/cfo-pdf.js               # zero-dep enterprise CFO PDF engine (PDF 1.4, no CDN/fonts/network): buildCFOData + generateCFOPDFBytes + downloadCFOPDF
 js/worker.js                # off-main-thread analyze() for 20k+ rows
 tools/cli.js                # CLI exact mode: 500MB-50GB streaming exact + --logs-csv/--bq-sql/--verify-rdns/--verify-batch/--pay-per-crawl/--sept-defaults/--bundle-dir/--citation-gap/--bq-streaming
 tools/mcp-server.js         # MCP stdio server: analyzeLogs/getBotPolicy/genEdgeRule (Claude/ChatGPT agents)
@@ -275,7 +284,7 @@ BOTS.md                     # open bot DB: training vs search-index vs user-trig
 METHOD.md                   # sampling/cost/verify/limits — read before quoting numbers
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 111 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness+fallback/spoof/js-shell/anomaly/v2/p0verdict)
+tests/                      # 115 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness+fallback/spoof/js-shell/anomaly/v2/p0verdict/cfo-pdf)
 llms.txt / llms-full.txt    # repo-root AI-use policy + full 127-sig grounding dump (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
