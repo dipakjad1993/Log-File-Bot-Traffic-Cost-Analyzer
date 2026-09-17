@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Free Log File Analyzer: GPTBot vs SearchBot Cost + Edge Rules (Private, Client-Side)</title>
-<meta name="description" content="Drop 1M-line server logs → see GPTBot vs OAI-SearchBot cost split → copy Cloudflare/Fastly/AWS edge rules. Free, 100% client-side, no upload. Training vs search-index vs user-triggered AI bot split (2026).">
+<title>Free Private Log File Analyzer 2026: GPTBot vs SearchBot Cost + Edge Rules (Client-Side)</title>
+<meta name="description" content="Drop 1M-line server logs → see GPTBot vs OAI-SearchBot cost split → copy Cloudflare/Fastly/AWS edge rules. Free, 100% private client-side, no upload. Training vs search-index vs user-triggered AI bot split (2026).">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/">
 <meta property="og:title" content="Log File Bot Traffic Cost Analyzer — Free, Private, Client-Side">
 <meta property="og:description" content="GPTBot vs OAI-SearchBot cost split + copy-paste Cloudflare edge rules. No log leaves your machine.">
@@ -25,21 +25,24 @@
 {"@context":"https://schema.org","@type":"HowTo","name":"How to find which AI bots cost you money","step":[{"@type":"HowToStep","name":"Drop your log file","text":"Drag access.log, JSONL, or .gz onto the analyzer. Files never leave your machine."},{"@type":"HowToStep","name":"Read the cost split","text":"Module 4 shows measured egress cost; blockable equals training plus suspicious only."},{"@type":"HowToStep","name":"Copy the edge rule","text":"Module 6 generates Cloudflare, Fastly, and AWS WAF rules plus a training-vs-search robots.txt."}]}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does any log leave my browser?","acceptedAnswer":{"@type":"Answer","text":"No. Parsing, analysis and rendering run 100% client-side (Web Worker for 20k+ rows). The only network request is loading the 10k demo file when you click it."}},{"@type":"Question","name":"Should I block OAI-SearchBot like GPTBot?","acceptedAnswer":{"@type":"Answer","text":"No. GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citation share in 1-2 weeks. ChatGPT-User is user-triggered and must never be throttled."}},{"@type":"Question","name":"Can I trust VERIFIED badges?","acceptedAnswer":{"@type":"Answer","text":"Only vendor-IP-JSON matches (dated snapshot in data/bot-ips.json, IPv6 + CIDR aware). Prefix matches are labeled heuristic low-confidence. Anthropic publishes no IP list — robots.txt only. Confirm with server-side reverse DNS before blocking."}},{"@type":"Question","name":"What about 1GB uploads?","acceptedAnswer":{"@type":"Answer","text":"Files stream in 8MB slices with multi-file and .gz support. Above ~300k lines a labeled systematic sample is analyzed and verification counts are scaled and labeled. For exact 500MB+ totals use the CLI."}}]}
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does any log leave my browser?","acceptedAnswer":{"@type":"Answer","text":"No. Parsing, analysis and rendering run 100% client-side (Web Worker for 20k+ rows). The only network request is loading the 10k demo file when you click it. SOC2-irrelevant by design."}},{"@type":"Question","name":"Should I block OAI-SearchBot like GPTBot?","acceptedAnswer":{"@type":"Answer","text":"No. GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citation share in 1-2 weeks. ChatGPT-User is user-triggered and must never be throttled."}},{"@type":"Question","name":"Can I trust VERIFIED badges?","acceptedAnswer":{"@type":"Answer","text":"Only vendor-IP-JSON matches (dated snapshot in data/bot-ips.json, IPv6 + CIDR aware, 11 endpoints). Prefix matches are labeled heuristic low-confidence. Anthropic crawling policy at claude.com/crawling/bots.json is robots-first. Confirm with server-side reverse DNS before blocking."}},{"@type":"Question","name":"What about 1GB uploads?","acceptedAnswer":{"@type":"Answer","text":"Files stream in 8MB slices with multi-file and .gz support. Above ~300k lines a labeled systematic sample is analyzed and verification counts are scaled and labeled. For exact 500MB+ totals use node tools/cli.js --exact."}}]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","name":"Free Private Log File Analyzer 2026","url":"https://log-file-bot-traffic-cost-analyzer.pages.dev/","isPartOf":{"@type":"WebSite","name":"Log File Bot Traffic Cost Analyzer","url":"https://log-file-bot-traffic-cost-analyzer.pages.dev/"}}
 </script>
 </head>
 <body>
 
 <nav class="sidebar" id="sidebar" aria-label="Main navigation">
   <div class="sidebar-brand">LOG &amp; BOT TRAFFIC ANALYZER</div>
-  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis <span class="badge b-green">v1.3.0</span></div>
+  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis <span class="badge b-green">v1.4.0</span> <span class="badge b-cyan" id="db-fresh-pill" title="Bot DB freshness: green <7d, amber <21d, red stale">DB v2026.09.17 · 127 sigs · fresh</span></div>
   <div class="sidebar-nav">
     <button class="sb-btn active" data-section="dashboard" aria-label="Open dashboard">Dashboard</button>
     <button class="sb-btn" data-section="about" aria-label="About this tool">About</button>
     <button class="sb-btn" data-section="howto" aria-label="How to use">How To Use</button>
   </div>
   <button class="btn-sm" id="dark-toggle" aria-label="Toggle dark mode">Dark mode</button>
-  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.13 · IP JSON 2026-09-13</div>
+  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.17 · IP JSON 2026-09-17 · <span style="color:var(--green)">● fresh</span><br>SOC2-irrelevant by design — no data transmitted (see SECURITY.md). <a href="./CHANGELOG.md">Changelog</a> · <a href="./METHOD.md">Method</a></div>
 </nav>
 
 <div class="main-wrap">
@@ -95,23 +98,26 @@
     <div class="upload-header">
       <div class="upload-brand-icon"></div>
       <h1>Log File &amp; Bot Traffic Analyzer</h1>
-      <p class="tool-tagline">Drop 1M-line logs → see <strong>GPTBot vs OAI-SearchBot cost split</strong> → copy Cloudflare rule. Free, private, $0 vs £99/yr Frog / €383/mo JetOctopus. 100% client-side — no log leaves your machine.</p>
+      <p class="tool-tagline">Drop 1M-line logs → see <strong>GPTBot vs OAI-SearchBot cost split</strong> → copy Cloudflare rule. Free, private, $0 vs £99/yr Frog / €383/mo JetOctopus. 100% client-side — 🔒 no log leaves your machine (<a href="./METHOD.md">audit</a>).</p>
       <div class="proof-strip" aria-label="Measured proof, not promises">
         <div class="proof-item"><strong>3.2M lines</strong><span>1.02GB streamed</span></div>
         <div class="proof-item"><strong>6.6s read</strong><span>320k sampled 1-in-10</span></div>
         <div class="proof-item"><strong>$2.61 total</strong><span>$0.25 blockable</span></div>
-        <div class="proof-item"><strong>75 sigs</strong><span>training vs search vs user</span></div>
+        <div class="proof-item"><strong>127 sigs</strong><span>training vs search vs user</span></div>
+        <div class="proof-item"><strong>UNVERIFIED GPTBot: top KPI</strong><span>spoof hunt built-in</span></div>
+        <div class="proof-item"><strong>JS-shell table</strong><span>GEO render gap</span></div>
       </div>
       <p><img src="./assets/screenshots/06-kpi-strip.png" alt="KPI strip from the measured 1.02GB run" loading="lazy" style="max-width:100%;border:1px solid var(--border);border-radius:10px;margin-top:12px"></p>
       <p><a class="btn-primary" href="?sample=10k" id="try-sample-link">Try 10k sample in 1 click</a> <a class="btn-outline" href="./research/1gb-teardown.html">See the 1GB proof</a></p>
     </div>
-    <div class="upload-drop" id="upload-drop" role="button" tabindex="0" aria-label="Drop log file here or browse">
-      <div class="drop-icon"></div>
-      <div class="drop-title">Drop your log file here</div>
+    <div class="upload-drop sticky-drop" id="upload-drop" role="button" tabindex="0" aria-label="Drop log file here or browse. Files stay on this device.">
+      <div class="drop-icon" aria-hidden="true">📁</div>
+      <div class="drop-title">Drop your log file here — stays on this device</div>
       <div class="drop-sub">or</div>
       <button class="btn-primary" id="browse-btn">Browse Files</button>
       <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log,.txt,.csv,.gz" multiple hidden aria-label="Log file input (multiple files + .gz supported)">
-      <div class="drop-formats">Accepted: JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended, AWS ALB, Cloudflare Logpush, <strong>.gz</strong>. Multi-select for rotations (access.log + access.log.1 + access.log.2.gz). Files &gt;50&nbsp;MB warn; 500&nbsp;MB+ use CLI.</div>
+      <div class="drop-formats">📄 .log &nbsp; 📄 .jsonl &nbsp; 📄 .csv &nbsp; 🗜️ .gz &nbsp; — JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush. Multi-select rotations. <strong>Mobile: 50MB guard pre-drop.</strong> 500MB+ → <code>node tools/cli.js --exact</code> (exact, no sampling).</div>
+      <div class="drop-formats">🔒 No upload — <a href="./METHOD.md">verified: no XHR/WebSocket/sendBeacon</a>. Example: <button class="btn-sm" id="example-chip">access.log.gz sample</button></div>
     </div>
     <div class="upload-extras">
       <span class="divider-text">no log file?</span>
@@ -134,7 +140,7 @@
         <div>
           <p class="eyebrow">Knowledge base · measured numbers, copy-paste rules</p>
           <h2>Guides &amp; research</h2>
-          <p class="guides-sub">Every page below is generated from real log runs and the live 75-signature DB — no thought-leadership fluff.</p>
+          <p class="guides-sub">Every page below is generated from real log runs and the live 127-signature DB — no thought-leadership fluff. Next: <a href="./guides/block-training-bots-cloudflare-without-losing-citations.html">block training in Cloudflare →</a> then <a href="./research/1gb-teardown.html">1GB proof →</a> then CLI waitlist.</p>
         </div>
       </div>
       <div class="guide-grid">
@@ -302,10 +308,10 @@
 </div>
 
 <footer class="site-footer" style="text-align:center;padding:24px 16px;opacity:.9">
-  <p>No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.</p>
-  <p><strong>Free</strong> — every analysis under 50MB, client-side, forever. <strong>Pro — $49 one-time</strong> (500MB+ CLI + weekly blocklist feed): checkout opens with v1.4 — <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">star the repo</a> to get notified. <a href="./bots/">Open bot DB</a> · <a href="./research/1gb-teardown.html">1GB proof</a> · <a href="./sitemap.xml">Sitemap</a></p>
+  <p>🔒 No upload — files never leave your machine. Verified: no XHR/WebSocket/sendBeacon in audit. SOC2-irrelevant by design — no data transmitted. Accessibility: WCAG 2.2 AA target, prefers-reduced-motion respected, keyboard 1-0 tabs.</p>
+  <p><strong>Free</strong> — every analysis under 50MB, client-side, forever. <strong>Pro — $49 one-time</strong> (500MB+ CLI exact + weekly blocklist feed, shipped v1.4): <a href="https://gumroad.com/l/log-analyzer-pro">Pre-order on Gumroad</a> · <code>node tools/cli.js --exact --out parquet</code> · <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">star the repo</a>. <a href="./bots/">Open bot DB (127 sigs)</a> · <a href="./research/1gb-teardown.html">1GB proof</a> · <a href="./sitemap.xml">Sitemap</a> · <a href="./CHANGELOG.md">Changelog</a> · <a href="./METHOD.md">Method</a> · <a href="./llms-full.txt">llms-full.txt</a></p>
 </footer>
 
-<script src="./js/analyzer.js?v=1.3.0"></script>
+<script src="./js/analyzer.js?v=1.4.0"></script>
 </body>
 </html>

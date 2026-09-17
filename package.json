@@ -1,15 +1,18 @@
 {
   "name": "log-file-bot-traffic-cost-analyzer",
-  "version": "1.3.0",
-  "description": "Free, private, client-side log file analyzer: GPTBot vs SearchBot cost split + Cloudflare/Fastly/AWS edge rules. Training vs search-index vs user-triggered AI split (2026). 75 signatures, 16 traps, IPv6+CIDR verify, .gz/multi-file, llms.txt, GSC join.",
+  "version": "1.4.0",
+  "description": "Free, private, client-side log file analyzer: GPTBot vs SearchBot cost split + Cloudflare/Fastly/AWS edge rules. Training vs search-index vs user-triggered AI split (2026). 127 signatures, 16 traps, IPv6+CIDR verify, .gz/multi-file, llms.txt, GSC join, CLI exact mode.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/bots.test.js tests/traps.test.js tests/costs.test.js tests/sample.test.js tests/upload.test.js tests/enterprise.test.js",
-    "lint": "node --check js/analyzer.js && node --check js/worker.js && node --check server.js && node --check tools/gen-logs.js && node --check tools/fetch-bot-ips.js && node --check tools/gen-bots-page.js",
+    "test": "node --test tests/bots.test.js tests/traps.test.js tests/costs.test.js tests/sample.test.js tests/upload.test.js tests/enterprise.test.js tests/freshness.test.js tests/spoof.test.js tests/jsshell.test.js tests/anomaly.test.js",
+    "lint": "node --check js/analyzer.js && node --check js/worker.js && node --check server.js && node --check tools/gen-logs.js && node --check tools/fetch-bot-ips.js && node --check tools/gen-bots-page.js && node --check tools/cli.js",
     "gen-logs": "node tools/gen-logs.js",
     "gen-bots-page": "node tools/gen-bots-page.js",
-    "fetch-ips": "node tools/fetch-bot-ips.js"
+    "fetch-ips": "node tools/fetch-bot-ips.js",
+    "cli": "node tools/cli.js --help",
+    "dev": "node server.js",
+    "preview:pages": "npx wrangler pages dev . --port 8788"
   },
   "engines": {
     "node": ">=18"

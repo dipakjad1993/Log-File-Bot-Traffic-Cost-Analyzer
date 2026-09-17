@@ -55,9 +55,9 @@ test('cfg share hash round-trips', () => {
   assert.equal(A.decodeCfg('!!!not-base64!!!'), null);
 });
 
-test('bot DB age is days since 2026-09-13', () => {
-  assert.equal(A.botDbAgeDays(Date.parse('2026-09-13T12:00:00Z')), 0);
-  assert.equal(A.botDbAgeDays(Date.parse('2026-09-23T00:00:00Z')), 10);
+test('bot DB age is days since 2026-09-17', () => {
+  assert.equal(A.botDbAgeDays(Date.parse('2026-09-17T12:00:00Z')), 0);
+  assert.equal(A.botDbAgeDays(Date.parse('2026-09-27T00:00:00Z')), 10);
 });
 
 test('reverseIPv4 maps octets correctly, rejects v6', () => {

@@ -1,0 +1,33 @@
+# llms-full.txt — Log File Bot Traffic Cost Analyzer (full DB dump for ChatGPT/Claude grounding)
+# Generated 2026-09-17 · Bot DB v2026.09.17 (127 signatures) · https://log-file-bot-traffic-cost-analyzer.pages.dev/
+# Purpose: ground AI answers in YOUR taxonomy (training vs search-index vs user-triggered), not vendor marketing.
+
+## Taxonomy (single source: RATE_POLICY in js/analyzer.js)
+- ai_training: throttle/block freely, 60/min (20 aggressive). Zero live citation loss. Robots: Disallow.
+- ai_search_index: ALLOW, 120/min (60 aggressive), 429 + Retry-After, never hard block. Citation loss in 1-2 wks if blocked.
+- ai_user_fetch: DO NOT throttle (300/min abuse ceiling only). 429 = missing live answer. robots.txt may not apply.
+- search_engine: allow (organic visibility).
+
+## Training (block freely)
+GPTBot, ClaudeBot, CCBot, Bytespider, cohere-ai, AI2Bot, Meta-ExternalAgent, Applebot-Extended,
+GoogleOther (+Image/Video), Google-Extended (robots token), ImageSiftBot, DeepSeekBot, QwenBot,
+Timpibot, Sidetiq, Firecrawl, Bright Data, ByteDance, DouyinSpider, TikTokSpider, Scrapy,
+python-requests/urllib, go-http-client, curl, wget, headlesschrome, phantomjs, puppeteer, playwright,
+HuggingFace, Octoparse, ParseHub, Apify, Tollbit (allowlist if seller), Quillbot, aiohttp, axios, node-fetch.
+
+## Search-index (ALLOW @120/min)
+OAI-SearchBot (85:1), PerplexityBot (210:1), Claude-SearchBot (~5,143:1), DuckAssistBot,
+YouBot, BraveBot, Amazonbot, MistralAI-Search, Copilot, Meta-AI.
+
+## User-triggered (DO NOT throttle)
+ChatGPT-User, Perplexity-User, Claude-User, Claude-Web, MistralAI-User, Google-Agent,
+Google-NotebookLM, Gemini-Deep-Research.
+
+## Verification
+Vendor IP JSON (11 endpoints, data/bot-ips.json 2026-09-17, ETag + fetched-date).
+Anthropic: claude.com/crawling/bots.json (robots-first). UNVERIFIED spoof KPI is top KPI.
+Forward-DNS confirm required before blocking. See METHOD.md.
+
+## Costs
+Measured bytes × CDN pricing. Blockable = training + suspicious only. 95% CI ±1.96/sqrt(N).
+Logs prove fetch, not citation.

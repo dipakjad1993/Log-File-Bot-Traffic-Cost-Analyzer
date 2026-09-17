@@ -3,9 +3,9 @@
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 [![100% Client-Side](https://img.shields.io/badge/Privacy-100%25_Client--Side-purple)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
-[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.13-orange)](data/bot-ips.json)
+[![Bot DB](https://img.shields.io/badge/Bot_DB-v2026.09.17-orange)](data/bot-ips.json)
 [![No Upload](https://img.shields.io/badge/Upload-None_needed-success)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
-[![v1.3.0](https://img.shields.io/badge/Version-1.3.0-informational)](CHANGELOG.md)
+[![v1.4.0](https://img.shields.io/badge/Version-1.4.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
 
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
@@ -16,22 +16,34 @@ Free, private, **$0** vs £99/yr Screaming Frog / €383/mo JetOctopus. No log l
 No upload — files never leave your machine. Verified: no XHR/WebSocket in audit.
 
 > [!NOTE]
-> `main` branch. v1.3.0 · Bot DB v2026.09.13 (75 signatures) · IP JSON 2026-09-13 (full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md).
+> `main` branch. v1.4.0 · Bot DB v2026.09.17 (127 signatures) · IP JSON 2026-09-17 (13 sources, full CIDRs + IPv6). See [CHANGELOG.md](CHANGELOG.md) · [METHOD.md](METHOD.md).
 
 ![Upload screen](assets/screenshots/01-hero-upload.png)
 
 ---
 
+## What's new in v1.4.0 (Bot DB v2026.09.17, 127 signatures)
+
+- **Module 3b Render Gap (JS-shell):** AI-bot 200s <5KB sorted ascending + `/_next/data/` signals. AI bots fetch raw HTML, no JS — shell = zero citation chance. Instant GEO win.
+- **UNVERIFIED spoof KPI (Module 2 top KPI):** claimed minus verified AI/search fetches. Post-Aug-2025 Chrome-UA + rotating-ASN shape. Forward-DNS confirm via DoH (browser, opt-in) or `node tools/cli.js --verify-rdns IP` (server-side).
+- **Anomaly ML-lite (Module 8):** per-bot bursts (z≥3), 404-clusters (`/vendor/phpunit`, `.git/HEAD`), Slack digest + `summary.json` week-over-week diff (`diffAnalyses`). No ML lib — z-score + rolling window in worker.
+- **CLI exact mode (shipped, not vaporware):** `node tools/cli.js --in access.log --exact --out summary.json --logs-csv logs.csv --bq-sql bq-pack.sql` — 500MB–50GB streaming exact, constant memory. Scale rule: browser <500MB triage (300k sampled), CLI 500MB–50GB exact, BigQuery 50GB+.
+- **BigQuery/Snowflake native:** partitioned DDL + 7 waste queries + Download .sql (Module 6). Parquet via DuckDB `COPY TO parquet` (see BIGQUERY.md).
+- **Origin vs Edge toggle (Module 6):** origin logs UNDERCOUNT when CDN filters at edge. Labeled ESTIMATE, never mixed into measured. Logpush/S3/R2/ALB pull guide.
+- **Sitemap + GSC + logs triple join:** the Botify money view — crawled-never-indexed ($ waste) + indexed-never-crawled (by clicks) + in-sitemap-never-crawled (discovery gap).
+- **Trust UX:** header freshness pill (green <7d / amber <21d / red stale), SOC2-irrelevant-by-design language, keyboard 1–0 tabs, focus-trapped Pricing, lazy-render tabs 2–10, sticky dropzone + pre-drop 50MB mobile guard, white-label CFO 1-pager (logo, date range, sampled-vs-exact badge).
+- **Verification 2026:** 11 endpoints (OpenAI x3, Perplexity x3, Anthropic `claude.com/crawling/bots.json` robots-first, Google x2, Bing) + ETag/fetched-date/fallback. `bot-ips.json` 13 sources dated 2026-09-17.
+- **95 asserts** (`npm test`): freshness (fails if >14d stale), spoof (Chrome-UA fixtures), js-shell, anomaly/diff/edge/BQ/triple-join + 20.5k worker-parity test.
+
 ## What's new since v1.3.0 (enterprise pass, on `main`)
 
 - **Stealth / spoof scoring (Module 9):** Chrome-UA + cloud-ASN + machine-velocity shape (the Aug 2025 spoof pattern) scored 0–100 per IP with listed signals. Heuristic, never a verdict — score ≥70 challenges at the edge, never auto-blocks.
 - **Honest cost intervals:** every total carries a 95% sampling interval (10k fixture: ±$0.001). Projections are ranges, not promises.
-- **Opt-in DoH rDNS verifier (Module 2):** click-only DNS-over-HTTPS via 1.1.1.1 with forward-confirm — telemetry default untouched. Bot DB age badge (`v2026.09.13 · N days old`) next to it.
-- **Dynamic edge rates:** thresholds are req/min/IP over your log window (not raw counts) + a 429-vs-challenge-vs-block decision tree in Module 6. Fixed a real bug: Tab 6 rendered `robots`/JSON strings char-by-char — arrays only now.
+- **Opt-in DoH rDNS verifier (Module 2):** click-only DNS-over-HTTPS via 1.1.1.1 with forward-confirm — telemetry default untouched. Bot DB age badge next to it.
+- **Dynamic edge rates:** thresholds are req/min/IP over your log window (not raw counts) + a 429-vs-challenge-vs-block decision tree in Module 6.
 - **Retention without accounts:** metadata-only local history + `?cfg=` share links for pricing configs. CFO tab adds a human-latency → revenue lab hint.
 - **R2 + Workers preset:** $0 egress, $0.50/M requests past the included 10M. `ai_citation` now warns (removed in v2).
-- **Docs that rank:** searchable [`/bots/`](https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/) page (all 75 sigs, regenerates via `npm run gen-bots-page`), [honest Frog-vs-JetOctopus-vs-$0 comparison](https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/compare-screaming-frog-jetoctopus-free.html) (prices verified 2026), breadcrumbs + HowTo schema. System fonts only — zero external requests, so the no-telemetry audit stays true.
-- **81 asserts** (`npm test`): +12 enterprise tests incl. a 20.5k-record worker-path parity test proving the GSC `_urlSet` survives large files.
+- **Docs that rank:** searchable [`/bots/`](https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/) page (regenerates via `npm run gen-bots-page`), [honest Frog-vs-JetOctopus-vs-$0 comparison](https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/compare-screaming-frog-jetoctopus-free.html) (prices verified 2026), breadcrumbs + HowTo schema. System fonts only — zero external requests, so the no-telemetry audit stays true.
 
 ## What's new in v1.3.0 (Bot DB v2026.09.13, 75 signatures)
 
@@ -92,7 +104,7 @@ The banner the tool shows on huge files (screenshot 08) states the sampling hone
 
 ## 3. The 2026 distinction: training vs search-index vs user-triggered
 
-Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions (Bot DB v2026.09.13, 75 signatures):
+Senior SEOs interview on exactly this — the analyzer splits all three with different edge actions (Bot DB v2026.09.17, 127 signatures):
 
 | Class | Examples | Action | Why |
 |-------|----------|--------|-----|
@@ -100,7 +112,7 @@ Senior SEOs interview on exactly this — the analyzer splits all three with dif
 | **Search-index** | OAI-SearchBot, PerplexityBot, Claude-SearchBot, DuckAssistBot | ALLOW, 120/min (60 aggressive), 429 + Retry-After — never hard block | Citation share drops in 1–2 weeks if blocked (OAI 85:1, Perplexity 210:1 crawl-to-referral) |
 | **User-triggered** | ChatGPT-User, Perplexity-User, Claude-User, MistralAI-User, Google-Agent | Do NOT throttle (300/min abuse ceiling only) | 429 = missing live answer; robots.txt may not apply (ChatGPT-User ignores robots 54%) |
 
-Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages for new domains, Pay Per Crawl 402 beta, vendor IP JSON verification (`data/bot-ips.json`, dated — short prefixes like `3.`/`34.` are heuristic-only and labeled low-confidence, never verdicts; Anthropic has no IP list → robots.txt only).
+Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages for new domains, Pay Per Crawl 402 beta, vendor IP JSON verification (`data/bot-ips.json`, 13 sources dated 2026-09-17 — short prefixes like `3.`/`34.` are heuristic-only and labeled low-confidence, never verdicts; Anthropic crawling policy at `claude.com/crawling/bots.json` is robots-first + forward-DNS confirm).
 
 ![AI Matrix from the 1GB run — red training, cyan search-index, blue user-triggered](assets/screenshots/13-tab5-ai-matrix.png)
 ![AI Matrix close-up](assets/screenshots/28-ai-matrix-viewport.png)
@@ -110,7 +122,7 @@ Also baked in: Cloudflare 15 Sep 2026 auto-block of Training+Agent on ad pages f
 ## 4. The 10 analysis modules (all screenshotted from the 1GB run)
 
 ### Module 1 — Bot Classification
-Bot-first signature order (bots beat browser fingerprints, documented against spoofing) over 75 signatures + 18 browser patterns, full per-category table with bandwidth, IPs, TTFB, status splits.
+Bot-first signature order (bots beat browser fingerprints, documented against spoofing) over 127 signatures + 18 browser patterns, full per-category table with bandwidth, IPs, TTFB, status splits.
 
 ![Bot Classification](assets/screenshots/09-tab1-classification.png)
 
@@ -187,13 +199,13 @@ node server.js   # LOCAL DEV ONLY — http://localhost:8080 (gzip + headers pari
 # or: docker build -t log-analyzer . && docker run -p 8080:8080 log-analyzer
 ```
 
-**Free vs Pro:** Free = every analysis under 50MB, client-side, forever. Pro = $49 one-time (500MB+ CLI + weekly blocklist feed) — checkout opens with v1.4 via Gumroad/Lemon Squeezy; star the repo to get notified. Honest comparison with paid tools: [`guides/compare-screaming-frog-jetoctopus-free.html`](https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/compare-screaming-frog-jetoctopus-free.html).
+**Free vs Pro:** Free = every analysis under 50MB, client-side, forever. Pro = $49 one-time (500MB+ CLI exact + weekly blocklist feed, shipped in v1.4) — [pre-order on Gumroad](https://gumroad.com/l/log-analyzer-pro); star the repo for updates. Honest comparison with paid tools: [`guides/compare-screaming-frog-jetoctopus-free.html`](https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/compare-screaming-frog-jetoctopus-free.html).
 
 Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fields), Nginx default, W3C Extended (real `#Fields` parsing, guess-mode flagged), AWS ALB, Cloudflare Logpush, **.gz** — auto-detected per line, mixed files OK, multi-select for rotations.
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 81 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity
+npm test          # 95 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity, freshness, spoof, js-shell, anomaly/diff/edge/BQ
 npm run lint      # node --check across engine/worker/server/tools
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
@@ -207,11 +219,11 @@ The app is 100% client-side, so it hosts as pure static files. `server.js` + `Do
 
 **Backup — GitHub Pages:** repo Settings → Pages → Deploy from branch → `main`, folder `/ (root)`. (Ignores `_headers`; fine for a backup.)
 
-Legacy Render mirror (sleeps, kept for old links only): `https://log-file-bot-traffic-cost-analyzer-1.onrender.com` — do not share; hero links are Pages-only because speed is trust.
+Pages-only. No Render mirror — speed is trust (a sleeping mirror costs conversions).
 
 **Bot DB stays fresh:** [`.github/workflows/fetch-ips.yml`](.github/workflows/fetch-ips.yml) runs `npm run fetch-ips` + `npm test` every Monday 2am UTC and auto-commits `data/bot-ips.json`. Pages redeploys on every push.
 
-**Docs on the site:** [BOTS.md](BOTS.md) (open 75-sig DB) · `bots/gptbot-vs-oai-searchbot.html` · `bots/perplexitybot-block-or-allow.html` · `bots/claudebot-no-ip-robots-only.html` · `guides/block-training-bots-cloudflare-without-losing-citations.html` · `guides/cloudflare-logpush-1gb-analysis-free.html` · `research/1gb-teardown.html` — all listed in [`sitemap.xml`](sitemap.xml).
+**Docs on the site:** [BOTS.md](BOTS.md) (open 127-sig DB) · [METHOD.md](METHOD.md) (sampling/cost/verify/limits) · `bots/gptbot-vs-oai-searchbot.html` · `bots/perplexitybot-block-or-allow.html` · `bots/claudebot-no-ip-robots-only.html` · `guides/block-training-bots-cloudflare-without-losing-citations.html` · `guides/cloudflare-logpush-1gb-analysis-free.html` · `research/1gb-teardown.html` — all listed in [`sitemap.xml`](sitemap.xml).
 
 ---
 
@@ -220,7 +232,7 @@ Legacy Render mirror (sleeps, kept for old links only): `https://log-file-bot-tr
 - **Cost = measured bytes × configured pricing.** No assumed traffic. Proven by perturbation test: +1 GiB on one record moves the total exactly +$0.09.
 - **Origin-compute is opt-in (OFF by default).** No log distinguishes SSR from static, so the engine adds $0 unless you enable it in Pricing.
 - **Blockable = training + suspicious/unknown only.** Search-index and user-fetch are never blockable (asserted in tests).
-- **Verification = vendor IP JSON first** (IPv6 + full-CIDR aware, `normalizeTier` consolidates the `ai_citation` legacy alias into `ai_search_index`), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic stays robots.txt-only).
+- **Verification = vendor IP JSON first** (11 endpoints, IPv6 + full-CIDR aware, ETag + fetched-date + fallback; `normalizeTier` consolidates the `ai_citation` legacy alias into `ai_search_index`), `/16`-or-longer prefix heuristics labeled low-confidence. No IP list is ever invented (Anthropic = crawling policy robots-first + forward-DNS confirm; Apple/Meta/ByteDance = robots/ASN-only).
 - **Sampling is disclosed** on-screen with stride, counts and timing — verification counts are scaled to the full set and labeled, never silent.
 - **Reproducibility:** `sample-data/EXPECTED.md` pins exact expected counts for the deterministic 10k fixture; CI re-verifies on every push.
 
@@ -230,17 +242,19 @@ Legacy Render mirror (sleeps, kept for old links only): `https://log-file-bot-tr
 index.html                  # dashboard + 10 tabs + join UI (?v= cache-busted assets)
 _headers                    # Cloudflare Pages headers: CSP/nosniff/DENY + cache rules (replaces server.js headers)
 server.js                   # LOCAL DEV ONLY: static server with gzip + headers (Pages ignores it)
-js/analyzer.js              # engine: 75-signature DB, 4-layer verify, 14-step analyze, 10 renderers
+js/analyzer.js              # engine: 127-signature DB, 4-layer verify, 14-step analyze, 10 renderers + Render Gap/spoof/anomaly/diff/edge/BQ/triple-join
 js/worker.js                # off-main-thread analyze() for 20k+ rows
-data/bot-ips.json           # dated vendor IP JSON snapshot, full CIDRs + IPv6 (refresh: npm run fetch-ips)
+tools/cli.js                # CLI exact mode: 500MB-50GB streaming exact + --logs-csv/--bq-sql/--verify-rdns (shipped v1.4)
+data/bot-ips.json           # dated vendor IP JSON snapshot, 13 sources, full CIDRs + IPv6 (refresh: npm run fetch-ips)
 .github/workflows/fetch-ips.yml  # free weekly Bot DB refresh (Mon 2am UTC) + test + auto-commit
 bots/ guides/ research/     # static SEO/docs pages, listed in sitemap.xml (bots/index.html regenerates via npm run gen-bots-page)
-tools/gen-bots-page.js      # builds the searchable bots/index.html from the live BOTS array (75 sigs)
+tools/gen-bots-page.js      # builds the searchable bots/index.html from the live BOTS array (127 sigs)
 BOTS.md                     # open bot DB: training vs search-index vs user-triggered
+METHOD.md                   # sampling/cost/verify/limits — read before quoting numbers
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 81 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity)
-llms.txt                    # repo-root AI-use policy (generated per-site in Module 6)
+tests/                      # 95 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity/freshness/spoof/js-shell/anomaly)
+llms.txt / llms-full.txt    # repo-root AI-use policy + full 127-sig grounding dump (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
 ```
@@ -251,7 +265,7 @@ See [benchmarks/MacBook-Air-100k.md](benchmarks/MacBook-Air-100k.md). Measured r
 
 ## Resume bullet
 
-> Log-File Analyzer (JS, 10 tabs, 75 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export. Proven on 3.2M-line log. Live: https://log-file-bot-traffic-cost-analyzer.pages.dev
+> Log-File Analyzer (JS, 10 tabs, 127 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, UNVERIFIED spoof KPI, JS-shell render gap, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export, CLI exact mode + BQ pack. Proven on 3.2M-line log. Live: https://log-file-bot-traffic-cost-analyzer.pages.dev
 
 ## Contributing / Security / License
 

@@ -1,10 +1,20 @@
 {
-  "date": "2026-09-13",
+  "date": "2026-09-17",
   "note": "Regenerate with: npm run fetch-ips. Authoritative vendor IP JSON prefixes in FULL CIDR form (/24 detail + IPv6 preserved, never truncated to /16). Short-prefix heuristics in analyzer.js are low-confidence only.",
+  "freshnessPolicy": "fail CI if >14 days old (see tests/freshness.test.js)",
   "sources": [
-    { "bot": "GPTBot / ChatGPT-User", "url": "https://openai.com/gptbot.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "20.42.0.0/16", "40.88.220.0/24", "2603:1030::/36"], "bots": ["gptbot", "chatgpt-user"], "date": "2026-09-13", "source": "openai.com/gptbot.json" },
-    { "bot": "OAI-SearchBot", "url": "https://openai.com/searchbot.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "2603:1030::/36"], "bots": ["oai-searchbot"], "date": "2026-09-13", "source": "openai.com/searchbot.json" },
-    { "bot": "PerplexityBot / Perplexity-User", "url": "https://docs.perplexity.ai/bot.json", "prefixes": ["23.236.0.0/16", "44.221.0.0/16", "44.221.12.0/24", "2600:1f18::/36"], "bots": ["perplexitybot", "perplexity-user"], "date": "2026-09-13", "source": "docs.perplexity.ai/bot.json" },
-    { "bot": "ClaudeBot / Claude-SearchBot", "url": null, "prefixes": [], "bots": ["claudebot", "claude-searchbot"], "date": "2026-09-13", "note": "Anthropic publishes no IP list — verify via robots.txt compliance only." }
+    { "bot": "GPTBot", "url": "https://openai.com/gptbot.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "20.42.0.0/16", "40.88.220.0/24", "2603:1030::/36"], "bots": ["gptbot"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "openai.com/gptbot.json" },
+    { "bot": "OAI-SearchBot", "url": "https://openai.com/searchbot.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "2603:1030::/36"], "bots": ["oai-searchbot"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "openai.com/searchbot.json" },
+    { "bot": "ChatGPT-User", "url": "https://openai.com/chatgpt-user.json", "prefixes": ["40.88.0.0/16", "40.84.0.0/16", "2603:1030::/36"], "bots": ["chatgpt-user"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "openai.com/chatgpt-user.json" },
+    { "bot": "PerplexityBot", "url": "https://www.perplexity.ai/perplexitybot.json", "prefixes": ["23.236.0.0/16", "44.221.0.0/16", "44.221.12.0/24", "2600:1f18::/36"], "bots": ["perplexitybot"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "www.perplexity.ai/perplexitybot.json" },
+    { "bot": "Perplexity-User", "url": "https://www.perplexity.ai/perplexity-user.json", "prefixes": ["23.236.0.0/16", "44.221.0.0/16", "2600:1f18::/36"], "bots": ["perplexity-user"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "www.perplexity.ai/perplexity-user.json" },
+    { "bot": "PerplexityBot/User (docs legacy)", "url": "https://docs.perplexity.ai/bot.json", "prefixes": ["23.236.0.0/16", "44.221.0.0/16"], "bots": ["perplexitybot", "perplexity-user"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "docs.perplexity.ai/bot.json" },
+    { "bot": "ClaudeBots (crawling policy)", "url": "https://claude.com/crawling/bots.json", "prefixes": [], "bots": ["claudebot", "claude-searchbot", "claude-user"], "date": "2026-09-17", "fetched": "2026-09-17", "note": "Anthropic crawling policy JSON — robots-first, no bare IP list. Verify via robots compliance + forward-DNS confirm." },
+    { "bot": "Googlebot", "url": "https://developers.google.com/search/apis/ipranges/googlebot.json", "prefixes": ["66.249.64.0/19", "66.249.32.0/19"], "bots": ["googlebot"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "developers.google.com/search/apis/ipranges/googlebot.json" },
+    { "bot": "Google-Other / Special crawlers", "url": "https://developers.google.com/search/apis/ipranges/special-crawlers.json", "prefixes": ["66.249.0.0/19"], "bots": ["googleother"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "developers.google.com/search/apis/ipranges/special-crawlers.json" },
+    { "bot": "Bingbot", "url": "https://www.bing.com/toolbox/bingbot.json", "prefixes": ["13.107.0.0/16", "204.79.0.0/16"], "bots": ["bingbot"], "date": "2026-09-17", "fetched": "2026-09-17", "source": "www.bing.com/toolbox/bingbot.json" },
+    { "bot": "Applebot-Extended", "url": null, "prefixes": [], "bots": ["applebot-extended"], "date": "2026-09-17", "note": "Apple publishes no IP list — robots token only." },
+    { "bot": "Meta-ExternalAgent", "url": null, "prefixes": [], "bots": ["meta-externalagent"], "date": "2026-09-17", "note": "Meta publishes no stable agent list — ASN + rDNS confirm." },
+    { "bot": "Bytespider", "url": null, "prefixes": [], "bots": ["bytespider"], "date": "2026-09-17", "note": "ByteDance publishes no list — ASN + rDNS confirm." }
   ]
 }

@@ -36,8 +36,8 @@ const EXPECTED = {
 };
 
 test('bot DB version pinned', () => {
-  assert.equal(A.BOT_DB_VERSION, '2026.09.13');
-  assert.ok(A.BOTS.length >= 75, `want 75+ signatures, got ${A.BOTS.length}`);
+  assert.equal(A.BOT_DB_VERSION, '2026.09.17');
+  assert.ok(A.BOTS.length >= 120, `want 120+ signatures, got ${A.BOTS.length}`);
 });
 
 for (const [ua, tier] of Object.entries(EXPECTED)) {

@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.4.0 — 2026-09-17
+
+Enterprise pass: 127 signatures, JS-shell render gap, UNVERIFIED spoof KPI, anomaly ML-lite, CLI exact mode, BQ native pack, Origin-vs-Edge toggle, A/B diff.
+
+### Added
+- Bot DB v2026.09.17 (127 signatures): +52 incl. ByteDance/Douyin/TikTok, Copilot, Meta-AI, NotebookLM, Gemini-Deep-Research, Claude-Web, DataForSEO, Tollbit, Quillbot, Lumar/Sitebulb/ContentKing, Barkrowler/Mojeek, aiohttp/axios/node-fetch.
+- Module 3b Render Gap: AI-bot 200s <5KB sorted ascending + /_next/data/ signals (GEO zero-citation hunt).
+- UNVERIFIED spoof KPI (Module 2): claimed minus verified AI/search, post-Aug-2025 Chrome-UA shape.
+- Anomaly ML-lite (Module 8): per-bot bursts (z≥3), 404-clusters, Slack digest + summary.json A/B diff.
+- `tools/cli.js --exact`: 500MB-50GB streaming exact (constant memory) + --logs-csv + --bq-sql + --verify-rdns forward-DNS. Scale: browser <500MB, CLI 500MB-50GB, BQ 50GB+.
+- `genBQPack()`: partitioned DDL + 7 waste queries + Download .sql. Parquet via DuckDB COPY (see BIGQUERY.md).
+- Origin vs Edge toggle (Module 6) + edge-blocked ESTIMATE (never mixed into measured).
+- `METHOD.md` (sampling/cost/verify/limits), `llms-full.txt` (127-sig grounding dump), sitemap lastmod automation.
+- Header freshness pill (green <7d/amber <21d/red stale), SOC2-irrelevant language, keyboard 1-0 tabs, focus-trapped Pricing, lazy-render tabs 2-10, sticky dropzone + pre-drop mobile guard.
+- Pro $49 pre-order live (Gumroad) — no more vaporware; CLI ships in v1.4.
+
+### Fixed
+- `fetch-bot-ips.js`: 11 endpoints (OpenAI x3, Perplexity x3, Anthropic policy, Google x2, Bing) + ETag/fetched-date/fallback. `bot-ips.json` 13 sources dated 2026-09-17.
+- Anthropic copy updated: `claude.com/crawling/bots.json` robots-first (was "no IP list").
+- `ai_citation` hidden from UI (code alias only in normalizeTier for pre-v1.3 exports).
+- Render mirror removed (Pages-only). Version single-sourced (BOT_DB_VERSION → UI/README/bots/llms).
+- `server.js` prod confusion: `npm run dev` vs `preview:pages` + NEVER-DEPLOY header.
+
 ## v1.3.0 — 2026-09-13
 
 Bot DB v2026.09.13 (75 signatures) + verification precision + 2026 trap/threat coverage.
