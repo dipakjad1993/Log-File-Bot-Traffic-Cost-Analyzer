@@ -22,6 +22,17 @@ No upload — files never leave your machine. Verified: no XHR/WebSocket in audi
 
 ---
 
+## What's new since v1.3.0 (enterprise pass, on `main`)
+
+- **Stealth / spoof scoring (Module 9):** Chrome-UA + cloud-ASN + machine-velocity shape (the Aug 2025 spoof pattern) scored 0–100 per IP with listed signals. Heuristic, never a verdict — score ≥70 challenges at the edge, never auto-blocks.
+- **Honest cost intervals:** every total carries a 95% sampling interval (10k fixture: ±$0.001). Projections are ranges, not promises.
+- **Opt-in DoH rDNS verifier (Module 2):** click-only DNS-over-HTTPS via 1.1.1.1 with forward-confirm — telemetry default untouched. Bot DB age badge (`v2026.09.13 · N days old`) next to it.
+- **Dynamic edge rates:** thresholds are req/min/IP over your log window (not raw counts) + a 429-vs-challenge-vs-block decision tree in Module 6. Fixed a real bug: Tab 6 rendered `robots`/JSON strings char-by-char — arrays only now.
+- **Retention without accounts:** metadata-only local history + `?cfg=` share links for pricing configs. CFO tab adds a human-latency → revenue lab hint.
+- **R2 + Workers preset:** $0 egress, $0.50/M requests past the included 10M. `ai_citation` now warns (removed in v2).
+- **Docs that rank:** searchable [`/bots/`](https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/) page (all 75 sigs, regenerates via `npm run gen-bots-page`), [honest Frog-vs-JetOctopus-vs-$0 comparison](https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/compare-screaming-frog-jetoctopus-free.html) (prices verified 2026), breadcrumbs + HowTo schema. System fonts only — zero external requests, so the no-telemetry audit stays true.
+- **81 asserts** (`npm test`): +12 enterprise tests incl. a 20.5k-record worker-path parity test proving the GSC `_urlSet` survives large files.
+
 ## What's new in v1.3.0 (Bot DB v2026.09.13, 75 signatures)
 
 - **8 new 2026 bots:** DeepSeekBot, QwenBot, Timpibot, Sidetiq, Firecrawl, Bright Data (training — block freely), MistralAI-Search (search-index, ALLOW @120/min), PetalBot (search-engine, allow). `ai_citation` legacy tier consolidated into `ai_search_index`.
@@ -182,7 +193,7 @@ Accepted inputs: JSON array, JSONL/NDJSON, **Apache Combined** (tolerates `-` fi
 Uploads stream in 8MB slices — 1GB files work (see §1); above ~300k lines a labeled systematic sample is analyzed; `500 MB+` exact totals → CLI.
 
 ```bash
-npm test          # 69 asserts: bots, traps, costs, streaming samples, upload parsing, .gz, CIDR/IPv6
+npm test          # 81 asserts: bots, traps, costs, samples, upload, .gz, CIDR/IPv6, stealth, CI, share-hash, 20k worker parity
 npm run lint      # node --check across engine/worker/server/tools
 npm run gen-logs -- --lines 10000 --bots 0.3 --seed 42 --out sample-data/sample-10k.jsonl
 npm run fetch-ips # refresh data/bot-ips.json from vendor endpoints (full CIDRs + IPv6 preserved)
@@ -223,11 +234,12 @@ js/analyzer.js              # engine: 75-signature DB, 4-layer verify, 14-step a
 js/worker.js                # off-main-thread analyze() for 20k+ rows
 data/bot-ips.json           # dated vendor IP JSON snapshot, full CIDRs + IPv6 (refresh: npm run fetch-ips)
 .github/workflows/fetch-ips.yml  # free weekly Bot DB refresh (Mon 2am UTC) + test + auto-commit
-bots/ guides/ research/     # static SEO/docs pages, listed in sitemap.xml
+bots/ guides/ research/     # static SEO/docs pages, listed in sitemap.xml (bots/index.html regenerates via npm run gen-bots-page)
+tools/gen-bots-page.js      # builds the searchable bots/index.html from the live BOTS array (75 sigs)
 BOTS.md                     # open bot DB: training vs search-index vs user-triggered
 tools/gen-logs.js           # deterministic batched NDJSON generator (1GB+ safe)
 sample-data/                # 22-row teaching set, combined-log fixture, 10k + EXPECTED.md
-tests/                      # 69 asserts (bots/traps/costs/samples/upload/.gz/CIDR)
+tests/                      # 81 asserts (bots/traps/costs/samples/upload/.gz/CIDR/stealth/CI/worker-parity)
 llms.txt                    # repo-root AI-use policy (generated per-site in Module 6)
 BIGQUERY.md / EXPERIMENTS.md  # SQL + experimentation guides
 assets/screenshots/         # 29 HD captures from the real 1.02GB run (this README)
