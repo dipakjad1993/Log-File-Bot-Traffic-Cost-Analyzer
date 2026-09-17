@@ -26,6 +26,27 @@ test('cfo-pdf: generates real PDF bytes (no window.print)', () => {
   assert.ok(!body.includes('window.print'), 'no print-dialog hack inside PDF');
 });
 
+test('cfo-pdf: stream is pure ASCII — no mojibake, proper alignment ops', () => {
+  const rs = [];
+  for (let i = 0; i < 60; i++) rs.push(rec('10.0.0.' + (i % 6 + 1), 'GPTBot/1.0 (+https://openai.com/gptbot)', '/p?page=' + i, 200, 60000, '2026-06-03T10:00:00Z'));
+  for (let i = 0; i < 30; i++) rs.push(rec('10.0.1.' + (i % 3 + 1), 'ClaudeBot/1.0', '/x', 200, 40000, '2026-07-01T10:00:00Z'));
+  const out = A.analyze(rs, { cdnEgress: 0.09, request10K: 0.0075, ssr1K: 0, preset: 'AWS CloudFront' }, () => {});
+  const res = CFO.generateCFOPDFBytes(out, { domain: 'example.com', file: 'access.log' });
+  const body = Buffer.from(res.bytes).toString('latin1');
+  // No multi-byte mojibake artifacts (the "[116;5u" class of corruption)
+  assert.ok(!body.includes('[116;'), 'no ANSI/mojibake artifact in stream');
+  assert.ok(!/[^\x00-\x7F]/.test(body), 'stream is pure 7-bit ASCII (WinAnsi-safe)');
+  // Sanitized replacements render correctly
+  assert.ok(body.includes('+/-'), 'CI renders as +/-, not +- or mojibake');
+  assert.ok(body.includes('--'), 'em-dashes render as --');
+  assert.ok(!body.includes('(cid:'), 'no CID font escapes (Helvetica only)');
+  // Real table grid: row rules + column rules + header band present
+  assert.ok(body.includes(' re S'), 'table grid strokes present');
+  assert.ok(body.includes('EXECUTIVE SUMMARY'), 'header band title intact');
+  // san() unit checks
+  assert.equal(CFO.san('a — b → c ± d × e'), 'a -- b -> c +/- d x e');
+});
+
 test('cfo-pdf: data model annualizes + labels pricing + badge', () => {
   const rs = [];
   for (let i = 0; i < 100; i++) rs.push(rec('9.9.9.' + (i % 5 + 1), 'GPTBot/1.0', '/x', 200, 100000, '2026-06-03T00:00:00Z'));
