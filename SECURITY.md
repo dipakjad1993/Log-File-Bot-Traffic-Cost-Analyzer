@@ -2,7 +2,7 @@
 
 - 100% client-side: log data never leaves the browser. No backend ingest, no cookies, no telemetry.
 - Verified: no `XHR` / `WebSocket` / `sendBeacon` in audit. Only network request is the demo file you click.
-- SOC2-irrelevant by design: there is no server to certify — data never transmitted. Architecture diagram: `browser → FileReader slices → Web Worker → DOM`. No egress.
+- Private by design — no server, passes no-XHR audit: there is no server to certify — data never transmitted. Architecture: `browser → FileReader slices → Web Worker → DOM`. No egress.
 - DoH rDNS is opt-in (click-only, Cloudflare 1.1.1.1). Forward-DNS confirm in CLI via Node `dns` (server-side).
 - Rate control uses 429/503 + Retry-After + allowlist. Delay-based defenses are a DoS liability — never shipped.
 - Stealth scores (0-100) are heuristics. Challenge at ≥70, never auto-block on score alone.

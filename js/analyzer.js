@@ -2519,7 +2519,7 @@ function genSample(targetSizeMB,seed){
 function renderAbout(){
   document.getElementById('about-content').innerHTML=`
 <h1>About This Tool</h1>
-<p>A fast, privacy-focused, <strong>100% client-side</strong> web utility for parsing server access logs, identifying bot traffic patterns, analyzing crawl budget distribution, and estimating infrastructure egress overhead. Free and open source (MIT) — the $0 alternative to £99/yr Screaming Frog Log Analyser and €171–383/mo JetOctopus.</p>
+<p>A fast, privacy-focused, <strong>100% client-side</strong> web utility for parsing server access logs, identifying bot traffic patterns, analyzing crawl budget distribution, and estimating infrastructure egress overhead. Free and open source (MIT) — the $0 alternative to $139/yr Screaming Frog Log Analyser and €171–383/mo JetOctopus.</p>
 <h2>Why it exists</h2>
 <p>Modern servers drown in automated traffic: search crawlers, SEO tools, and — since 2024 — AI bots that train models on your content for zero return. Incumbent answers are a desktop app with manual regex lists, or cloud platforms that require uploading sensitive logs to someone else's server. This tool is the third option: drop the log in your browser, get the GPTBot-vs-OAI-SearchBot cost split and copy-paste edge rules, with <strong>no log ever leaving your machine</strong> (safe for DPDP/RBI-sensitive data).</p>
 <h2>The 2026 bot split (training vs search-index vs user-triggered)</h2>

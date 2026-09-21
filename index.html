@@ -25,7 +25,7 @@
 {"@context":"https://schema.org","@type":"HowTo","name":"How to find which AI bots cost you money","step":[{"@type":"HowToStep","name":"Drop your log file","text":"Drag access.log, JSONL, or .gz onto the analyzer. Files never leave your machine."},{"@type":"HowToStep","name":"Read the cost split","text":"Module 4 shows measured egress cost; blockable equals training plus suspicious only."},{"@type":"HowToStep","name":"Copy the edge rule","text":"Module 6 generates Cloudflare, Fastly, and AWS WAF rules plus a training-vs-search robots.txt."}]}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does any log leave my browser?","acceptedAnswer":{"@type":"Answer","text":"No. Parsing, analysis and rendering run 100% client-side (Web Worker for 20k+ rows). The only network request is loading the 10k demo file when you click it. SOC2-irrelevant by design."}},{"@type":"Question","name":"Should I block OAI-SearchBot like GPTBot?","acceptedAnswer":{"@type":"Answer","text":"No. GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citation share in 1-2 weeks. ChatGPT-User is user-triggered and must never be throttled."}},{"@type":"Question","name":"Can I trust VERIFIED badges?","acceptedAnswer":{"@type":"Answer","text":"Only vendor-IP-JSON matches (dated snapshot in data/bot-ips.json, IPv6 + CIDR aware, 11 endpoints). Prefix matches are labeled heuristic low-confidence. Anthropic crawling policy at claude.com/crawling/bots.json is robots-first. Confirm with server-side reverse DNS before blocking."}},{"@type":"Question","name":"What about 1GB uploads?","acceptedAnswer":{"@type":"Answer","text":"Files stream in 8MB slices with multi-file and .gz support. Above ~300k lines a labeled systematic sample is analyzed and verification counts are scaled and labeled. For exact 500MB+ totals use node tools/cli.js --exact."}}]}
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does any log leave my browser?","acceptedAnswer":{"@type":"Answer","text":"No. Parsing, analysis and rendering run 100% client-side (Web Worker for 20k+ rows). The only network request is loading the 10k demo file when you click it. Private by design — no server, passes no-XHR audit."}},{"@type":"Question","name":"Should I block OAI-SearchBot like GPTBot?","acceptedAnswer":{"@type":"Answer","text":"No. GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citation share in 1-2 weeks. ChatGPT-User is user-triggered and must never be throttled."}},{"@type":"Question","name":"Can I trust VERIFIED badges?","acceptedAnswer":{"@type":"Answer","text":"Only vendor-IP-JSON matches (dated snapshot in data/bot-ips.json, IPv6 + CIDR aware, 11 endpoints). Prefix matches are labeled heuristic low-confidence. Anthropic crawling policy at claude.com/crawling/bots.json is robots-first. Confirm with server-side reverse DNS before blocking."}},{"@type":"Question","name":"What about 1GB uploads?","acceptedAnswer":{"@type":"Answer","text":"Files stream in 8MB slices with multi-file and .gz support. Above ~300k lines a labeled systematic sample is analyzed and verification counts are scaled and labeled. For exact 500MB+ totals use node tools/cli.js --exact."}}]}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebPage","name":"Free Private Log File Analyzer 2026","url":"https://log-file-bot-traffic-cost-analyzer.pages.dev/","isPartOf":{"@type":"WebSite","name":"Log File Bot Traffic Cost Analyzer","url":"https://log-file-bot-traffic-cost-analyzer.pages.dev/"}}
@@ -42,7 +42,7 @@
     <button class="sb-btn" data-section="howto" aria-label="How to use">How To Use</button>
   </div>
   <button class="btn-sm" id="dark-toggle" aria-label="Toggle dark mode">Dark mode</button>
-  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.17 · IP JSON 2026-09-17 · <span style="color:var(--green)">● fresh</span><br>SOC2-irrelevant by design — no data transmitted (see SECURITY.md). <a href="./CHANGELOG.md">Changelog</a> · <a href="./METHOD.md">Method</a></div>
+  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.17 · IP JSON 2026-09-17 · <span style="color:var(--green)">● fresh</span><br>Private by design — no data transmitted (see SECURITY.md). <a href="./CHANGELOG.md">Changelog</a> · <a href="./METHOD.md">Method</a></div>
 </nav>
 
 <div class="main-wrap">
@@ -98,7 +98,7 @@
     <div class="upload-header">
       <div class="upload-brand-icon"></div>
       <h1>Log File &amp; Bot Traffic Analyzer</h1>
-      <p class="tool-tagline">Drop 1M-line logs → see <strong>GPTBot vs OAI-SearchBot cost split</strong> → copy Cloudflare rule. Free, private, $0 vs £99/yr Frog / €383/mo JetOctopus. 100% client-side — 🔒 no log leaves your machine (<a href="./METHOD.md">audit</a>).</p>
+      <p class="tool-tagline">Drop 1M-line logs → see <strong>GPTBot vs OAI-SearchBot cost split</strong> → copy Cloudflare rule. Free, private, $0 vs $139/yr Frog / €171–383/mo JetOctopus. 100% client-side — 🔒 no log leaves your machine (<a href="./METHOD.md">audit</a>).</p>
       <div class="proof-strip" aria-label="Measured proof, not promises">
         <div class="proof-item"><strong>3.2M lines</strong><span>1.02GB streamed</span></div>
         <div class="proof-item"><strong>6.6s read</strong><span>320k sampled 1-in-10</span></div>
@@ -182,8 +182,8 @@
         </a>
         <a class="guide-card" href="./guides/compare-screaming-frog-jetoctopus-free.html">
           <span class="badge b-amber">COMPARE</span>
-          <strong>Screaming Frog £99 vs JetOctopus €383 vs $0</strong>
-          <span class="guide-desc">Honest 2026 comparison with verified prices — including where the paid tools win.</span>
+          <strong>Screaming Frog $139 vs JetOctopus €171–383 vs $0</strong>
+          <span class="guide-desc">Honest 2026 comparison with verified prices (Feb 2026) — including where the paid tools win.</span>
           <span class="guide-meta">7 min read <span aria-hidden="true">→</span></span>
         </a>
         <a class="guide-card" href="./research/1gb-teardown.html">
