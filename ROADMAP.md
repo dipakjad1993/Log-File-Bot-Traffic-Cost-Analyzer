@@ -3,7 +3,7 @@
 ## P0 — 48 hours (hiring impact)
 
 - [ ] Record `assets/demo.gif` (15s: drop 10k → KPI strip → copy Cloudflare rule → CFO PDF ↓). Swap into README hero. Poster until then: `assets/screenshots/01-hero-upload.png` + `06-kpi-strip.png`. Mobile second: `25-mobile-hero.png`.
-- [ ] Record 90s Loom walkthrough, link in `docs/RECRUITER.md` + README.
+- [ ] Record 90s Loom walkthrough, link in README.
 - [ ] Lighthouse 100 screenshot (system fonts, zero external reqs): save to `assets/screenshots/30-lighthouse.png`, link in README.
 - [ ] GitHub metadata (manual, owner only): About website = `https://log-file-bot-traffic-cost-analyzer.pages.dev`; Topics = `seo log-file-analyzer ai-bots cloudflare javascript privacy gptbot`; Pin this repo; disable Render mirror if listed.
 - [ ] Profile README `dipakjad1993/dipakjad1993`: 5 lines + stack (Tech SEO · JS · Cloudflare · BigQuery) + pin this repo.

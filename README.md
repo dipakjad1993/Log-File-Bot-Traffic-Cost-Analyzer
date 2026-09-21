@@ -11,19 +11,13 @@
 Drop 1M-line logs → see **GPTBot vs OAI-SearchBot cost split** → copy the Cloudflare rule.
 Free, private, **$0** vs $139/yr Screaming Frog Log Analyser ($279 Spider) / €171–383/mo JetOctopus (prices verified Feb 2026). No log leaves your machine.
 
-**[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html) · [30-sec recruiter brief](docs/RECRUITER.md)**
+**[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html)**
 
 > Private by design: 100% client-side, no XHR/WebSocket/sendBeacon. Only network request is loading the demo file you click. See [METHOD.md](METHOD.md).
 
 ![Drop → cost split → Cloudflare rule in 30s](assets/screenshots/01-hero-upload.png)
 ![KPI strip from the measured 1.02GB run](assets/screenshots/06-kpi-strip.png)
 <!-- TODO: record 15s demo.gif (drop 10k → KPI strip → copy Cloudflare rule → CFO PDF ↓) and place at assets/demo.gif, then swap first image. See ROADMAP.md P0. Mobile layout: assets/screenshots/25-mobile-hero.png -->
-
-## Resume bullet (copy-paste)
-
-> Log-File Analyzer (JS, 10 tabs, 127 bot signatures) — client-side 1GB streaming uploads (.gz + multi-file), training vs search vs user split, UNVERIFIED spoof KPI, JS-shell render gap, IPv6/CIDR verification, Cloudflare/Fastly rule + llms.txt export, CLI exact mode + BQ pack. Proven on 3.2M-line log. Live: https://log-file-bot-traffic-cost-analyzer.pages.dev
->
-> Impact: reduced bot-waste analysis from €383/mo tool to $0 client-side; quantified $0.25 blockable per ~10GB sample; generated Cloudflare WAF rules with OAI-AdsBot revenue guard.
 
 ## 1. Proven on a real 1.02 GB / 3.2M-line log
 
@@ -113,7 +107,7 @@ flowchart LR
 
 ## Docs
 
-[BOTS.md](BOTS.md) · [METHOD.md](METHOD.md) · [docs/RECRUITER.md](docs/RECRUITER.md) · [ROADMAP.md](ROADMAP.md) · [BIGQUERY.md](BIGQUERY.md) · [sitemap.xml](sitemap.xml)
+[BOTS.md](BOTS.md) · [METHOD.md](METHOD.md) · [ROADMAP.md](ROADMAP.md) · [BIGQUERY.md](BIGQUERY.md) · [sitemap.xml](sitemap.xml)
 
 ## Contributing / Security / License
 
