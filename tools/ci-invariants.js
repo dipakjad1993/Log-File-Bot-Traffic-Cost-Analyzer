@@ -1,0 +1,20 @@
+// CI invariants (extracted from ci.yml inline node -e for YAML safety).
+// Verifies v2 enterprise modules on a generated 2000-line fixture.
+// Usage: node tools/gen-logs.js --lines 2000 --seed 42 --out /tmp/sample.jsonl && node tools/ci-invariants.js
+// Reads fixture path from argv[2] or /tmp/sample.jsonl.
+const fs = require('fs');
+const path = process.argv[2] || '/tmp/sample.jsonl';
+const A = require('../js/analyzer.js');
+
+const recs = fs.readFileSync(path, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+const r = A.analyze(recs, {}, () => {});
+console.log('records:', r.summary.totalRecords, 'tiers:', Object.keys(r.tierData).join(','));
+if (!r.tierData.ai_training || !r.tierData.human) process.exit(1);
+if (A.BOTS.length < 120 || A.TRAPS.length < 16 || A.THREATS.length < 14) throw new Error('DB counts regressed');
+if (A.RATE_POLICY.ai_citation) throw new Error('ai_citation alias must stay removed');
+if (A.normalizeTier('ai_citation') !== 'ai_citation') throw new Error('v2: normalizeTier must be identity');
+if (A.migrateLegacyTier({ tier: 'ai_citation' }).migrated !== 1) throw new Error('migrateLegacyTier broken');
+if (!r.jsShell || !r.spoof || !r.anomalies) throw new Error('enterprise modules missing');
+if (typeof A.genSept2026Defaults !== 'function' || typeof A.genPayPerCrawlV2 !== 'function' || typeof A.genPolicyBundle !== 'function' || typeof A.genBQStreamingPack !== 'function') throw new Error('v2 modules missing');
+if (A.BOT_IP_SOURCES.length < 14) throw new Error('BotBase 14th source missing');
+console.log('v2.0.0 invariants ok:', A.BOT_DB_VERSION, A.BOTS.length + ' bots', A.TRAPS.length + ' traps', A.THREATS.length + ' threats');
