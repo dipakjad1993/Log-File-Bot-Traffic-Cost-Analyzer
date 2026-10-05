@@ -3,31 +3,54 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Analyze 1GB Cloudflare Logpush Logs Free, No Upload (2026)</title>
-<meta name="description" content="Stream 3.2M-line / 1GB Cloudflare Logpush + ALB + Nginx logs in-browser: 8MB slices, Web Worker, .gz, systematic sampling disclosed on-screen. Free, private, no upload.">
+<meta name="description" content="Stream 3.2M-line / 1GB Cloudflare Logpush + ALB + Nginx logs in-browser: 8MB slices, Web Worker, .gz, systematic sampling disclosed on-screen. 16 traps, 14 threats, 127 signatures. Free, private, no upload.">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/cloudflare-logpush-1gb-analysis-free.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=2.1.0">
 </head>
-<body><div class="main-wrap"><div class="card">
-<p class="crumbs"><a href="../">Analyzer</a> / <a href="../#guides">Guides</a> / 1GB Logpush</p>
+<body><div class="main-wrap"><div class="card" style="max-width:960px">
+<p class="crumbs"><a href="../">Analyzer</a> / Guides / 1GB Logpush</p>
 <h1>Analyze 1GB Cloudflare Logpush logs free — no upload</h1>
-<p>Cloudflare Logpush fields, AWS ALB, Nginx/Apache Combined and W3C Extended auto-detect per line. Files stream in <strong>8MB slices</strong> with <strong>.gz + multi-file rotation</strong> support. Above ~300k lines a labeled systematic sample is analyzed (stride + counts + timing on-screen); 500MB+ exact totals → CLI in the repo.</p>
+<p>Cloudflare Logpush fields, AWS ALB, Nginx/Apache Combined and W3C Extended auto-detect <strong>per line</strong> — mixed formats in one file are fine. Files stream in <strong>8MB slices</strong> with <strong>.gz + multi-file rotation</strong> support (drop <code>access.log + access.log.1 + access.log.2.gz</code> together). Above ~300k lines a <strong>labeled systematic sample</strong> is analyzed (stride + counts + timing on-screen); 500MB+ exact totals → CLI in the repo.</p>
+
 <h2>Measured, not marketing</h2>
 <ul>
-<li><strong>1.02 GB / 3,200,000 lines</strong> → 320,000 kept (1-in-10) in <strong>6.6 s read, 13.0 s wall</strong> (headless Chromium).</li>
-<li><strong>$2.61 total, $0.25 blockable</strong>, 19,272 threats, 427 verification warnings, 18% trap waste.</li>
-<li>10k fixture: $0.08 → $0.04 total, byte-identical counts — pinned in <code>sample-data/EXPECTED.md</code>, re-verified by CI.</li>
+<li><strong>1.02 GB / 3,200,000 lines</strong> → 320,000 kept (1-in-10) in <strong>6.6 s read, 13.0 s wall</strong> (headless Chromium, 2026-09-11, seed 7).</li>
+<li><strong>$2.61 total, $0.25 blockable</strong> (training only), 19,272 suspicious, 427 verification warnings, 18% trap waste, 70.0% human across 15 categories.</li>
+<li><strong>10k fixture:</strong> 10,000 records, 69.9% human, <strong>$0.04 total, ~$0.00 blockable</strong> ($0.0046 training-only) — byte-identical counts pinned in <code>sample-data/EXPECTED.md</code>, re-verified by CI on every push.</li>
 </ul>
-<h2>Steps</h2>
+
+<h2>What the pipeline does with your file</h2>
 <ol>
-<li>Export Logpush (JSON/JSONL) — .gz is fine, it decompresses in-browser.</li>
-<li>Drop it into the <a href="../">analyzer</a> — progress reads locally, worker kicks in past 20k rows.</li>
-<li>Read Tab 3 crawl budget (16 traps incl. gclid, /filter/, _next/data), Tab 4 cost split, Tab 6 edge rules.</li>
-<li>Files &gt;50MB on mobile trigger a guard; 500MB+ use <code>node tools/gen-logs.js</code> + local analyze or the Colab path.</li>
+<li><strong>Stream, don't load:</strong> 8MB slices keep the tab responsive; <code>.gz</code> decompresses in-browser via DecompressionStream. A 50MB mobile guard and a 500MB desktop confirm protect small devices.</li>
+<li><strong>Detect per line:</strong> JSON array, JSONL/NDJSON, Apache Combined, Nginx default, W3C Extended (uses your <code>#Fields</code> header — without it, guess-mode parses but edge-rule generation is blocked to prevent acting on wrong columns), AWS ALB, Cloudflare Logpush.</li>
+<li><strong>Analyze at scale:</strong> past 20k rows a Web Worker runs the 14-step pipeline; past ~300k lines a systematic 1-in-N sample keeps analysis honest, with an on-screen banner stating stride, kept/total counts, and timing.</li>
+<li><strong>Render 10 modules:</strong> Bots → Verification → Crawl Budget → Costs → AI Matrix → Edge + Policy Bundle → Performance + Traffic → Dynamics → Security → CFO, plus Crawl+GSC join and local history.</li>
 </ol>
+
+<h2>Read the output that matters</h2>
+<ul>
+<li><strong>Tab 3 · Crawl Budget:</strong> per-crawler efficiency, parameterized-URL ratios, <strong>16 traps</strong> (gclid/fbclid, currency/locale, <code>/filter/</code>, cart/variant combos, <code>/_next/data/</code>, price sliders) + the JS-shell table (AI-bot 200s under 5KB = zero citation chance).</li>
+<li><strong>Tab 4 · Costs:</strong> measured bytes × your CDN preset (CloudFront/Cloudflare/Fastly/GCS), 95% interval, blockable = training + suspicious only. Origin-compute stays OFF unless you opt in.</li>
+<li><strong>Tab 6 · Edge + Policy Bundle:</strong> Cloudflare/Fastly/AWS rules with copy buttons, training-vs-search robots.txt, <code>crawlers.json</code> + <code>security.txt</code> bundle, llms.txt, 402 pay-per-crawl example, rDNS checklist.</li>
+<li><strong>Tab 9 · Security:</strong> traversal, <code>.git/HEAD</code>, creds, <code>vendor/phpunit</code>, <code>actuator/env</code>, SSRF probes, velocity anomalies — 14 threat patterns.</li>
+</ul>
 <p><img src="../assets/screenshots/08-sample-banner.png" alt="Sampling banner disclosing stride" style="max-width:100%"></p>
+
+<h2>When to leave the browser</h2>
+<ul>
+<li><strong>500MB–50GB:</strong> <code>node tools/cli.js --exact --in access.log --out summary.json</code> — exact full-file totals, no sampling.</li>
+<li><strong>50GB+:</strong> the BigQuery pack (DDL + 5 queries + R2→Parquet streaming + scheduled UNVERIFIED-% query) in Tab 6 / BIGQUERY.md.</li>
+<li><strong>Test data:</strong> pick a URL range in the tool (0–100 … 1M–10M, each with max-size estimate) or <code>npm run gen-logs -- --lines N --out file.jsonl</code> (deterministic seeds).</li>
+</ul>
+
+<h2>FAQ</h2>
+<p><strong>1GB upload fails?</strong> Use a modern desktop browser (not a phone), accept the &gt;500MB confirm, stay on the tab. You will see Reading % then analysis %. Costs describe the analyzed sample and scale ~Nx — the banner says exactly how much.</p>
+<p><strong>"No valid records found"?</strong> The error reports lines seen + detected format. Compare your first line with the How To Use examples — usually a custom column order (add a <code>#Fields</code> header) or a truncated download.</p>
+<p><strong>Is sampling honest?</strong> The banner shows stride, kept/total lines, and read time; verification counts are scaled and labeled. No silent extrapolation anywhere.</p>
+
 <p><a class="btn-primary" href="../">Analyze your Logpush file now</a></p>
 </div></div><p class="crumbs">See also: <a href="./block-training-bots-cloudflare-without-losing-citations.html">Block training bots</a> · <a href="./compare-screaming-frog-jetoctopus-free.html">Tool comparison</a> · <a href="../research/1gb-teardown.html">1GB proof</a></p>
 </body>

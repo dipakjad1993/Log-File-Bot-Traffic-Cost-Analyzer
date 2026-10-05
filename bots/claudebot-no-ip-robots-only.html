@@ -3,29 +3,52 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ClaudeBot Has No IP List: Robots-Only Verification (2026)</title>
-<meta name="description" content="Anthropic publishes no IP list — ClaudeBot and Claude-SearchBot verify via robots.txt compliance only. Never trust IP verdicts for Claude. Free client-side checker.">
+<meta name="description" content="Anthropic publishes no IP list — ClaudeBot and Claude-SearchBot verify via robots.txt compliance only (claude.com/crawling/bots.json). Never trust IP verdicts for Claude. Free client-side checker.">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/claudebot-no-ip-robots-only.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=2.1.0">
 </head>
-<body><div class="main-wrap"><div class="card">
+<body><div class="main-wrap"><div class="card" style="max-width:960px">
 <p class="crumbs"><a href="../">Analyzer</a> / <a href="./">Bots</a> / ClaudeBot IPs</p>
 <h1>ClaudeBot: no IP list — robots.txt only</h1>
-<p>Anthropic publishes <strong>no IP allowlist</strong>. Any tool that shows "VERIFIED ClaudeBot via IP" is guessing. This analyzer labels Claude verification as <em>robots.txt only</em> by design and never invents an IP list.</p>
-<h2>What to do instead</h2>
-<pre><code># robots.txt — block training, allow search
-User-agent: ClaudeBot
-Disallow: /
-User-agent: Claude-SearchBot
-Allow: /</code></pre>
+<p>Anthropic publishes <strong>no IP allowlist</strong>. Any tool that shows "VERIFIED ClaudeBot via IP" is guessing. This analyzer labels Claude verification as <em>robots.txt only</em> by design and never invents an IP list — across all <strong>127 signatures</strong>, Claude entries are the only ones whose verification path skips IP matching entirely.</p>
+
+<h2>1. What Anthropic actually publishes</h2>
+<p><code>claude.com/crawling/bots.json</code> is a <strong>crawling policy file, not an IP list</strong>: bot names, purposes, and robots directives — no CIDRs, no ranges. The analyzer snapshots it in <code>data/bot-ips.json</code> (2026-09-17, 14 sources) with an explicit note: <em>robots-first, no bare IP list</em>. Verification for Claude means:</p>
 <ul>
-<li><strong>ClaudeBot</strong> (training): throttle/block freely, 60/min.</li>
-<li><strong>Claude-SearchBot</strong> (search-index): allow at 120/min — worst crawl-to-referral in class (~5,143:1) but still citation-bearing.</li>
-<li><strong>Claude-User</strong> (user-triggered): never throttle.</li>
-<li>Confirm spoofing server-side with reverse DNS before blocking — the tool exports an rDNS checklist.</li>
+<li><strong>Robots compliance</strong> — does the claimant respect the Disallow/Allow split below?</li>
+<li><strong>Forward-DNS confirm</strong> — does the hostname resolve back to the source IP?</li>
+<li><strong>Behavioral scoring</strong> — rate, breadth, and trap hits consistent with a real crawler?</li>
 </ul>
+
+<h2>2. What to do instead</h2>
+<div class="code"><h5>robots.txt — block training, allow search</h5><code>User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-SearchBot
+Allow: /</code></div>
+<div class="tbl-wrap"><table class="dt"><thead><tr><th>Claude bot</th><th>Tier</th><th>Policy</th></tr></thead><tbody>
+<tr><td>ClaudeBot (training)</td><td>ai_training</td><td><strong>Throttle/block freely, 60/min</strong> (20 aggressive)</td></tr>
+<tr><td>Claude-SearchBot (search-index)</td><td>ai_search_index</td><td><strong>Allow at 120/min</strong> — worst crawl-to-referral in class (~5,143:1, improved from 20,583:1) but still citation-bearing</td></tr>
+<tr><td>Claude-User / Claude-Web (user-triggered)</td><td>ai_user_fetch</td><td><strong>Never throttle</strong> (300/min abuse ceiling only)</td></tr>
+</tbody></table></div>
+
+<h2>3. Why Claude's ratio is the worst (and why you still allow search)</h2>
+<p>At ~5,143 fetches per referral, Claude-SearchBot is the most expensive citation in the DB — yet blocking it still costs Claude-answer visibility within weeks. The correct response is rate-limiting (120/min + 429), not blocking: you cap the cost while keeping the citation channel open. Training (ClaudeBot) has no referral channel at all, so it takes the full block.</p>
+
+<h2>4. Catch Claude spoofing without an IP list</h2>
+<ul>
+<li>Confirm spoofing <strong>server-side with reverse DNS</strong> before blocking — the tool exports an rDNS checklist (Tab 2 · Verification) with <code>dig -x</code> + forward-confirm commands.</li>
+<li>Cross-check behavior: real ClaudeBot fetches broadly and respects robots; a "ClaudeBot" hammering <code>/.git/HEAD</code> or <code>/vendor/phpunit</code> is an exploit probe wearing a costume (Tab 9 · Security flags these).</li>
+<li>Watch the <strong>UNVERIFIED share</strong> KPI — claimed-Claude traffic that never verifies is your spoof hunt shortlist.</li>
+</ul>
+
+<h2>FAQ</h2>
+<p><strong>Will Anthropic publish IPs later?</strong> Unknown. The DB refreshes weekly by automation — if a list appears, verification upgrades automatically and the freshness pill shows it. Until then: robots-first.</p>
+<p><strong>Should I just block everything claiming to be Claude?</strong> No — you'd block Claude-SearchBot citations and Claude-User live answers along with the spoofs. Split by tier, verify by DNS, enforce per-policy.</p>
+
 <p><a class="btn-primary" href="../">Check your log free — no upload</a></p>
 </div></div><p class="crumbs">See also: <a href="./gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="./perplexitybot-block-or-allow.html">PerplexityBot</a> · <a href="./">Full bot DB</a> · <a href="../guides/compare-screaming-frog-jetoctopus-free.html">Tool comparison</a></p>
 </body>

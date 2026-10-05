@@ -3,26 +3,55 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PerplexityBot: Block or Allow? 210:1 Says Allow (2026)</title>
-<meta name="description" content="PerplexityBot crawl-to-referral is ~210:1 — the best ROI in class. Allow at 120/min, throttle training bots instead. Free client-side check, no upload.">
+<meta name="description" content="PerplexityBot crawl-to-referral is ~210:1 — the best ROI in class vs OAI 85:1 and Claude ~5,143:1. Allow at 120/min with vendor IP verification, never hard block. Free client-side check, no upload.">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/perplexitybot-block-or-allow.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=2.1.0">
 </head>
-<body><div class="main-wrap"><div class="card">
+<body><div class="main-wrap"><div class="card" style="max-width:960px">
 <p class="crumbs"><a href="../">Analyzer</a> / <a href="./">Bots</a> / PerplexityBot</p>
 <h1>PerplexityBot: block or allow?</h1>
-<p><strong>Allow — at 120/min.</strong> PerplexityBot is search-index with the best measured crawl-to-referral in the DB (~210:1 vs OAI 85:1, Claude ~5,143:1). Hard-blocking it trades pennies of bandwidth for lost AI-answer citations. Throttle <em>training</em> bots (GPTBot, CCBot, Bytespider) instead.</p>
-<h2>Copy-paste rule</h2>
-<pre><code># robots.txt
-User-agent: PerplexityBot
-Allow: /</code></pre>
-<pre><code>// Cloudflare: PerplexityBot 120/min/IP, 429 + Retry-After on excess
-// Perplexity-User (user-triggered): do NOT throttle</code></pre>
-<h2>How to confirm on your own log</h2>
-<p>Drop your log into the <a href="../">free analyzer</a> (100% client-side, .gz + multi-file supported) → open <strong>Tab 5 AI Scraper Matrix</strong> → PerplexityBot shows cyan (search-index) with its 120/min policy. Verify via vendor JSON (<code>https://docs.perplexity.ai/bot.json</code>, snapshotted in <code>data/bot-ips.json</code>).</p>
+<p><strong>Allow — at 120/min.</strong> PerplexityBot is search-index with the <strong>best measured crawl-to-referral in the DB (~210:1</strong> vs OAI 85:1, Claude ~5,143:1). Hard-blocking it trades pennies of bandwidth for lost AI-answer citations. Throttle <em>training</em> bots (GPTBot, CCBot, Bytespider) instead.</p>
+
+<h2>1. Why the math favors allow</h2>
+<p>Every 210 Perplexity fetches correspond to roughly one referral visit — by far the cheapest AI crawler per unit of returned traffic. In the 10k pinned fixture PerplexityBot made <strong>251 requests / 9.7 MB</strong>: a few cents of CloudFront egress against citation-bearing answer traffic. Compare Claude-SearchBot (~5,143:1, still allowed because citations compound) and raw training crawlers (no referrals at all — pure cost).</p>
+<div class="tbl-wrap"><table class="dt"><thead><tr><th>Search-index bot</th><th>Crawl-to-referral</th><th>Policy</th></tr></thead><tbody>
+<tr><td>PerplexityBot</td><td class="n"><strong>~210:1</strong> (best in class)</td><td>ALLOW 120/min</td></tr>
+<tr><td>OAI-SearchBot</td><td class="n">~85:1</td><td>ALLOW 120/min</td></tr>
+<tr><td>Claude-SearchBot</td><td class="n">~5,143:1 (worst, still citation-bearing)</td><td>ALLOW 120/min</td></tr>
+</tbody></table></div>
+<p>Ratios are directional medians from 2026 studies plus log measurement — confirm against your own analytics. Logs prove fetch, not citation.</p>
+
+<h2>2. Copy-paste rule</h2>
+<div class="code"><h5>robots.txt — search-index stays allowed</h5><code>User-agent: PerplexityBot
+Allow: /</code></div>
+<div class="code"><h5>Cloudflare — rate-limit, never block</h5><code># PerplexityBot: ALLOW, 120/min/IP
+# excess =&gt; 429 + Retry-After: 30 — NEVER Block
+# Perplexity-User (user-triggered): do NOT throttle (300/min abuse ceiling only)</code></div>
+<p>Rate control uses 429/503 + Retry-After — the analyzer never generates tarpitting rules. Tab 6 builds these from your log with copy buttons for Cloudflare, Fastly, and AWS.</p>
+
+<h2>3. Verify it's really Perplexity (spoof check)</h2>
+<ul>
+<li><strong>Vendor IP JSON:</strong> <code>perplexity.ai/perplexitybot.json</code> (+ legacy <code>docs.perplexity.ai/bot.json</code>), snapshotted with full CIDRs + IPv6 in <code>data/bot-ips.json</code> (2026-09-17, 14 sources). IP match = VERIFIED.</li>
+<li><strong>UNVERIFIED PerplexityBot</strong> on a residential/cloud IP with a browser UA = spoof — challenge it, and export the rDNS checklist from Tab 2 before blocking.</li>
+<li><strong>Perplexity-User</strong> is user-triggered fetch (live answers), verified separately via <code>perplexity.ai/perplexity-user.json</code> — robots.txt may not even apply to it.</li>
+</ul>
+
+<h2>4. How to confirm on your own log</h2>
+<ol>
+<li>Drop your log into the <a href="../">free analyzer</a> (100% client-side, .gz + multi-file supported, 8MB slices).</li>
+<li>Open <strong>Tab 5 · AI Matrix</strong> → PerplexityBot shows <strong>cyan (search-index)</strong> with its 120/min policy.</li>
+<li>Open <strong>Tab 2 · Verification</strong> → check VERIFIED vs heuristic share for its IPs.</li>
+<li>Open <strong>Tab 4 · Costs</strong> → confirm its bytes are excluded from blockable (search-index is never blockable — asserted in tests).</li>
+</ol>
 <p><a class="btn-primary" href="../?sample=10k">Try the 1-click 10k demo</a></p>
+
+<h2>FAQ</h2>
+<p><strong>Perplexity crawls aggressively — isn't that reason to block?</strong> Aggression is a rate problem, solved by 120/min + 429. Blocking is a visibility decision with 2-week citation consequences. Rate-limit first, measure, then decide.</p>
+<p><strong>What about Perplexity-User?</strong> Never throttle. It's a live user waiting for an answer; a 429 is a missing citation, not saved bandwidth.</p>
+
 </div></div><p class="crumbs">See also: <a href="./gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="./claudebot-no-ip-robots-only.html">ClaudeBot IPs</a> · <a href="./">Full bot DB</a> · <a href="../research/1gb-teardown.html">1GB proof</a></p>
 </body>
 </html>
