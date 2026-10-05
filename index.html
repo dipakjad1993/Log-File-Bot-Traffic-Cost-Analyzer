@@ -16,7 +16,10 @@
 <meta name="twitter:title" content="Log File Bot Traffic Cost Analyzer — Free, Private, Client-Side">
 <meta name="twitter:description" content="GPTBot vs OAI-SearchBot cost split + copy-paste Cloudflare edge rules. 100% client-side.">
 <meta name="twitter:image" content="https://log-file-bot-traffic-cost-analyzer.pages.dev/assets/screenshots/06-kpi-strip.png">
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#0A1930">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./css/style.css">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Log File Bot Traffic Cost Analyzer","applicationCategory":"DeveloperApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0"},"license":"https://opensource.org/licenses/MIT","featureList":"bot classification, crawl budget, egress cost, edge rules, robots.txt generator, llms.txt generator, GSC join"}
@@ -33,17 +36,36 @@
 </head>
 <body>
 
-<nav class="sidebar" id="sidebar" aria-label="Main navigation">
-  <div class="sidebar-brand">LOG &amp; BOT TRAFFIC ANALYZER</div>
-  <div class="sidebar-sub">Fast, Privacy-Focused, Client-Side Analysis <span class="badge b-green">v2.2.0</span> <span class="badge b-cyan" id="db-fresh-pill" title="Bot DB freshness: green <7d, amber <21d, red stale">DB v2026.09.17 · 127 sigs · fresh</span></div>
-  <div class="sidebar-nav">
-    <button class="sb-btn active" data-section="dashboard" aria-label="Open dashboard">Dashboard</button>
-    <button class="sb-btn" data-section="about" aria-label="About this tool">About</button>
-    <button class="sb-btn" data-section="howto" aria-label="How to use">How To Use</button>
+<header class="topbar" id="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="./" data-section="dashboard" aria-label="Log File and Bot Traffic Analyzer — home">
+      <span class="brand-mark" aria-hidden="true">▦</span>
+      <span class="brand-text"><strong>Log File &amp; Bot Traffic Analyzer</strong><small>Enterprise bot-cost &amp; crawl audit · <span class="badge b-green">v2.2.0</span> <span class="badge b-cyan" id="db-fresh-pill" title="Bot DB freshness: green <7d, amber <21d, red stale">DB v2026.09.17 · 127 sigs · fresh</span></small></span>
+    </a>
+    <nav class="topnav" aria-label="Primary">
+      <button class="nav-btn active" data-section="dashboard">Analyzer</button>
+      <div class="nav-group">
+        <button class="nav-btn nav-drop-btn" aria-haspopup="true">Knowledge Base ▾</button>
+        <div class="nav-menu" role="menu" aria-label="Knowledge base">
+          <a href="./bots/gptbot-vs-oai-searchbot.html" role="menuitem">GPTBot vs OAI-SearchBot</a>
+          <a href="./bots/perplexitybot-block-or-allow.html" role="menuitem">PerplexityBot: block or allow?</a>
+          <a href="./bots/claudebot-no-ip-robots-only.html" role="menuitem">ClaudeBot verification</a>
+          <a href="./bots/" role="menuitem">Bot database (all signatures)</a>
+          <a href="./guides/block-training-bots-cloudflare-without-losing-citations.html" role="menuitem">Block training in Cloudflare</a>
+          <a href="./guides/cloudflare-logpush-1gb-analysis-free.html" role="menuitem">Analyze 1GB Logpush free</a>
+          <a href="./guides/compare-screaming-frog-jetoctopus-free.html" role="menuitem">Frog vs JetOctopus vs $0</a>
+          <a href="./research/1gb-teardown.html" role="menuitem">1.02GB teardown (measured)</a>
+        </div>
+      </div>
+      <button class="nav-btn" data-section="about">About</button>
+      <button class="nav-btn" data-section="howto">How To Use</button>
+    </nav>
+    <div class="top-actions">
+      <span class="privacy-chip" title="Private by design — no data transmitted (see SECURITY.md)">🔒 Client-side · no upload</span>
+      <button class="btn-theme" id="dark-toggle" aria-label="Toggle dark mode">◐ Theme</button>
+    </div>
   </div>
-  <button class="btn-sm" id="dark-toggle" aria-label="Toggle dark mode">Dark mode</button>
-  <div class="sidebar-footer">Client-side analysis only. No data leaves your browser. Bot DB v2026.09.17 · IP JSON 2026-09-17 · <span style="color:var(--green)">● fresh</span><br>Private by design — no data transmitted (see SECURITY.md). <a href="./CHANGELOG.md">Changelog</a> · <a href="./METHOD.md">Method</a></div>
-</nav>
+</header>
 
 <div class="main-wrap">
 
@@ -96,19 +118,15 @@
   <section id="sec-dashboard" class="page active-page">
     <div class="upload-panel" id="upload-panel">
     <div class="upload-header">
-      <div class="upload-brand-icon"></div>
       <h1>Log File &amp; Bot Traffic Analyzer</h1>
-      <p class="tool-tagline">Drop 1M-line logs → see <strong>GPTBot vs OAI-SearchBot cost split</strong> → copy Cloudflare rule. Free, private, $0 vs $139/yr Frog / €171–383/mo JetOctopus. 100% client-side — 🔒 no log leaves your machine (<a href="./METHOD.md">audit</a>).</p>
-      <div class="proof-strip" aria-label="Measured proof, not promises">
-        <div class="proof-item"><strong>3.2M lines</strong><span>1.02GB streamed</span></div>
-        <div class="proof-item"><strong>6.6s read</strong><span>320k sampled 1-in-10</span></div>
-        <div class="proof-item"><strong>$2.61 total</strong><span>$0.25 blockable</span></div>
-        <div class="proof-item"><strong>127 sigs</strong><span>training vs search vs user</span></div>
-        <div class="proof-item"><strong>UNVERIFIED GPTBot: top KPI</strong><span>spoof hunt built-in</span></div>
-        <div class="proof-item"><strong>JS-shell table</strong><span>GEO render gap</span></div>
+      <p class="tool-sub">Upload server logs to separate <strong>AI training bots from search crawlers</strong>, quantify bandwidth cost, catch spoofed bots, and export Cloudflare / Fastly / AWS block rules — 100% private, in your browser.</p>
+      <div class="trust-row" aria-label="Trust signals">
+        <span class="trust-chip">🔒 Client-side only</span>
+        <span class="trust-chip">127 bot signatures</span>
+        <span class="trust-chip">Training vs Search vs User</span>
+        <span class="trust-chip">Free · <a href="./METHOD.md">Method</a> · <a href="./CHANGELOG.md">Changelog</a></span>
       </div>
-      <p><img src="./assets/screenshots/06-kpi-strip.png" alt="KPI strip from the measured 1.02GB run" loading="lazy" style="max-width:100%;border:1px solid var(--border);border-radius:10px;margin-top:12px"></p>
-      <p><a class="btn-primary" href="?sample=10k" id="try-sample-link">Try 10k sample in 1 click</a> <a class="btn-outline" href="./research/1gb-teardown.html">See the 1GB proof</a></p>
+      <p class="hero-cta"><a class="btn-primary" href="?sample=10k" id="try-sample-link">Try 10k sample in 1 click</a> <a class="btn-outline" href="./research/1gb-teardown.html">See the 1GB proof</a></p>
     </div>
     <div class="upload-drop sticky-drop" id="upload-drop" role="button" tabindex="0" aria-label="Drop log file here or browse. Files stay on this device.">
       <div class="drop-icon" aria-hidden="true">📁</div>
@@ -116,84 +134,28 @@
       <div class="drop-sub">or</div>
       <button class="btn-primary" id="browse-btn">Browse Files</button>
       <input type="file" id="file-input" accept=".json,.jsonl,.ndjson,.log,.txt,.csv,.gz" multiple hidden aria-label="Log file input (multiple files + .gz supported)">
-      <div class="drop-formats">📄 .log &nbsp; 📄 .jsonl &nbsp; 📄 .csv &nbsp; 🗜️ .gz &nbsp; — JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush. Multi-select rotations. <strong>Mobile: 50MB guard pre-drop.</strong> 500MB+ → <code>node tools/cli.js --exact</code> (exact, no sampling).</div>
-      <div class="drop-formats">Example: <button class="btn-sm" id="example-chip">access.log.gz sample</button></div>
+      <div class="drop-accept">Accepts .log · .jsonl · .csv · .gz · multi-file rotations — files never leave this device.</div>
+      <div class="drop-example">No file handy? <button class="btn-sm" id="example-chip">Load 10k demo</button></div>
     </div>
     <div class="upload-extras">
-      <span class="divider-text">no log file?</span>
+      <span class="divider-text">Need test data?</span>
       <div class="sample-controls">
-        <label class="sample-size-label" for="sample-size">Size:</label>
-        <select id="sample-size">
-          <option value="1">1 MB</option>
-          <option value="5" selected>5 MB</option>
-          <option value="10">10 MB</option>
-          <option value="50">50 MB</option>
-          <option value="100">100 MB</option>
-          <option value="500">500 MB</option>
-          <option value="1024">1 GB</option>
+        <label class="sample-size-label" for="sample-size">Sample volume:</label>
+        <select id="sample-size" aria-label="Sample volume in log lines">
+          <option value="100">100 URLs</option>
+          <option value="1000">1,000 URLs</option>
+          <option value="10000" selected>10,000 URLs</option>
+          <option value="100000">100,000 URLs</option>
+          <option value="1000000">1,000,000 URLs</option>
         </select>
+        <span class="sample-est" id="sample-size-est" aria-live="polite">≈ 4.3 MB</span>
         <button class="btn-outline" id="download-sample-btn">Download Sample Log</button>
       </div>
+      <p class="sample-note">Each option lists total URLs plus its estimated file size (≈450 bytes/row). For exact multi-GB totals use <code>node tools/cli.js --exact</code>.</p>
     </div>
-    <nav class="guides-nav" id="guides" aria-label="Guides and research">
-      <div class="guides-head">
-        <div>
-          <p class="eyebrow">Knowledge base · measured numbers, copy-paste rules</p>
-          <h2>Guides &amp; research</h2>
-          <p class="guides-sub">Every page below is generated from real log runs and the live 127-signature DB — no thought-leadership fluff. Next: <a href="./guides/block-training-bots-cloudflare-without-losing-citations.html">block training in Cloudflare →</a> then <a href="./research/1gb-teardown.html">1GB proof →</a> then CLI waitlist.</p>
-        </div>
-      </div>
-      <div class="guide-grid">
-        <a class="guide-card" href="./bots/gptbot-vs-oai-searchbot.html">
-          <span class="badge b-purple">BOTS</span>
-          <strong>GPTBot vs OAI-SearchBot: cost split, different rules</strong>
-          <span class="guide-desc">Same vendor, opposite policies. Block training freely; allow search at 120/min or citations die in 2 weeks.</span>
-          <span class="guide-meta">4 min read <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./bots/perplexitybot-block-or-allow.html">
-          <span class="badge b-purple">BOTS</span>
-          <strong>PerplexityBot: block or allow? 210:1 says allow</strong>
-          <span class="guide-desc">Best crawl-to-referral in its class. Rate-limit at 120/min — never hard block.</span>
-          <span class="guide-meta">3 min read <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./bots/claudebot-no-ip-robots-only.html">
-          <span class="badge b-purple">BOTS</span>
-          <strong>ClaudeBot has no IP list: robots-only verification</strong>
-          <span class="guide-desc">Anthropic publishes no IPs. Any tool claiming IP verification for Claude is guessing.</span>
-          <span class="guide-meta">3 min read <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./bots/">
-          <span class="badge b-green">DATABASE</span>
-          <strong>Searchable bot DB — all 75 signatures</strong>
-          <span class="guide-desc">Every signature with its edge policy and rate limit. Refreshed weekly by automation.</span>
-          <span class="guide-meta">Updated weekly <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./guides/block-training-bots-cloudflare-without-losing-citations.html">
-          <span class="badge b-blue">GUIDE</span>
-          <strong>Block training bots in Cloudflare without losing AI citations</strong>
-          <span class="guide-desc">Copy-paste WAF rules plus the RFC 9309 robots split that keeps search-index allowed.</span>
-          <span class="guide-meta">6 min read <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./guides/cloudflare-logpush-1gb-analysis-free.html">
-          <span class="badge b-blue">GUIDE</span>
-          <strong>Analyze 1GB Cloudflare Logpush logs free, no upload</strong>
-          <span class="guide-desc">8MB slices, in-browser .gz, multi-file rotation. Nothing leaves the machine.</span>
-          <span class="guide-meta">5 min read <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./guides/compare-screaming-frog-jetoctopus-free.html">
-          <span class="badge b-amber">COMPARE</span>
-          <strong>Screaming Frog $139 vs JetOctopus €171–383 vs $0</strong>
-          <span class="guide-desc">Honest 2026 comparison with verified prices (Feb 2026) — including where the paid tools win.</span>
-          <span class="guide-meta">7 min read <span aria-hidden="true">→</span></span>
-        </a>
-        <a class="guide-card" href="./research/1gb-teardown.html">
-          <span class="badge b-red">RESEARCH</span>
-          <strong>1.02GB / 3.2M lines teardown: $2.61 measured</strong>
-          <span class="guide-desc">Full numbers from the headless-Chromium run: 6.6s read, $0.25 blockable, 19,272 threats.</span>
-          <span class="guide-meta">Measured data <span aria-hidden="true">→</span></span>
-        </a>
-      </div>
-    </nav>
+    <section class="kb-strip" aria-label="Knowledge base">
+      <p>Looking for research? Open <strong>Knowledge Base ▾</strong> in the top bar — bot comparisons, Cloudflare playbooks, and the measured 1.02GB teardown live on their own pages.</p>
+    </section>
   </div>
 
   <!-- File info bar -->

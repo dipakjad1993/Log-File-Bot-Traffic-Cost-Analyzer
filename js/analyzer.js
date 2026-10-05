@@ -2553,7 +2553,7 @@ function renderHowto(){
 
 /* ==== Q: CONTROLLER ==== */
 let currentAnalysis=null,currentCfg={cdnEgress:0.09,request10K:0.0075,ssr1K:0,preset:'AWS CloudFront (default)'},currentPreset='AWS CloudFront (default)';
-function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));document.querySelectorAll('.sb-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+id).classList.add('active-page');document.querySelector(`[data-section="${id}"]`).classList.add('active')}
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));document.querySelectorAll('.sb-btn,.nav-btn[data-section]').forEach(b=>b.classList.remove('active'));const sec=document.getElementById('sec-'+id);if(sec)sec.classList.add('active-page');document.querySelectorAll(`[data-section="${id}"]`).forEach(el=>{if(el.classList.contains('nav-btn'))el.classList.add('active')});try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){window.scrollTo(0,0)}}
 function showTab(id){document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active-tp'));document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active-tp');document.querySelector(`[data-tab="${id}"]`).classList.add('active')}
 
 function processRecords(records,file,meta){
@@ -3049,7 +3049,11 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   renderAbout();renderHowto();
   const prm=new URLSearchParams(location.search);
   if(prm.get('sample')==='10k'){fetch('./sample-data/sample-10k.jsonl').then(r=>r.text()).then(t=>{const recs=t.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);document.getElementById('upload-panel').classList.add('hidden');document.getElementById('progress-wrap').classList.remove('hidden');lastRecords=recs;processRecords(recs,{name:'sample-10k.jsonl',size:t.length});}).catch(()=>{});}
-  document.querySelectorAll('.sb-btn').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.section)));
+  document.querySelectorAll('.nav-btn[data-section],.brand[data-section]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();showPage(b.dataset.section)}));
+  // URL-count sample estimator: total URLs + estimated file size side by side
+  function fmtEst(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(bytes<10240?1:0)+' KB';if(bytes<1073741824)return (bytes/1048576).toFixed(bytes<10485760?1:0)+' MB';return (bytes/1073741824).toFixed(2)+' GB';}
+  function updateSampleEst(){try{const sel=document.getElementById('sample-size'),est=document.getElementById('sample-size-est');if(!sel||!est)return;const n=parseInt(sel.value||'10000',10)||10000;est.textContent='≈ '+fmtEst(n*450)+' · '+n.toLocaleString()+' URLs';}catch(e){}}
+  document.getElementById('sample-size')?.addEventListener('change',updateSampleEst);updateSampleEst();
   document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>{showTab(b.dataset.tab);lazyRender(b.dataset.tab);}));
   // Keyboard 1-0 tab shortcuts (a11y) + lazy-render tabs 2-10 after analyze
   document.addEventListener('keydown',e=>{
@@ -3130,16 +3134,18 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   document.getElementById('clear-btn').addEventListener('click',()=>{fi.value='';document.getElementById('info-bar').classList.add('hidden');document.getElementById('results').classList.add('hidden');document.getElementById('upload-panel').classList.remove('hidden');currentAnalysis=null});
   document.getElementById('download-sample-btn').addEventListener('click',e=>{
     e.stopPropagation();
-    const sizeMB=parseInt(document.getElementById('sample-size')?.value||'5',10);
-    const maxSizeMB=1024;
-    let actualSizeMB=Math.min(sizeMB,maxSizeMB);
-    if(sizeMB>maxSizeMB) alert('Maximum sample size is 1 GB. Generating 1 GB file.');
-    // Mobile guard: phones OOM on giant in-browser generation — cap at 50MB with CLI hint
+    // URL-count selector: total URLs drive generation; file size shown as estimate (~450 B/row)
+    let urlCount=parseInt(document.getElementById('sample-size')?.value||'10000',10)||10000;
+    urlCount=Math.max(100,Math.min(urlCount,1000000));
+    let actualSizeMB=(urlCount*450)/1048576; // fractional MB => exact URL count via sampleTargetRecords
+    const dispMB=actualSizeMB<1?actualSizeMB.toFixed(2):actualSizeMB<10?actualSizeMB.toFixed(1):Math.round(actualSizeMB).toString();
+    const estLabel=urlCount.toLocaleString()+' URLs (≈ '+dispMB+' MB)';
+    // Mobile guard: phones OOM on giant in-browser generation — cap at 100k URLs with CLI hint
     try{
       const isMobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||'')||(window.matchMedia&&matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<820);
-      if(isMobile&&actualSizeMB>50){alert('Mobile detected: sample capped at 50MB (large generation needs desktop RAM). For 500MB+ use the CLI: npm run gen-logs -- --lines N --out file.jsonl');actualSizeMB=50;}
+      if(isMobile&&urlCount>100000){alert('Mobile detected: sample capped at 100,000 URLs (≈43 MB). For 1M+ use the CLI on desktop: npm run gen-logs -- --lines N --out file.jsonl');urlCount=100000;actualSizeMB=(urlCount*450)/1048576;}
     }catch(err){}
-    if(actualSizeMB>100&&!confirm(`${actualSizeMB} MB will take a while in-browser (streaming, tab stays responsive). For 500 MB+ the CLI is faster: npm run gen-logs -- --lines N --out file.jsonl. Continue in browser?`))return;
+    if(urlCount>=1000000&&!confirm(`${estLabel} will take a while in-browser (streaming, tab stays responsive). For exact multi-GB totals the CLI is faster: npm run gen-logs -- --lines N --out file.jsonl. Continue in browser?`))return;
     const btn=document.getElementById('download-sample-btn');
     btn.textContent='Generating 0%...';
     btn.disabled=true;
@@ -3157,7 +3163,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
             const a=document.createElement('a');
             const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
             a.href=u;
-            a.download=`sample-logs-${actualSizeMB}MB-${ts}.jsonl`;
+            a.download=`sample-logs-${urlCount}urls-${actualSizeMB<1?actualSizeMB.toFixed(2):Math.round(actualSizeMB)}MB-${ts}.jsonl`;
             a.click();
             setTimeout(()=>URL.revokeObjectURL(u),5000);
           }catch(err){

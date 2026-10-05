@@ -13,6 +13,8 @@ Free, private, **$0** vs $139/yr Screaming Frog Log Analyser ($279 Spider) / €
 
 **[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html)**
 
+Enterprise UI (v2.2.0): navy top bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), tool name + one-line description up front, sample downloads by **URL count with file-size estimate** (100–1M URLs), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
+
 > Private by design: 100% client-side, no XHR/WebSocket/sendBeacon. Only network request is loading the demo file you click. See [METHOD.md](METHOD.md).
 
 ![Drop → cost split → Cloudflare rule in 30s](assets/screenshots/01-hero-upload.png)
@@ -72,7 +74,7 @@ Includes Cloudflare Sept-15-2026 defaults, Pay Per Crawl 402 beta, Web Bot Auth,
 | 9 | Security | Traversal, .git/HEAD, creds, SSRF, velocity anomalies |
 | 10 | CFO / FinOps | Totals, monthly/annual run-rate, CSV + real PDF download (vendored jsPDF, no CDN) |
 
-Screenshots: `assets/screenshots/09-tab1-classification.png` → `29-cfo-viewport.png`. Full history: [CHANGELOG.md](CHANGELOG.md).
+Screenshots: `assets/screenshots/09-tab1-classification.png` → `29-cfo-viewport.png` (analysis modules unchanged; only the app header/hero was refreshed in v2.2.0). Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## 5. Quick start
 
@@ -85,7 +87,7 @@ npm test             # 118 asserts
 npm run lint
 ```
 
-Inputs: JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush, .gz — mixed files + rotations OK. Streams in 8MB slices; 500MB+ exact → `node tools/cli.js --exact --in access.log --out summary.json`.
+Inputs: JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush, .gz — mixed files + rotations OK. Streams in 8MB slices; 500MB+ exact → `node tools/cli.js --exact --in access.log --out summary.json`. Test data: pick **100 / 1K / 10K / 100K / 1M URLs** in the tool (each shows its estimated file size, ≈450 bytes/row) or `npm run gen-logs -- --lines N --out file.jsonl`.
 
 Deploy: Cloudflare Pages (primary, `main`, no build command, headers from `_headers`) or GitHub Pages backup. Live: https://log-file-bot-traffic-cost-analyzer.pages.dev
 
