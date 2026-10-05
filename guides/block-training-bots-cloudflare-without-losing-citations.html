@@ -5,17 +5,41 @@
 <title>Block Training Bots in Cloudflare Without Losing AI Citations (2026)</title>
 <meta name="description" content="Block GPTBot, CCBot, Bytespider, DeepSeekBot and 49 training bots at the edge while keeping search-index allowed at 120/min. Copy-paste Cloudflare/Fastly/AWS rules, RFC 9309 robots split, rollout plan.">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/block-training-bots-cloudflare-without-losing-citations.html">
+<meta property="og:title" content="Block Training Bots in Cloudflare Without Losing AI Citations (2026)">
+<meta property="og:description" content="Block 49 training bots at the edge while keeping search-index allowed at 120/min. Copy-paste Cloudflare/Fastly/AWS rules, RFC 9309 robots split, rollout plan.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://log-file-bot-traffic-cost-analyzer.pages.dev/guides/block-training-bots-cloudflare-without-losing-citations.html">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0B57D0">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"HowTo","name":"Block training bots in Cloudflare without losing AI citations","step":[{"@type":"HowToStep","name":"Split robots.txt","text":"Disallow training bots (GPTBot, ClaudeBot, CCBot, Bytespider, Google-Extended), Allow search-index (OAI-SearchBot, PerplexityBot, Claude-SearchBot)."},{"@type":"HowToStep","name":"Add Cloudflare WAF rules","text":"Managed Challenge training at 60/min; ALLOW search-index at 120/min with 429 + Retry-After; never throttle user-triggered fetch."},{"@type":"HowToStep","name":"Roll out monitor, challenge, block","text":"One week per stage; watch citation dashboards, not crawl volume."},{"@type":"HowToStep","name":"Measure on your log","text":"Free client-side analyzer: Tab 4 Costs shows blockable, Tab 6 generates the exact rules."}]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Analyzer","item":"https://log-file-bot-traffic-cost-analyzer.pages.dev/"},{"@type":"ListItem","position":2,"name":"Guides"},{"@type":"ListItem","position":3,"name":"Block training bots"}]}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/style.css?v=2.1.0">
+<link rel="stylesheet" href="../css/style.css?v=2.2.0">
 </head>
 <body><div class="main-wrap"><div class="card" style="max-width:960px">
 <p class="crumbs"><a href="../">Analyzer</a> / Guides / Block training bots</p>
+<div class="page-hero">
+<span class="eyebrow">Guide · Cloudflare WAF</span>
 <h1>Block training bots without losing AI citations</h1>
-<p>The classic mistake: one rule blocks "AI bots" and kills ChatGPT/Perplexity citations for 2 weeks. The fix: split <strong>training (block)</strong> vs <strong>search-index (allow 120/min)</strong> vs <strong>user-triggered (never throttle)</strong> — exactly what the analyzer's <strong>127-signature DB</strong> (49 training, 10 search-index, 8 user-triggered) enforces end to end.</p>
+<p class="lede">The classic mistake: one rule blocks "AI bots" and kills ChatGPT/Perplexity citations for 2 weeks. The fix: split <strong>training (block)</strong> vs <strong>search-index (allow 120/min)</strong> vs <strong>user-triggered (never throttle)</strong> — exactly what the analyzer's <strong>127-signature DB</strong> (49 training, 10 search-index, 8 user-triggered) enforces end to end.</p>
+<div class="meta-row"><span class="meta-chip">⏱ <strong>6 min</strong> read</span><span class="meta-chip">✓ Updated <strong>2026-10-05</strong></span><span class="meta-chip">Copy-paste <strong>WAF + robots</strong></span></div>
+</div>
+<nav class="toc" aria-label="On this page"><strong>On this page</strong><ol>
+<li><a href="#robots">robots.txt split (RFC 9309)</a></li>
+<li><a href="#waf">Cloudflare WAF rules</a></li>
+<li><a href="#rollout">Roll out: monitor → challenge → block</a></li>
+<li><a href="#measure">Measure before/after</a></li>
+<li><a href="#ppc">Alternative: Pay Per Crawl</a></li>
+<li><a href="#refs">References</a></li>
+</ol></nav>
 
-<h2>1. robots.txt split (RFC 9309 most-specific-wins)</h2>
+<h2 id="robots">1. robots.txt split (RFC 9309 most-specific-wins)</h2>
 <div class="code"><h5>Training blocked, search allowed — paste as-is</h5><code>User-agent: GPTBot
 Disallow: /
 User-agent: ClaudeBot
@@ -38,7 +62,7 @@ User-agent: *
 Allow: /</code></div>
 <p>Notes from the field: <code>Google-Extended</code> is a robots <em>token</em>, not a user-agent — it only works here, never in a WAF rule. <code>ChatGPT-User</code> / <code>Perplexity-User</code> ignore robots ~54% of the time (they're user-triggered fetches), so robots.txt is not their control plane — edge policy is. The analyzer's Tab 6 generates this file from your log with one click.</p>
 
-<h2>2. Cloudflare WAF rules (plus Fastly + AWS equivalents)</h2>
+<h2 id="waf">2. Cloudflare WAF rules (plus Fastly + AWS equivalents)</h2>
 <div class="code"><h5>Rule 1 — training bots: Managed Challenge, 60/min (20 aggressive)</h5><code>(http.user_agent contains "GPTBot") or (http.user_agent contains "ClaudeBot")
 or (http.user_agent contains "CCBot") or (http.user_agent contains "Bytespider")
 or (http.user_agent contains "GoogleOther") or (http.user_agent contains "Meta-ExternalAgent")
@@ -52,7 +76,7 @@ or (http.user_agent contains "Claude-User")
   =&gt; ALLOW + log. Abuse ceiling 300/min =&gt; 429 + Retry-After: 10.</code></div>
 <p>Rate control uses 429/503 + Retry-After — the analyzer never generates tarpitting rules. Tab 6 emits the same policy for <strong>Fastly (VCL snippets) and AWS WAF</strong>, maps to <strong>Cloudflare AI Crawl Control</strong> (Sept-15-2026 defaults: block training + agent on ad pages, allow search-only), and exports the mapping as JSON. It also runs a <strong>consistency check</strong> that flags robots-vs-edge conflicts (e.g. allowing GPTBot in robots while blocking at edge).</p>
 
-<h2>3. Roll out safely: monitor → challenge → block</h2>
+<h2 id="rollout">3. Roll out safely: monitor → challenge → block</h2>
 <ol>
 <li><strong>Week 1 — monitor:</strong> deploy Rule 1 in Log/Managed-Challenge-bypass mode. Read Tab 8 · Dynamics for bursts and Tab 2 · Verification for VERIFIED vs spoof share.</li>
 <li><strong>Week 2 — challenge:</strong> enforce Managed Challenge on training. Watch citation dashboards (not crawl volume) for OAI-SearchBot/PerplexityBot — they must stay untouched.</li>
@@ -60,18 +84,23 @@ or (http.user_agent contains "Claude-User")
 <li><strong>Never:</strong> hard-block search-index, throttle user-triggered, or Disallow OAI-AdsBot (revenue risk on ecommerce).</li>
 </ol>
 
-<h2>4. Measure before/after on your own log</h2>
+<h2 id="measure">4. Measure before/after on your own log</h2>
 <p>Run your log through the <a href="../">free analyzer</a> → <strong>Tab 4 · Costs</strong> shows blockable = training + suspicious only ($0.25 on the 1.02&nbsp;GB sample; $0.0046 on the 10k fixture) → <strong>Tab 6 · Edge + Policy Bundle</strong> generates the exact rule set with copy buttons. No log leaves your machine — verified: no XHR/WebSocket, only the demo file loads on click.</p>
-<p><img src="../assets/screenshots/14-tab6-edge-rules.png" alt="Edge rules tab with copy buttons" style="max-width:100%"></p>
+<figure class="post-fig"><img src="../assets/screenshots/14-tab6-edge-rules.png" alt="Edge rules tab with copy buttons" loading="lazy"><figcaption><strong>Tab 6 · Edge + Policy Bundle.</strong> Cloudflare, Fastly, and AWS rules generated from your log mix, each with a copy button — plus robots.txt, crawlers.json, and the rDNS checklist.</figcaption></figure>
 
-<h2>5. Alternative: charge instead of blocking (Pay Per Crawl)</h2>
+<h2 id="ppc">5. Alternative: charge instead of blocking (Pay Per Crawl)</h2>
 <p>Tab 6 generates per-path 402 pricing — free paths, premium paths ($0.05/req), API paths ($0.25/req) — with an origin <code>Crawler-Price</code> header, a Cloudflare Worker enforcer, and a test harness. Training bots without a payment token get 402 + price; search-index and user-fetch are hard-bypassed and never charged.</p>
 
 <h2>FAQ</h2>
 <p><strong>How fast do citations recover if I already blocked search?</strong> Typically 1–2 weeks after re-allowing at 120/min, once fetch volume normalizes. Watch Tab 8 for the recovery curve.</p>
 <p><strong>Do these rules cover the 2026 surge bots (DeepSeek, Qwen, Firecrawl)?</strong> Yes — all classified training in the 127-signature DB with 60/min policies. Re-run the analyzer after each weekly DB refresh.</p>
 
-<p><a class="btn-primary" href="../?sample=10k">Test on the 10k demo first</a></p>
+<h2 id="refs">References</h2>
+<ul class="ref-list">
+<li>Vendor IP snapshots: <code>data/bot-ips.json</code> (14 sources, 2026-09-17) — <a href="https://openai.com/gptbot.json">GPTBot</a> · <a href="https://openai.com/searchbot.json">OAI-SearchBot</a> · <a href="https://docs.perplexity.ai/bot.json">PerplexityBot</a> · <a href="https://claude.com/crawling/bots.json">Claude policy</a>.</li>
+<li>Companion pages: <a href="./cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <a href="../bots/gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="../research/1gb-teardown.html">1GB proof</a>.</li>
+</ul>
+<p class="cta-row"><a class="btn-primary" href="../?sample=10k">Test on the 10k demo first</a></p>
 </div></div><p class="crumbs">See also: <a href="./cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <a href="./compare-screaming-frog-jetoctopus-free.html">Tool comparison</a> · <a href="../bots/gptbot-vs-oai-searchbot.html">GPTBot vs OAI-SearchBot</a> · <a href="../research/1gb-teardown.html">1GB proof</a></p>
 </body>
 </html>

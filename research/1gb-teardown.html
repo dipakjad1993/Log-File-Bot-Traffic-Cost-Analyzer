@@ -5,15 +5,47 @@
 <title>1.02GB / 3.2M Lines in Browser: $2.61 Cost Teardown (Measured)</title>
 <meta name="description" content="Real 1.02GB NDJSON run: 320k sampled in 6.6s, 70% human, $2.61 total, $0.25 blockable, 19,272 threats, 18% trap waste, 127 signatures. Every number measured, with screenshots.">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/research/1gb-teardown.html">
+<meta property="og:title" content="1.02GB / 3.2M Lines in Browser: $2.61 Cost Teardown (Measured)">
+<meta property="og:description" content="Real 1.02GB NDJSON run: 320k sampled in 6.6s, 70% human, $2.61 total, $0.25 blockable, 19,272 threats. Every number measured.">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://log-file-bot-traffic-cost-analyzer.pages.dev/assets/screenshots/06-kpi-strip.png">
+<meta property="og:url" content="https://log-file-bot-traffic-cost-analyzer.pages.dev/research/1gb-teardown.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0B57D0">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"I streamed 3.2M log lines in-browser: $2.61, $0.25 blockable","datePublished":"2026-09-11","dateModified":"2026-10-05","author":{"@type":"Organization","name":"Log File Bot Traffic Cost Analyzer"},"image":"https://log-file-bot-traffic-cost-analyzer.pages.dev/assets/screenshots/06-kpi-strip.png"}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Analyzer","item":"https://log-file-bot-traffic-cost-analyzer.pages.dev/"},{"@type":"ListItem","position":2,"name":"Research"},{"@type":"ListItem","position":3,"name":"1GB teardown"}]}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/style.css?v=2.1.0">
+<link rel="stylesheet" href="../css/style.css?v=2.2.0">
 </head>
 <body><div class="main-wrap"><div class="card" style="max-width:960px">
 <p class="crumbs"><a href="../">Analyzer</a> / Research / 1GB teardown</p>
+<div class="page-hero">
+<span class="eyebrow">Research · Measured 2026-09-11</span>
 <h1>I streamed 3.2M log lines in-browser: $2.61, $0.25 blockable</h1>
-<p>Not a toy demo. On <strong>2026-09-11</strong> the tool (v2.2.0, DB v2026.09.17, 127 signatures) ran end-to-end in headless Chromium against a <strong>real 1.02 GB NDJSON log (3,200,000 lines, seed 7)</strong>. Every number below is measured — and the sampling is disclosed on-screen, not buried in footnotes.</p>
+<p class="lede">Not a toy demo. On <strong>2026-09-11</strong> the tool (v2.2.0, DB v2026.09.17, 127 signatures) ran end-to-end in headless Chromium against a <strong>real 1.02 GB NDJSON log (3,200,000 lines, seed 7)</strong>. Every number below is measured — and the sampling is disclosed on-screen, not buried in footnotes.</p>
+<div class="meta-row"><span class="meta-chip">⏱ <strong>6 min</strong> read</span><span class="meta-chip">⚗ <strong>100%</strong> measured</span><span class="meta-chip"><strong>29</strong> screenshots in repo</span></div>
+</div>
+<nav class="toc" aria-label="On this page"><strong>On this page</strong><ol>
+<li><a href="#numbers">The numbers</a></li>
+<li><a href="#fired">What fired</a></li>
+<li><a href="#blockable-math">Why $0.25 — the blockable math</a></li>
+<li><a href="#reproduce">Reproduce it</a></li>
+<li><a href="#refs">References</a></li>
+</ol></nav>
+
+<h2 id="numbers">The numbers</h2>
+<div class="stat-grid" aria-label="Headline measurements">
+<div class="stat"><b>3.2M</b><span>lines streamed (1.02 GB)</span></div>
+<div class="stat"><b>6.6 s</b><span>320k-line read, 13.0 s wall</span></div>
+<div class="stat"><b>$2.61</b><span>total cost, CloudFront rates</span></div>
+<div class="stat"><b>$0.25</b><span>blockable (training only)</span></div>
+</div>
 <div class="tbl-wrap"><table class="dt"><thead><tr><th>Measurement</th><th>Result</th></tr></thead><tbody>
 <tr><td>File</td><td><code>oneGB.jsonl</code>, 1.02 GB, 3,200,000 lines</td></tr>
 <tr><td>Read + parsed + analyzed</td><td>320,000 of 3,200,000 (systematic 1-in-10) in <strong>6.6 s read</strong>, 13.0 s wall</td></tr>
@@ -24,20 +56,20 @@
 <tr><td>Threats / warnings</td><td><strong>19,272</strong> suspicious, 427 verification warnings surfaced (not hidden)</td></tr>
 <tr><td>Trap waste</td><td>18% trap bandwidth (16 parameterized/trap patterns)</td></tr>
 </tbody></table></div>
-<p><img src="../assets/screenshots/06-kpi-strip.png" alt="KPI strip from the 1GB run" style="max-width:100%"></p>
-<p><img src="../assets/screenshots/12-tab4-cost.png" alt="Cost analysis $2.61 total" style="max-width:100%"></p>
+<figure class="post-fig"><img src="../assets/screenshots/06-kpi-strip.png" alt="KPI strip from the 1GB run" loading="lazy"><figcaption><strong>KPI strip, measured.</strong> Records, human share, and total vs blockable cost straight from the 320k-line analyzed sample.</figcaption></figure>
+<figure class="post-fig"><img src="../assets/screenshots/12-tab4-cost.png" alt="Cost analysis $2.61 total" loading="lazy"><figcaption><strong>Tab 4 · Costs.</strong> $2.61 total with the training-only $0.25 blockable slice — search-index and user-fetch are never counted.</figcaption></figure>
 
-<h2>What fired</h2>
+<h2 id="fired">What fired</h2>
 <p><strong>9 Cloudflare rules</strong> fired on the sample. <strong>127 signatures</strong> classified; 4-layer verification surfaced 427 unusual checks instead of hiding them. The on-screen banner states sampling honestly — figures describe the analyzed sample and scale ~10× to the full file. For exact full-file totals (no sampling), <code>node tools/cli.js --exact</code> covers 500MB–50GB.</p>
 
-<h2>Why $0.25 — the blockable math</h2>
+<h2 id="blockable-math">Why $0.25 — the blockable math</h2>
 <ul>
 <li><strong>Blockable = training + suspicious only.</strong> Search-index (OAI-SearchBot, PerplexityBot) and user-triggered (ChatGPT-User et al.) are <em>never</em> counted — asserted in tests, so the CFO number can't be inflated by citation traffic.</li>
 <li><strong>Measured bytes × your CDN preset:</strong> CloudFront defaults here; switch to Cloudflare/Fastly/GCS presets in the pricing panel and every figure recomputes. Origin-compute stays OFF (logs can't tell SSR from static) unless you opt in with your own $/1K.</li>
 <li><strong>Cross-check:</strong> the 10k pinned fixture independently measures $0.04 total / ~$0.00 blockable ($0.0046 training-only) with byte-identical counts in CI.</li>
 </ul>
 
-<h2>Reproduce it</h2>
+<h2 id="reproduce">Reproduce it</h2>
 <ol>
 <li><code>npm run gen-logs -- --seed 42 --days 30</code> reproduces the 10k fixture byte-identically (see <code>sample-data/EXPECTED.md</code>).</li>
 <li>Drop any large log in the <a href="../">analyzer</a> — watch Reading % (8MB slices), then the 14-step analysis progress (Web Worker past 20k rows).</li>
@@ -45,7 +77,12 @@
 </ol>
 
 <h2>Run your own log</h2>
-<p><a class="btn-primary" href="../">Run your own log — no upload, files never leave your machine</a> · <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">GitHub + EXPECTED.md</a></p>
+<h2 id="refs">References</h2>
+<ul class="ref-list">
+<li>Pinned 10k counts: <code>sample-data/EXPECTED.md</code> · Method + privacy audit: <a href="../METHOD.md">METHOD.md</a> · All 29 screenshots: <code>assets/screenshots/</code>.</li>
+<li>Companion: <a href="../guides/cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <a href="../guides/compare-screaming-frog-jetoctopus-free.html">Tool comparison</a> · <a href="../bots/">Full bot DB</a>.</li>
+</ul>
+<p class="cta-row"><a class="btn-primary" href="../">Run your own log — no upload, files never leave your machine</a> · <a href="https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer">GitHub + EXPECTED.md</a></p>
 </div></div><p class="crumbs">See also: <a href="../guides/cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <a href="../guides/compare-screaming-frog-jetoctopus-free.html">Tool comparison</a> · <a href="../bots/">Full bot DB</a></p>
 </body>
 </html>

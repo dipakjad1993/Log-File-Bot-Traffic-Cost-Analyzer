@@ -5,17 +5,44 @@
 <title>GPTBot vs OAI-SearchBot: Cost Split, Different Rules (2026)</title>
 <meta name="description" content="GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citations in 1-2 weeks. Measured 85:1 crawl-to-referral, IP verification, copy-paste rules. Free client-side log check, no upload.">
 <link rel="canonical" href="https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/gptbot-vs-oai-searchbot.html">
+<meta property="og:title" content="GPTBot vs OAI-SearchBot: Cost Split, Different Rules (2026)">
+<meta property="og:description" content="GPTBot is training (block freely, 60/min). OAI-SearchBot is search-index (allow at 120/min) — blocking it drops ChatGPT citations in 1-2 weeks.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/gptbot-vs-oai-searchbot.html">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0B57D0">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"GPTBot vs OAI-SearchBot: same vendor, opposite rules","datePublished":"2026-09-17","dateModified":"2026-10-05","author":{"@type":"Organization","name":"Log File Bot Traffic Cost Analyzer"},"about":["GPTBot","OAI-SearchBot","AI crawler cost analysis"]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Analyzer","item":"https://log-file-bot-traffic-cost-analyzer.pages.dev/"},{"@type":"ListItem","position":2,"name":"Bots","item":"https://log-file-bot-traffic-cost-analyzer.pages.dev/bots/"},{"@type":"ListItem","position":3,"name":"GPTBot vs OAI-SearchBot"}]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Will blocking GPTBot hurt my ChatGPT citations?","acceptedAnswer":{"@type":"Answer","text":"No. Training crawls don't produce citations; search-index does. The 1–2 week citation decay applies to OAI-SearchBot blocks, not GPTBot blocks."}},{"@type":"Question","name":"Should I block OAI-SearchBot like GPTBot?","acceptedAnswer":{"@type":"Answer","text":"No. OAI-SearchBot is search-index — allow at 120/min with 429 + Retry-After. Blocking it drops ChatGPT citation share in 1–2 weeks."}}]}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/style.css?v=2.1.0">
+<link rel="stylesheet" href="../css/style.css?v=2.2.0">
 </head>
 <body><div class="main-wrap"><div class="card" style="max-width:960px">
 <p class="crumbs"><a href="../">Analyzer</a> / <a href="./">Bots</a> / GPTBot vs OAI-SearchBot</p>
+<div class="page-hero">
+<span class="eyebrow">Bots · Training vs Search</span>
 <h1>GPTBot vs OAI-SearchBot: same vendor, opposite rules</h1>
-<p><strong>GPTBot</strong> trains models — block it freely with zero live citation loss. <strong>OAI-SearchBot</strong> powers ChatGPT Search citations (crawl-to-referral ~85:1) — block it and citation share drops in 1–2 weeks. They share a vendor and nothing else: different user-agents, different IP lists, different robots directives, opposite edge policies. The analyzer splits them automatically across <strong>127 signatures</strong> and prices each side separately.</p>
+<p class="lede"><strong>GPTBot</strong> trains models — block it freely with zero live citation loss. <strong>OAI-SearchBot</strong> powers ChatGPT Search citations (crawl-to-referral ~85:1) — block it and citation share drops in 1–2 weeks. They share a vendor and nothing else: different user-agents, different IP lists, different robots directives, opposite edge policies. The analyzer splits them automatically across <strong>127 signatures</strong> and prices each side separately.</p>
+<div class="meta-row"><span class="meta-chip">⏱ <strong>4 min</strong> read</span><span class="meta-chip">✓ Updated <strong>2026-10-05</strong></span><span class="meta-chip">DB <strong>v2026.09.17</strong> · 127 sigs</span></div>
+</div>
+<nav class="toc" aria-label="On this page"><strong>On this page</strong><ol>
+<li><a href="#tell-apart">Tell them apart in your logs</a></li>
+<li><a href="#right-rule">The rule that gets it right</a></li>
+<li><a href="#proof">Proof from a real log</a></li>
+<li><a href="#verify">Verify before you block</a></li>
+<li><a href="#edge-cases">Edge cases (2026)</a></li>
+<li><a href="#refs">References</a></li>
+</ol></nav>
 
-<h2>1. Tell them apart in your logs</h2>
+<h2 id="tell-apart">1. Tell them apart in your logs</h2>
 <div class="tbl-wrap"><table class="dt"><thead><tr><th>Signal</th><th>GPTBot (training)</th><th>OAI-SearchBot (search-index)</th></tr></thead><tbody>
 <tr><td>User-Agent</td><td><code>GPTBot/1.x (+https://openai.com/gptbot)</code> + path-form <code>openai/gptbot</code> variant</td><td><code>OAI-SearchBot/1.x (+https://openai.com/searchbot)</code></td></tr>
 <tr><td>Purpose</td><td>Bulk crawl for model training. Zero direct traffic return.</td><td>Live fetch grounding ChatGPT Search answers. Citation-bearing.</td></tr>
@@ -26,7 +53,7 @@
 </tbody></table></div>
 <p>In the 10k pinned fixture (seed 42, EXPECTED.md) GPTBot made <strong>351 requests / 12.5 MB</strong> and OAI-SearchBot <strong>234 requests / 8.1 MB</strong> — GPTBot is the heavier, more blockable side on most sites, and the analyzer's 1GB run confirmed the pattern at scale (training dominates blockable cost).</p>
 
-<h2>2. The rule that gets it right</h2>
+<h2 id="right-rule">2. The rule that gets it right</h2>
 <div class="code"><h5>robots.txt — training blocked, search allowed (RFC 9309)</h5><code>User-agent: GPTBot
 Disallow: /
 
@@ -38,11 +65,17 @@ Allow: /</code></div>
 # excess =&gt; 429 + Retry-After: 30 — NEVER Block</code></div>
 <p>The analyzer generates these exact rules from <em>your</em> log mix (Tab 6 · Edge + Policy Bundle) with copy buttons for Cloudflare, Fastly, and AWS WAF — plus the Sept-15-2026 Cloudflare AI Crawl Control mapping and a consistency check that flags robots-vs-edge conflicts.</p>
 
-<h2>3. Proof from a real log</h2>
+<h2 id="proof">3. Proof from a real log</h2>
+<div class="stat-grid" aria-label="Measured results">
+<div class="stat"><b>$2.61</b><span>total cost (1.02 GB sample)</span></div>
+<div class="stat"><b>$0.25</b><span>blockable — training only</span></div>
+<div class="stat"><b>6.6 s</b><span>320k lines read (1-in-10)</span></div>
+<div class="stat"><b>85:1</b><span>OAI crawl-to-referral</span></div>
+</div>
 <p>On a 1.02&nbsp;GB / 3.2M-line run the tool streamed a systematic 1-in-10 sample (320,000 lines in 6.6&nbsp;s), measured <strong>$2.61 total</strong> with <strong>$0.25 blockable (training only)</strong>. Search-index and user-fetch are <em>never</em> counted as blockable — asserted in tests. <a href="../?sample=10k">Run the 1-click 10k demo</a> and check <strong>Tab 5 · AI Matrix</strong> (red = training, cyan = search-index, blue = user-triggered).</p>
-<p><img src="../assets/screenshots/13-tab5-ai-matrix.png" alt="AI Matrix red training vs cyan search-index" style="max-width:100%"></p>
+<figure class="post-fig"><img src="../assets/screenshots/13-tab5-ai-matrix.png" alt="AI Matrix red training vs cyan search-index" loading="lazy"><figcaption><strong>Tab 5 · AI Matrix.</strong> Red rows are training (blockable); cyan rows are search-index (rate-limit only); blue rows are user-triggered (never touch).</figcaption></figure>
 
-<h2>4. Verify before you block (spoof hunting built in)</h2>
+<h2 id="verify">4. Verify before you block (spoof hunting built in)</h2>
 <ul>
 <li><strong>VERIFIED</strong> = source IP matches the vendor JSON (full CIDRs + IPv6, dated 2026-09-17). Only this earns the badge.</li>
 <li><strong>UNVERIFIED GPTBot is the tool's top spoof KPI</strong> — a Chrome UA claiming GPTBot from a residential IP is scored as spoofed, not trusted.</li>
@@ -50,7 +83,7 @@ Allow: /</code></div>
 <li>One-click batch verify: Tab 2 exports <code>dig -x</code> + DoH bundles for the top-20 unverified IPs, plus an rDNS checklist. Confirm server-side before enforcing.</li>
 </ul>
 
-<h2>5. Edge cases (2026)</h2>
+<h2 id="edge-cases">5. Edge cases (2026)</h2>
 <ul>
 <li><strong>OAI-AdsBot: allow-listed</strong> — it verifies ChatGPT shopping checkouts. Blocking it breaks revenue checks on ecommerce (the analyzer never blocks it, even if mis-tiered — tested).</li>
 <li><strong>ChatGPT-User: user-triggered, ignores robots ~54%</strong> — do NOT throttle (300/min abuse ceiling only). A 429 here means a missing live answer, not saved bandwidth.</li>
@@ -63,7 +96,13 @@ Allow: /</code></div>
 <p><strong>Why 85:1 — is that guaranteed?</strong> No. It's a directional median from 2026 studies plus log measurement — ranges, not promises. Confirm against your own analytics before quoting savings.</p>
 <p><strong>What about Pay Per Crawl?</strong> Tab 6 generates per-path 402 pricing (free / premium / API tiers) with a tollbit-style worker — charge training bots per request instead of blocking, but never price search-index or user-fetch paths.</p>
 
-<p><a class="btn-primary" href="../">Analyze your log free — files never leave your machine</a></p>
+<h2 id="refs">References</h2>
+<ul class="ref-list">
+<li>Vendor IP lists: <a href="https://openai.com/gptbot.json">openai.com/gptbot.json</a> · <a href="https://openai.com/searchbot.json">openai.com/searchbot.json</a> — snapshotted with full CIDRs + IPv6 in <code>data/bot-ips.json</code> (2026-09-17).</li>
+<li>Measured baselines: <a href="../research/1gb-teardown.html">1.02 GB teardown ($2.61 / $0.25)</a> · <a href="../guides/cloudflare-logpush-1gb-analysis-free.html">1GB Logpush guide</a> · <code>sample-data/EXPECTED.md</code> in the repo.</li>
+<li>Method: <a href="../METHOD.md">METHOD.md</a> (no-XHR audit) · <a href="../BOTS.md">BOTS.md</a> (tier policy).</li>
+</ul>
+<p class="cta-row"><a class="btn-primary" href="../">Analyze your log free — files never leave your machine</a></p>
 </div></div><p class="crumbs">See also: <a href="./perplexitybot-block-or-allow.html">PerplexityBot</a> · <a href="./claudebot-no-ip-robots-only.html">ClaudeBot IPs</a> · <a href="./">Full bot DB</a> · <a href="../guides/block-training-bots-cloudflare-without-losing-citations.html">Cloudflare guide</a></p>
 </body>
 </html>

@@ -513,6 +513,53 @@ table.dt{min-width:640px}
   html{scroll-behavior:smooth}
 }
 
+/* ---- Article pages (Knowledge Base): enterprise formatting ---- */
+.card h2{font-size:19px;font-weight:800;letter-spacing:-0.01em;margin:26px 0 10px;padding-top:18px;border-top:1px solid var(--md-outline-variant)}
+.card h2:first-of-type{margin-top:20px}
+.card p{font-size:13.5px;color:var(--md-on-surface-variant);line-height:1.8;margin-bottom:10px}
+.card ul,.card ol{font-size:13.5px;color:var(--md-on-surface-variant);line-height:1.75;margin:8px 0 14px 22px}
+.card li{margin-bottom:6px}
+.card li::marker{color:var(--md-primary);font-weight:700}
+/* Page hero: kicker + title + lede + meta row */
+.page-hero{margin-bottom:6px}
+.eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--md-primary);background:var(--md-primary-container);border-radius:var(--m3-sm);padding:5px 12px;margin-bottom:12px}
+.meta-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 4px}
+.meta-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--md-on-surface-variant);border:1px solid var(--md-outline);border-radius:var(--m3-full);padding:5px 12px;background:var(--md-surface-container-lowest)}
+.meta-chip strong{color:var(--md-on-surface)}
+.lede{font-size:15px !important;line-height:1.8 !important;color:var(--md-on-surface) !important}
+/* Table of contents */
+.toc{background:var(--md-surface-container);border:none;border-radius:var(--m3-md);padding:14px 18px;margin:16px 0}
+.toc strong{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--md-primary)}
+.toc ol{margin:8px 0 0 20px;font-size:13px}
+.toc li{margin-bottom:4px}
+.toc a{color:var(--md-on-surface);text-decoration:none;font-weight:500}
+.toc a:hover{color:var(--md-primary);text-decoration:underline}
+/* Code blocks: bare <pre> gets the full M3 treatment */
+pre{background:var(--md-surface-container);border:none;border-radius:var(--m3-md);padding:16px 18px;margin:12px 0;overflow-x:auto;box-shadow:var(--m3-e0)}
+pre code{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--md-on-surface);white-space:pre;word-break:normal;background:none;padding:0;border-radius:0}
+.code code{white-space:pre-wrap;word-break:break-all}
+/* Bare tables (no .dt class) inherit the M3 data-table look */
+.card table:not(.dt){width:100%;border-collapse:collapse;font-size:12px;margin:12px 0;border:1px solid var(--md-outline-variant);border-radius:var(--m3-md);overflow:hidden;background:var(--md-surface-container-lowest);display:block;overflow-x:auto}
+.card table:not(.dt) th{background:var(--md-surface-container);padding:10px 14px;text-align:left;font-weight:700;font-size:11px;letter-spacing:.04em;color:var(--md-on-surface-variant);border-bottom:1px solid var(--md-outline-variant);white-space:nowrap}
+.card table:not(.dt) td{padding:10px 14px;border-bottom:1px solid var(--md-outline-variant);font-size:12px;color:var(--md-on-surface)}
+.card table:not(.dt) tr:last-child td{border-bottom:none}
+/* Screenshots as captioned figures */
+.post-fig{margin:14px 0;border:1px solid var(--md-outline-variant);border-radius:var(--m3-lg);overflow:hidden;background:var(--md-surface-container-lowest);box-shadow:var(--m3-e1)}
+.post-fig img{display:block;width:100%;height:auto}
+.post-fig figcaption{font-size:11.5px;color:var(--md-on-surface-variant);padding:10px 16px;border-top:1px solid var(--md-outline-variant);background:var(--md-surface-container-low)}
+.post-fig figcaption strong{color:var(--md-on-surface)}
+/* Stat highlight grid */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.stat{background:var(--md-primary-container);color:var(--md-on-primary-container);border:none;border-radius:var(--m3-md);padding:12px 14px;text-align:center}
+.stat b{display:block;font-size:20px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;font-weight:600;opacity:.85}
+/* References */
+.ref-list{font-size:12.5px !important}
+.ref-list a{color:var(--md-primary);font-weight:600;text-decoration:none}
+.ref-list a:hover{text-decoration:underline}
+/* Callout variants reuse .rec/.infobox — aligning embedded ctas */
+.cta-row{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 4px}
+
 /* ---- Responsive ---- */
 @media(max-width:900px){
   .topbar-inner{flex-wrap:wrap;padding:8px 14px;gap:8px}
