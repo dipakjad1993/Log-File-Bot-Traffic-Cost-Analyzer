@@ -13,7 +13,7 @@ Free, private, **$0** vs $139/yr Screaming Frog Log Analyser ($279 Spider) / €
 
 **[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html)**
 
-Enterprise UI (v2.2.0): navy top bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), tool name + one-line description up front, sample downloads by **URL count with file-size estimate** (100–1M URLs), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
+Enterprise UI (v2.2.0): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Tool name + one-line description up front, sample downloads by **URL count with live file-size estimate** (100–1M URLs; estimator refreshes on every selection), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
 
 > Private by design: 100% client-side, no XHR/WebSocket/sendBeacon. Only network request is loading the demo file you click. See [METHOD.md](METHOD.md).
 

@@ -3053,7 +3053,7 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   // URL-count sample estimator: total URLs + estimated file size side by side
   function fmtEst(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(bytes<10240?1:0)+' KB';if(bytes<1073741824)return (bytes/1048576).toFixed(bytes<10485760?1:0)+' MB';return (bytes/1073741824).toFixed(2)+' GB';}
   function updateSampleEst(){try{const sel=document.getElementById('sample-size'),est=document.getElementById('sample-size-est');if(!sel||!est)return;const n=parseInt(sel.value||'10000',10)||10000;est.textContent='≈ '+fmtEst(n*450)+' · '+n.toLocaleString()+' URLs';}catch(e){}}
-  document.getElementById('sample-size')?.addEventListener('change',updateSampleEst);updateSampleEst();
+  {const _sel=document.getElementById('sample-size');if(_sel){_sel.addEventListener('change',updateSampleEst);_sel.addEventListener('input',updateSampleEst);}updateSampleEst();}
   document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>{showTab(b.dataset.tab);lazyRender(b.dataset.tab);}));
   // Keyboard 1-0 tab shortcuts (a11y) + lazy-render tabs 2-10 after analyze
   document.addEventListener('keydown',e=>{
