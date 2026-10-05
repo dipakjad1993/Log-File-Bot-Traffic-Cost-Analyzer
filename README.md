@@ -3,7 +3,7 @@
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://log-file-bot-traffic-cost-analyzer.pages.dev)
 [![1.02GB Proven](https://img.shields.io/badge/Proven-1.02GB_3.2M_lines-blue)](research/1gb-teardown.html)
 [![Bot DB](https://img.shields.io/badge/Bot_DB-127_sigs-orange)](data/bot-ips.json)
-[![Tests](https://img.shields.io/badge/Tests-118_asserts-success)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-121_asserts-success)](tests/)
 [![Price](https://img.shields.io/badge/Price-%240-purple)](guides/compare-screaming-frog-jetoctopus-free.html)
 [![MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 [![CI](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer/actions)
@@ -13,7 +13,7 @@ Free, private, **$0** vs $139/yr Screaming Frog Log Analyser ($279 Spider) / €
 
 **[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html)**
 
-Enterprise UI (v2.2.1): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Centered 1200px layout with no right-side whitespace gap, tables scroll inside their cards, and a crisp SVG brand mark. Sample downloads by **URL range with live max-size estimate** (0–100 … 1M–10M URLs; in-browser generation caps at 1M, CLI covers the rest), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
+Enterprise UI (v2.3.0): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Centered 1200px layout with no right-side whitespace gap, tables scroll inside their cards, and a crisp SVG brand mark. Sample downloads by **URL range with live max-size estimate** (0–100 … 1M–10M URLs; in-browser generation caps at 1M, CLI covers the rest), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
 
 > Private by design: 100% client-side, no XHR/WebSocket/sendBeacon. Only network request is loading the demo file you click. See [METHOD.md](METHOD.md).
 
@@ -72,7 +72,7 @@ Includes Cloudflare Sept-15-2026 defaults, Pay Per Crawl 402 beta, Web Bot Auth,
 | 6 | Edge Rules + Policy | Cloudflare/Fastly/AWS copy-paste, robots + llms.txt + crawlers.json bundle, OAI-AdsBot guard |
 | 7–8 | Performance + Traffic | TTFB bots vs humans, bursts (z-score, no deps), 404-cluster tickets, GSC overlay |
 | 9 | Security | Traversal, .git/HEAD, creds, SSRF, velocity anomalies |
-| 10 | CFO / FinOps | Totals, monthly/annual run-rate, CSV + redesigned 2-page PDF (M3 blue, numbered sections, KPI cards, dynamic exec box, aligned tables + sign-off) — vendored jsPDF, no CDN |
+| 10 | CFO / FinOps | Totals, monthly/annual run-rate, CSV + redesigned 2-page PDF (M3 blue, numbered sections, KPI cards, dynamic exec box, aligned tables + sign-off) — vendored jsPDF, no CDN. **Full Report PDF ↓** exports all 10 modules + CFO summary in one offline reference file |
 
 Screenshots: `assets/screenshots/09-tab1-classification.png` → `29-cfo-viewport.png` (analysis modules unchanged; v2.2.1 refreshed the app shell centering, brand mark, and CFO PDF design). Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -83,7 +83,7 @@ git clone https://github.com/dipakjad1993/Log-File-Bot-Traffic-Cost-Analyzer.git
 cd Log-File-Bot-Traffic-Cost-Analyzer
 node dev-server.js   # LOCAL DEV ONLY — http://localhost:8080. Never deploy to Pages.
 # or: docker build -t log-analyzer . && docker run -p 8080:8080 log-analyzer
-npm test             # 118 asserts
+npm test             # 121 asserts
 npm run lint
 ```
 

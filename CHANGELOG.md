@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — v2.3.0 feature (Full Report PDF: all 10 modules + CFO in one file)
+
+- **Full Report PDF** (`js/full-report-pdf.js`, `Full Report PDF ↓` button in the
+  info bar): one offline reference PDF with a cover + contents, Part A executive
+  summary (same `buildCFOData` numbers as the standalone CFO PDF), then Modules
+  1-9 trimmed for print (top-25 bots, verification KPIs, crawl efficiency, top-20
+  costs, AI matrix, edge rules + robots.txt + decision tree, TTFB/status/hourly,
+  bursts/404s/weekdays/IPs/referrers, threats/hvIPs/stealth) and a method appendix
+  with sign-off. Same M3 styling + WinAnsi-safe text as the CFO engine.
+  Suite: 118 → 121 asserts (`tests/full-report.test.js`), all green.
+
 ## Unreleased — v2.2.1 patch (CFO PDF redesign + centered layout)
 
 - **CFO PDF redesign** (`js/cfo-pdf.js`): Material-3 blue palette matching the app,

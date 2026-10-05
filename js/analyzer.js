@@ -1746,6 +1746,20 @@ function exportCFOPDF(A, opts){
   w.document.write(`<html><head><title>CFO 1-pager — Bot Traffic Cost</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:13px}code{background:#f4f4f4;padding:2px 4px;font-size:12px}</style></head><body><h1>Bot Traffic Cost — CFO 1-pager</h1><p>Total: <b>$${c.total.all.toFixed(2)}</b> | Blockable: <b>$${c.savings.botBlocking.toFixed(2)}</b> | Records: ${s.totalRecords.toLocaleString()} | Period: ${(s.dateRange.start||'').toString().slice(0,10)} → ${(s.dateRange.end||'').toString().slice(0,10)}</p><h3>Top 3 traps</h3><ul>${traps||'<li>none</li>'}</ul><h3>Top 3 edge rules</h3><ul>${rules||'<li>none</li>'}</ul><p><i>Real PDF engine failed to load — this legacy print view is a fallback only.</i></p></body></html>`);
   w.document.close();
 }
+function exportFullPDF(A, opts){
+  // Full reference PDF: all 10 modules + CFO summary in one file (js/full-report-pdf.js).
+  try{
+    const engine=(typeof window!=='undefined'&&window.FULLPDF)||(typeof globalThis!=='undefined'&&globalThis.FULLPDF)||null;
+    const domain=(opts&&opts.domain)||'';
+    let fileName='';
+    try{
+      const ib=document.getElementById('ib-file'); const t=ib?ib.textContent:'';
+      fileName=(t&&t!=='--')?t:'';
+    }catch(e){}
+    if(engine&&engine.downloadFullPDF){ return engine.downloadFullPDF(A,{domain:domain||undefined,file:fileName||undefined}); }
+  }catch(e){}
+  alert('Full-report engine failed to load — re-check js/full-report-pdf.js script tag, then retry.');
+}
 /* AWS ALB space-delimited access logs:
  * http 2026-09-01T10:00:00.000Z app/lb/abc 192.168.1.1:2817 10.0.0.1:80 0.001 0.002 0.003 200 200 0 57 "GET http://x:80/ HTTP/1.1" "curl/7.46.0" ... */
 function parseALBLine(line){
@@ -3004,6 +3018,7 @@ function wireExportButtons(){
   const add=(id,label,fn)=>{let b=document.getElementById(id);if(b){b.onclick=fn;return}b=document.createElement('button');b.id=id;b.className='btn-sm';b.textContent=label||id;document.getElementById('info-bar')?.appendChild(b);b.onclick=fn;};
   add('export-csv-btn','Download CSV',()=>currentAnalysis&&exportBotCSV(currentAnalysis));
   add('export-cfo-btn','CFO PDF ↓',()=>currentAnalysis&&exportCFOPDF(currentAnalysis));
+  add('export-full-btn','Full Report PDF ↓',()=>currentAnalysis&&exportFullPDF(currentAnalysis));
   add('export-logs-btn','Logs CSV (BQ)',()=>currentAnalysis&&exportLogsBQCSV(currentAnalysis));
   add('export-prompts-btn','Prompt list',()=>currentAnalysis&&exportPromptListFile(currentAnalysis));
   add('export-llms-btn','llms.txt',()=>currentAnalysis&&exportLlmsFile(currentAnalysis));
