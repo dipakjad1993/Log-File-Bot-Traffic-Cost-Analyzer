@@ -209,12 +209,14 @@ function getJsPDFCtor() {
   throw new Error('CFO PDF engine missing: load js/vendor/jspdf.umd.min.js + jspdf-autotable.min.js before js/cfo-pdf.js (browser) or npm install (Node).');
 }
 
-/* ---------- layout constants ---------- */
-var M = 40, PW = 595, PH = 842, CW = PW - M * 2; // A4 pt
-var INK = [26, 29, 43], MUT = [74, 80, 104], FAINT = [124, 130, 157];
-var ACC = [79, 70, 229], HDRF = [40, 46, 71], GRID = [197, 203, 214];
-var ZEBRA = [246, 247, 250], RED = [220, 38, 38];
+/* ---------- layout constants (M3 modern, airy, grid-aligned) ---------- */
+var M = 44, PW = 595, PH = 842, CW = PW - M * 2; // A4 pt, 44pt side margins
+var INK = [25, 28, 34], MUT = [68, 71, 78], FAINT = [116, 119, 127];
+var ACC = [11, 87, 208], ACC_DK = [4, 66, 160], HDRF = [25, 28, 34];
+var GRID = [220, 227, 238], ZEBRA = [243, 246, 251], RED = [179, 38, 30];
+var GREEN_BG = [237, 255, 240], RED_BG = [249, 222, 220], BLUE_BG = [211, 227, 253], CYAN_BG = [224, 242, 245];
 var TOTAL_PAGES = '{total_pages_count_string}';
+var FOOT_Y = PH - 30, BODY_BOTTOM = PH - 62;
 
 /* Chrome (header/footer) is stamped in ONE post-pass after all content is
  * laid out — exactly once per page with correct numbers. Never in didDrawPage
@@ -222,21 +224,29 @@ var TOTAL_PAGES = '{total_pages_count_string}';
  * page numbers) and never inline in flow helpers. */
 function drawHeader(doc, d) {
   doc.setFillColor(ACC[0], ACC[1], ACC[2]);
-  doc.rect(0, 0, PW, 56, 'F');
+  doc.rect(0, 0, PW, 54, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text(san('BOT TRAFFIC COST - EXECUTIVE SUMMARY'), M, 24);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-  doc.setTextColor(224, 227, 244);
-  doc.text(san(d.meta.domain + '  |  ' + d.meta.periodStart + ' to ' + d.meta.periodEnd + '  |  Generated ' + d.meta.generated), M, 40);
-  doc.setFont('helvetica', 'bold');
-  doc.text(san(d.meta.badge), PW - M, 40, { align: 'right' });
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5);
+  doc.text(san('BOT TRAFFIC COST - EXECUTIVE SUMMARY'), M, 23);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2);
+  doc.setTextColor(211, 227, 253);
+  var meta = san(d.meta.domain + '  |  ' + d.meta.periodStart + ' to ' + d.meta.periodEnd + '  |  Generated ' + d.meta.generated);
+  doc.text(meta, M, 39);
+  // badge pill, right-aligned
+  var badge = san(d.meta.badge);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+  var bw = doc.getTextWidth(badge) + 16;
+  var bx = PW - M - bw;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(bx, 28, bw, 14, 7, 7, 'F');
+  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
+  doc.text(badge, bx + bw / 2, 37.5, { align: 'center' });
 }
 function drawFooter(doc, pageNo) {
-  var y = PH - 22;
-  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.6);
-  doc.line(M, y - 8, PW - M, y - 8);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+  var y = FOOT_Y;
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.5);
+  doc.line(M, y - 9, PW - M, y - 9);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.3);
   doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
   doc.text(san('Confidential  |  Measured bytes x configured CDN pricing. Blockable = training + suspicious only.'), M, y);
   doc.text(san('Page ' + pageNo + ' of ' + TOTAL_PAGES), PW - M, y, { align: 'right' });
@@ -250,84 +260,110 @@ function stampChrome(doc, d) {
   }
 }
 function h1(doc, d, y, t) {
-  y = ensure(doc, d, y, 90);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.setTextColor(HDRF[0], HDRF[1], HDRF[2]);
-  doc.text(san(t), M, y);
-  y += 5;
-  doc.setDrawColor(ACC[0], ACC[1], ACC[2]); doc.setLineWidth(1.1);
-  doc.line(M, y, PW - M, y);
-  return y + 14;
+  y = ensure(doc, d, y, 96);
+  // numbered badge: "1" in accent circle, rest as title
+  var m = /^(\d+)\s*-\s*(.*)$/.exec(t || '');
+  var tx = M;
+  if (m) {
+    doc.setFillColor(ACC[0], ACC[1], ACC[2]);
+    doc.circle(M + 8, y - 4, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text(m[1], M + 8, y - 1, { align: 'center' });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.setTextColor(HDRF[0], HDRF[1], HDRF[2]);
+    doc.text(san(m[2]), M + 22, y);
+    y += 7;
+  } else {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.setTextColor(HDRF[0], HDRF[1], HDRF[2]);
+    doc.text(san(t), M, y);
+    y += 7;
+  }
+  doc.setDrawColor(ACC[0], ACC[1], ACC[2]); doc.setLineWidth(1.2);
+  doc.line(M, y, M + 34, y);
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.5);
+  doc.line(M + 34, y, PW - M, y);
+  return y + 16;
 }
 function h2(doc, d, y, t) {
-  y = ensure(doc, d, y, 60);
+  y = ensure(doc, d, y, 64);
+  // accent left bar + title
+  doc.setFillColor(ACC[0], ACC[1], ACC[2]);
+  doc.rect(M, y - 8.5, 3, 11, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
-  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
-  doc.text(san(t), M, y);
-  return y + 12;
+  doc.setTextColor(HDRF[0], HDRF[1], HDRF[2]);
+  doc.text(san(t), M + 9, y);
+  return y + 14;
 }
 /* Keep blocks together: section titles never strand at a page bottom.
  * Adds a page WITHOUT chrome — stampChrome owns all chrome in post-pass. */
 function ensure(doc, d, y, need) {
-  if (y + need > PH - 56) {
+  if (y + need > BODY_BOTTOM) {
     doc.addPage();
-    return 76;
+    return 78;
   }
   return y;
 }
 function para(doc, d, y, t, size) {
   doc.setFont('helvetica', 'normal'); doc.setFontSize(size || 8.5);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  var lines = doc.splitTextToSize(san(t), CW);
+  doc.setTextColor(MUT[0], MUT[1], MUT[2]);
+  var lines = doc.splitTextToSize(san(t), CW - 4);
   for (var i = 0; i < lines.length; i++) {
-    y = ensure(doc, d, y, 12);
-    doc.text(lines[i], M, y);
-    y += 10.5;
+    y = ensure(doc, d, y, 13);
+    doc.text(lines[i], M + 2, y);
+    y += 12;
   }
-  return y + 3;
+  return y + 4;
 }
 function kpiGrid(doc, d, y) {
-  var gw = (CW - 12) / 2, gh = 48, gap = 10;
-  y = ensure(doc, d, y, gh * 2 + gap + 4);
+  var gap = 12, gw = (CW - gap) / 2, gh = 58;
+  y = ensure(doc, d, y, gh * 2 + gap + 6);
   var kpis = [
-    { l: 'TOTAL PERIOD COST', v: money(d.kpis.total), s: num(d.meta.records) + ' records  |  ' + bytesFmt(d.totalBytes), c: [245, 245, 255] },
-    { l: 'BLOCKABLE (PERIOD)', v: money(d.kpis.blockable) + '  (' + pct(d.kpis.blockableShare) + ')', s: 'Training + suspicious only', c: [255, 237, 237] },
-    { l: 'PROJECTED MONTHLY SAVING', v: money(d.kpis.monthly) + ' / mo', s: 'Scaled x' + d.kpis.monthlyFactor.toFixed(2) + ' from ' + (d.meta.periodDays ? d.meta.periodDays.toFixed(0) + '-day window' : 'window'), c: [237, 255, 240] },
-    { l: 'PROJECTED ANNUAL SAVING', v: money(d.kpis.annual) + ' / yr', s: '12 x monthly  |  95% CI +/-' + money(d.meta.ciAbs), c: [237, 250, 255] }
+    { l: 'TOTAL PERIOD COST', v: money(d.kpis.total), s: num(d.meta.records) + ' records  |  ' + bytesFmt(d.totalBytes), bg: BLUE_BG, bar: ACC },
+    { l: 'BLOCKABLE (PERIOD)', v: money(d.kpis.blockable) + '  (' + pct(d.kpis.blockableShare) + ')', s: 'Training + suspicious only', bg: RED_BG, bar: RED },
+    { l: 'PROJECTED MONTHLY SAVING', v: money(d.kpis.monthly) + ' / mo', s: 'Scaled x' + d.kpis.monthlyFactor.toFixed(2) + ' from ' + (d.meta.periodDays ? d.meta.periodDays.toFixed(0) + '-day window' : 'window'), bg: GREEN_BG, bar: [19, 115, 51] },
+    { l: 'PROJECTED ANNUAL SAVING', v: money(d.kpis.annual) + ' / yr', s: '12 x monthly  |  95% CI +/-' + money(d.meta.ciAbs), bg: CYAN_BG, bar: [11, 114, 133] }
   ];
   for (var i = 0; i < 4; i++) {
-    var x = M + (i % 2) * (gw + 12);
+    var x = M + (i % 2) * (gw + gap);
     var yy = y + Math.floor(i / 2) * (gh + gap);
-    doc.setFillColor(kpis[i].c[0], kpis[i].c[1], kpis[i].c[2]);
-    doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
-    doc.roundedRect(x, yy, gw, gh, 4, 4, 'FD');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.6);
+    doc.roundedRect(x, yy, gw, gh, 6, 6, 'FD');
+    // top accent strip
+    doc.setFillColor(kpis[i].bar[0], kpis[i].bar[1], kpis[i].bar[2]);
+    doc.roundedRect(x, yy, gw, 4.5, 6, 6, 'F');
+    doc.rect(x, yy + 2.5, gw, 2, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.6);
     doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
-    doc.text(kpis[i].l, x + 8, yy + 13);
-    doc.setFontSize(11);
+    doc.text(kpis[i].l, x + 12, yy + 19);
+    doc.setFontSize(13);
     doc.setTextColor(INK[0], INK[1], INK[2]);
-    doc.text(kpis[i].v, x + 8, yy + 29);
+    doc.text(kpis[i].v, x + 12, yy + 37);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
     doc.setTextColor(MUT[0], MUT[1], MUT[2]);
-    doc.text(kpis[i].s.slice(0, 56), x + 8, yy + 41);
+    var sub = kpis[i].s;
+    if (sub.length > 52) sub = sub.slice(0, 52);
+    doc.text(sub, x + 12, yy + 49);
   }
-  return y + gh * 2 + gap + 10;
+  return y + gh * 2 + gap + 12;
 }
 var TABLE_BASE = {
   theme: 'grid',
   margin: { left: M, right: M },
-  styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 3.5, textColor: INK, lineColor: GRID, lineWidth: 0.6, valign: 'middle' },
-  headStyles: { fillColor: HDRF, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+  styles: { font: 'helvetica', fontSize: 8, cellPadding: { top: 5, right: 6, bottom: 5, left: 6 }, textColor: INK, lineColor: GRID, lineWidth: 0.5, valign: 'middle', overflow: 'linebreak' },
+  headStyles: { fillColor: ACC, textColor: 255, fontStyle: 'bold', fontSize: 7.2, cellPadding: { top: 6, right: 6, bottom: 6, left: 6 } },
   alternateRowStyles: { fillColor: ZEBRA },
   showHead: 'everyPage'
 };
 function autoTable(doc, d, y, head, body, colStyles) {
-  y = ensure(doc, d, y, 44);
+  y = ensure(doc, d, y, 52);
   doc.autoTable(Object.assign({}, TABLE_BASE, {
     startY: y, head: [head.map(san)], body: body.map(function (r) { return r.map(san); }),
     columnStyles: colStyles || {}
   }));
-  return doc.lastAutoTable.finalY + 9;
+  return doc.lastAutoTable.finalY + 12;
 }
 /* Data-driven next steps (owners + payoff) — the box that turns a report
  * into a decision. Plus a shaded callout for boxes that must stand out. */
@@ -342,60 +378,72 @@ function nextSteps(d) {
   return steps.slice(0, 4);
 }
 function callout(doc, d, y, title, body, tint) {
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-  var lines = doc.splitTextToSize(san(body), CW - 20);
-  var h = 20 + lines.length * 10.5;
-  y = ensure(doc, d, y, h + 8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8);
+  var lines = doc.splitTextToSize(san(body), CW - 28);
+  var h = 28 + lines.length * 12;
+  y = ensure(doc, d, y, h + 10);
   doc.setFillColor(tint[0], tint[1], tint[2]);
-  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
-  doc.roundedRect(M, y, CW, h, 4, 4, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
-  doc.text(san(title), M + 10, y + 13);
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.6);
+  doc.roundedRect(M, y, CW, h, 6, 6, 'FD');
+  doc.setFillColor(ACC[0], ACC[1], ACC[2]);
+  doc.roundedRect(M, y, 4.5, h, 6, 6, 'F');
+  doc.rect(M + 2, y, 2.5, h, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.8);
+  doc.setTextColor(ACC_DK[0], ACC_DK[1], ACC_DK[2]);
+  doc.text(san(title), M + 14, y + 16);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  for (var i = 0; i < lines.length; i++) doc.text(lines[i], M + 10, y + 25 + i * 10.5);
-  return y + h + 8;
+  for (var i = 0; i < lines.length; i++) doc.text(lines[i], M + 14, y + 29 + i * 12);
+  return y + h + 10;
 }
 function bars(doc, d, y) {
   if (!d.topBots.length) return y;
   y = h2(doc, d, y, 'Cost concentration (top bots)');
   var max = Math.max.apply(null, d.topBots.map(function (b) { return b.cost; }).concat([0.0001]));
-  var labelX = M, barX = M + 232, barMax = 190, valX = PW - M;
+  var labelX = M + 2, labelW = 208, barX = M + 218, barMax = 168, valX = PW - M - 2;
   for (var i = 0; i < Math.min(5, d.topBots.length); i++) {
     var b = d.topBots[i];
-    y = ensure(doc, d, y, 15);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    y = ensure(doc, d, y, 18);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.8);
     doc.setTextColor(INK[0], INK[1], INK[2]);
-    doc.text(shortBot(b.bot, 38), labelX, y);
-    var bw = Math.max(3, barMax * (b.cost / max));
+    doc.text(shortBot(b.bot, 34), labelX, y);
+    // track
+    doc.setFillColor(GRID[0], GRID[1], GRID[2]);
+    doc.roundedRect(barX, y - 7.5, barMax, 8, 4, 4, 'F');
+    var bw = Math.max(6, barMax * (b.cost / max));
     doc.setFillColor(ACC[0], ACC[1], ACC[2]);
-    doc.rect(barX, y - 7, bw, 8, 'F');
+    doc.roundedRect(barX, y - 7.5, bw, 8, 4, 4, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.8);
     doc.text(money(b.cost), valX, y, { align: 'right' });
-    y += 13.5;
+    y += 16;
   }
-  return y + 4;
+  return y + 6;
 }
 
 function generateCFOPDFBytes(A, opts) {
   var d = buildCFOData(A, opts);
   var JsPDF = getJsPDFCtor();
   var doc = new JsPDF({ unit: 'pt', format: 'a4', compress: false });
-  var y = 76; // header band occupies 0..56; post-pass stamps it on every page
+  var y = 78; // header band occupies 0..54; post-pass stamps it on every page
 
-  // Executive recommendation box
-  y = ensure(doc, d, y, 64);
-  doc.setFillColor(237, 240, 255);
-  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.7);
-  doc.roundedRect(M, y - 2, CW, 56, 4, 4, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  doc.setTextColor(ACC[0], ACC[1], ACC[2]);
-  doc.text('EXECUTIVE RECOMMENDATION', M + 8, y + 11);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  // Executive recommendation box (dynamic height, left accent, breathing room)
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8);
+  var recLines = doc.splitTextToSize(san('AI training bots consumed ' + money(d.kpis.blockable) + ' (' + pct(d.kpis.blockableShare) + ' of egress) with zero citation value. Blocking recovers ~' + money(d.kpis.monthly) + '/mo (' + money(d.kpis.annual) + '/yr). Search-index + user-fetch traffic must stay allowed -- blocking drops AI citations in 1-2 weeks and breaks shopping-ad verification.'), CW - 30);
+  var recH = 30 + recLines.length * 12.5;
+  y = ensure(doc, d, y, recH + 10);
+  doc.setFillColor(BLUE_BG[0], BLUE_BG[1], BLUE_BG[2]);
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.6);
+  doc.roundedRect(M, y, CW, recH, 6, 6, 'FD');
+  doc.setFillColor(ACC[0], ACC[1], ACC[2]);
+  doc.roundedRect(M, y, 4.5, recH, 6, 6, 'F');
+  doc.rect(M + 2, y, 2.5, recH, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.2);
+  doc.setTextColor(ACC_DK[0], ACC_DK[1], ACC_DK[2]);
+  doc.text('EXECUTIVE RECOMMENDATION', M + 14, y + 16);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8);
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  var recLines = doc.splitTextToSize(san('AI training bots consumed ' + money(d.kpis.blockable) + ' (' + pct(d.kpis.blockableShare) + ' of egress) with zero citation value. Blocking recovers ~' + money(d.kpis.monthly) + '/mo (' + money(d.kpis.annual) + '/yr). Search-index + user-fetch traffic must stay allowed -- blocking drops AI citations in 1-2 weeks and breaks shopping-ad verification.'), CW - 16);
-  for (var ri = 0; ri < recLines.length; ri++) doc.text(recLines[ri], M + 8, y + 24 + ri * 10.5);
-  y += 66;
+  for (var ri = 0; ri < recLines.length; ri++) doc.text(recLines[ri], M + 14, y + 30 + ri * 12.5);
+  y += recH + 12;
 
   y = h1(doc, d, y, '1 - Financials (measured, auditable)');
   y = kpiGrid(doc, d, y);
@@ -410,8 +458,8 @@ function generateCFOPDFBytes(A, opts) {
   y = h2(doc, d, y, 'Top cost bots (measured)');
   y = autoTable(doc, d, y,
     ['Bot', 'Tier', 'Reqs', 'Bytes', 'Cost'],
-    d.topBots.map(function (b) { return [b.bot, tierLabel(b.tier), num(b.count), bytesFmt(b.bytes), money(b.cost)]; }),
-    { 0: { fontStyle: 'bold' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', textColor: RED } });
+    d.topBots.map(function (b) { return [shortBot(b.bot, 40), tierLabel(b.tier), num(b.count), bytesFmt(b.bytes), money(b.cost)]; }),
+    { 0: { fontStyle: 'bold' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', textColor: RED, fontStyle: 'bold' } });
   y = bars(doc, d, y);
   y = h2(doc, d, y, 'Crawl traps -> $ waste (fix owners: Eng/SEO)');
   if (d.traps.length) {
@@ -425,7 +473,7 @@ function generateCFOPDFBytes(A, opts) {
   if (d.actions.length) {
     y = autoTable(doc, d, y,
       ['Bot', 'Edge action', 'Saving', 'Risk'],
-      d.actions.map(function (a) { return [a.bot, a.action, money(a.saving), a.risk]; }),
+      d.actions.map(function (a) { return [shortBot(a.bot, 30), a.action, money(a.saving), a.risk]; }),
       { 0: { fontStyle: 'bold' }, 2: { halign: 'right' } });
   } else y = para(doc, d, y, 'No training/suspicious volume above the >=2-request floor -- nothing to block. Re-run after a larger window.', 8);
   y = h2(doc, d, y, 'Do NOT block (revenue / citation protection)');
@@ -439,14 +487,24 @@ function generateCFOPDFBytes(A, opts) {
   y = para(doc, d, y, 'Verification: ' + num(d.verify.verified) + ' checks match expected patterns; ' + num(d.verify.suspicious) + ' unusual. Claimed AI fetches: ' + num(d.verify.claimed) + ', unverified ' + num(d.verify.unverified) + ' (' + pct(d.verify.unverifiedPct) + '). Confirm blocks with vendor IP JSON + server-side reverse DNS (dig -x) before enforcing.', 7.5);
   y = para(doc, d, y, 'Human ' + pct(d.humanPct) + ' / bot ' + pct(d.botPct) + '  |  IPs ' + num(d.uniqueIPs) + '  |  URLs ' + num(d.uniqueURLs) + '  |  File: ' + (d.meta.file || 'upload') + '  |  Tool v' + d.meta.db + ' client-side -- no log leaves this browser.', 7);
   y = para(doc, d, y, 'Method: ' + d.method, 7);
-  y = ensure(doc, d, y, 34);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  doc.text('Approved: ______________________    Date: __________    Owner: __________', M, y);
+  y = ensure(doc, d, y, 52);
+  doc.setDrawColor(GRID[0], GRID[1], GRID[2]); doc.setLineWidth(0.5);
+  doc.line(M, y, PW - M, y);
   y += 14;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.setTextColor(MUT[0], MUT[1], MUT[2]);
+  var colW = CW / 3;
+  doc.text('Approved:', M + 2, y);
+  doc.text('Date:', M + colW, y);
+  doc.text('Owner:', M + colW * 2, y);
+  doc.setDrawColor(INK[0], INK[1], INK[2]); doc.setLineWidth(0.7);
+  doc.line(M + 52, y + 3, M + colW - 8, y + 3);
+  doc.line(M + colW + 30, y + 3, M + colW * 2 - 8, y + 3);
+  doc.line(M + colW * 2 + 38, y + 3, PW - M - 2, y + 3);
+  y += 16;
   doc.setFontSize(7);
   doc.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
-  doc.text('Full WAF + robots bundle lives in Module 6 (copy buttons) -- this PDF carries the business case, not raw regex.', M, y);
+  doc.text('Full WAF + robots bundle lives in Module 6 (copy buttons) -- this PDF carries the business case, not raw regex.', M + 2, y);
 
   stampChrome(doc, d); // footers carry the {total} placeholder…
   if (typeof doc.putTotalPages === 'function') doc.putTotalPages(TOTAL_PAGES); // …resolved here, once

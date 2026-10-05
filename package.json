@@ -1,6 +1,6 @@
 {
   "name": "log-file-bot-traffic-cost-analyzer",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Free, private, client-side log file analyzer: GPTBot vs SearchBot cost split + Cloudflare Sept-2026 defaults + Pay Per Crawl v2 + Web Bot Auth batch verify + policy bundle + MCP. Training vs search-index vs user-triggered AI split (2026). 127 signatures, 16 traps, IPv6+CIDR verify, .gz/multi-file, CLI exact mode.",
   "main": "dev-server.js",
   "scripts": {

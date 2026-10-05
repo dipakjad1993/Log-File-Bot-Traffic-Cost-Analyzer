@@ -13,7 +13,7 @@ Free, private, **$0** vs $139/yr Screaming Frog Log Analyser ($279 Spider) / €
 
 **[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html)**
 
-Enterprise UI (v2.2.0): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Tool name + one-line description up front, sample downloads by **URL range with live max-size estimate** (0–100 … 1M–10M URLs; in-browser generation caps at 1M, CLI covers the rest), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
+Enterprise UI (v2.2.1): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Centered 1200px layout with no right-side whitespace gap, tables scroll inside their cards, and a crisp SVG brand mark. Sample downloads by **URL range with live max-size estimate** (0–100 … 1M–10M URLs; in-browser generation caps at 1M, CLI covers the rest), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
 
 > Private by design: 100% client-side, no XHR/WebSocket/sendBeacon. Only network request is loading the demo file you click. See [METHOD.md](METHOD.md).
 
@@ -72,9 +72,9 @@ Includes Cloudflare Sept-15-2026 defaults, Pay Per Crawl 402 beta, Web Bot Auth,
 | 6 | Edge Rules + Policy | Cloudflare/Fastly/AWS copy-paste, robots + llms.txt + crawlers.json bundle, OAI-AdsBot guard |
 | 7–8 | Performance + Traffic | TTFB bots vs humans, bursts (z-score, no deps), 404-cluster tickets, GSC overlay |
 | 9 | Security | Traversal, .git/HEAD, creds, SSRF, velocity anomalies |
-| 10 | CFO / FinOps | Totals, monthly/annual run-rate, CSV + real PDF download (vendored jsPDF, no CDN) |
+| 10 | CFO / FinOps | Totals, monthly/annual run-rate, CSV + redesigned 2-page PDF (M3 blue, numbered sections, KPI cards, dynamic exec box, aligned tables + sign-off) — vendored jsPDF, no CDN |
 
-Screenshots: `assets/screenshots/09-tab1-classification.png` → `29-cfo-viewport.png` (analysis modules unchanged; only the app header/hero was refreshed in v2.2.0). Full history: [CHANGELOG.md](CHANGELOG.md).
+Screenshots: `assets/screenshots/09-tab1-classification.png` → `29-cfo-viewport.png` (analysis modules unchanged; v2.2.1 refreshed the app shell centering, brand mark, and CFO PDF design). Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## 5. Quick start
 

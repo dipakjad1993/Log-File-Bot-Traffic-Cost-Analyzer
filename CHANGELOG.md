@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — v2.2.1 patch (CFO PDF redesign + centered layout)
+
+- **CFO PDF redesign** (`js/cfo-pdf.js`): Material-3 blue palette matching the app,
+  44pt margins, numbered section badges, KPI cards with accent strips, dynamic-height
+  executive box (no more text overflow), lighter table padding/typography,
+  track-and-fill cost bars, 3-column sign-off. Same data model + copy; all 7
+  `cfo-pdf` asserts green, no autotable width warnings.
+- **Layout fix** (`css/style.css`): `.main-wrap` centered (`margin:0 auto`) instead of
+  left-pinned — removes the right-side whitespace gap on wide screens;
+  `overflow-x:clip` on page/shell/cards so wide tables scroll inside `.tbl-wrap` only.
+- **Brand mark** (`index.html`): `▦` text glyph replaced with an inline SVG icon
+  (no more tofu box on systems missing the glyph).
+- Cache-busters bumped (`style.css?v=2.2.1`, `cfo-pdf.js?v=1.3.0`).
+
 ## Unreleased — sample-data v3 (in-app Download generator)
 
 Enterprise-realistic downloadable samples at every size (1MB–1GB, same mix):
