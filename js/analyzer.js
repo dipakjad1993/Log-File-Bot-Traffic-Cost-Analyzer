@@ -1756,7 +1756,17 @@ function exportFullPDF(A, opts){
       const ib=document.getElementById('ib-file'); const t=ib?ib.textContent:'';
       fileName=(t&&t!=='--')?t:'';
     }catch(e){}
-    if(engine&&engine.downloadFullPDF){ return engine.downloadFullPDF(A,{domain:domain||undefined,file:fileName||undefined}); }
+    // Live environment extras so the PDF carries real DB/freshness + PPC numbers.
+    let extras={};
+    try{
+      extras.botDb=BOT_DB_VERSION; extras.sigs=BOTS.length;
+      extras.rateTraining=RATE_POLICY.ai_training.limit+' ('+RATE_POLICY.ai_training.aggressive+')';
+      extras.rateSearch=RATE_POLICY.ai_search_index.limit+' ('+RATE_POLICY.ai_search_index.aggressive+')';
+      extras.rateUser=RATE_POLICY.ai_user_fetch.limit;
+      try{const fs=getFreshnessStatus(); extras.fresh='DB '+fs.label;}catch(e2){}
+      try{const p=calcPayPerCrawlRecovery(A.botData,0.02); extras.ppc={rows:p.rows.slice(0,10),totalMonthly:p.totalMonthly,headline:p.headline};}catch(e3){}
+    }catch(e4){}
+    if(engine&&engine.downloadFullPDF){ return engine.downloadFullPDF(A,{domain:domain||undefined,file:fileName||undefined,extras}); }
   }catch(e){}
   alert('Full-report engine failed to load — re-check js/full-report-pdf.js script tag, then retry.');
 }

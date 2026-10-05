@@ -28,6 +28,10 @@ test('full-report: data model covers all 10 modules + CFO', () => {
   assert.ok(d.costs.rows.length <= 20 && d.costs.rows.length > 0, 'cost rows trimmed');
   assert.ok(Array.isArray(d.ai.rows), 'AI matrix rows');
   assert.ok(Array.isArray(d.edge.cloudflare), 'edge rules arrays');
+  assert.ok(d.edge.counts && d.edge.counts.total >= 0, 'edge rule counts');
+  assert.ok(Array.isArray(d.crawl.topPaths), 'top paths array');
+  assert.ok(d.classification.topBots[0].avgMs !== undefined, 'TTFB on top-bot rows');
+  assert.ok(d.env && d.env.botDb.length > 0, 'env provenance present');
   assert.ok(d.perf.statuses.length > 0, 'status distribution');
   assert.ok(d.perf.hourly.length === 24, 'hourly buckets');
   assert.ok(Array.isArray(d.dynamics.daily) && d.dynamics.daily.length === 7, 'day-of-week');
@@ -45,9 +49,18 @@ test('full-report: generates multi-page real PDF with all sections', () => {
   assert.ok(/^%PDF-1\.[3-7]/.test(head), 'real PDF header, got: ' + head);
   assert.ok(res.pages >= 4, 'full reference spans multiple pages, got ' + res.pages);
   const body = Buffer.from(res.bytes).toString('latin1');
-  for (const s of ['FULL ANALYSIS REPORT', 'EXECUTIVE RECOMMENDATION', 'Bot classification', 'Multi-layer bot verification', 'Crawl budget', 'Infrastructure cost analysis', 'citation ROI matrix', 'Edge + policy bundle', 'Performance deep dive', 'Dynamics', 'Security threat intelligence', 'Do NOT block', 'Appendix']) {
+  for (const s of ['FULL ANALYSIS REPORT', 'EXECUTIVE RECOMMENDATION', 'Bot classification', 'Multi-layer bot verification', 'Crawl budget', 'Infrastructure cost analysis', 'citation ROI matrix', 'Edge + policy bundle', 'Performance deep dive', 'Dynamics', 'Security threat intelligence', 'Do NOT block', 'Appendix', 'Contents', 'Tier glossary', 'At a glance']) {
     assert.ok(body.includes(s), 'section present: ' + s);
   }
+  // Navigation: numbered contents with dotted leaders + PDF bookmarks
+  assert.ok(/\.{5,}\s+\d+/.test(body), 'contents carry page numbers');
+  assert.ok(body.includes('/Outlines'), 'PDF bookmarks present (reader sidebar)');
+  // Code integrity: robots.txt lines intact (one directive per line), full rules kept
+  assert.ok(body.includes('User-agent: GPTBot'), 'robots training line present');
+  assert.ok(body.includes('User-agent: OAI-SearchBot'), 'robots allow line present');
+  assert.ok(body.includes('http.user_agent contains'), 'full Cloudflare rule match present, not truncated');
+  assert.ok(body.includes('{ action: "block"; }'), 'full block action present');
+  assert.ok(!body.includes('Match (truncated)'), 'no truncated-match tables anymore');
   assert.ok(/Page 1 of/.test(body), 'paginated footer present');
   const footers = [...body.matchAll(/Page (\d+) of (\d+)/g)].map((m) => [m[1], m[2]]);
   assert.equal(footers.length, res.pages, 'one footer per page');

@@ -7,8 +7,17 @@
   summary (same `buildCFOData` numbers as the standalone CFO PDF), then Modules
   1-9 trimmed for print (top-25 bots, verification KPIs, crawl efficiency, top-20
   costs, AI matrix, edge rules + robots.txt + decision tree, TTFB/status/hourly,
-  bursts/404s/weekdays/IPs/referrers, threats/hvIPs/stealth) and a method appendix
+  bursts/404s/weekdays/IPs/referrers, threats/hvIPs/stealth)   and a method appendix
   with sign-off. Same M3 styling + WinAnsi-safe text as the CFO engine.
+  v2.3.0-redesign: numbered + clickable contents with real page numbers
+  (two-pass layout), PDF bookmarks for the reader sidebar, ^ Contents
+  backlinks per module, rows never split across pages, robots.txt /
+  decision-tree / rules render line-by-line (newline-safe splitter),
+  full-length edge-rule cards (no truncation), 6-KPI cover strip,
+  data-derived finding callouts per module (biggest drain, costliest
+  trap, revenue watch, largest burst, top threat), trap $ waste,
+  cost-component split, PPC recovery table (live), rate-policy table,
+  tier glossary appendix, most-requested paths, spike-day notes.
   Suite: 118 → 121 asserts (`tests/full-report.test.js`), all green.
 
 ## Unreleased — v2.2.1 patch (CFO PDF redesign + centered layout)
