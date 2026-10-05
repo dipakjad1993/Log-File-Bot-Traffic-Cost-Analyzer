@@ -3050,9 +3050,11 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   const prm=new URLSearchParams(location.search);
   if(prm.get('sample')==='10k'){fetch('./sample-data/sample-10k.jsonl').then(r=>r.text()).then(t=>{const recs=t.split('\n').filter(l=>l.trim()).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);document.getElementById('upload-panel').classList.add('hidden');document.getElementById('progress-wrap').classList.remove('hidden');lastRecords=recs;processRecords(recs,{name:'sample-10k.jsonl',size:t.length});}).catch(()=>{});}
   document.querySelectorAll('.nav-btn[data-section],.brand[data-section]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();showPage(b.dataset.section)}));
-  // URL-count sample estimator: total URLs + estimated file size side by side
+  // URL-range sample estimator: selected range + max file size side by side
   function fmtEst(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(bytes<10240?1:0)+' KB';if(bytes<1073741824)return (bytes/1048576).toFixed(bytes<10485760?1:0)+' MB';return (bytes/1073741824).toFixed(2)+' GB';}
-  function updateSampleEst(){try{const sel=document.getElementById('sample-size'),est=document.getElementById('sample-size-est');if(!sel||!est)return;const n=parseInt(sel.value||'10000',10)||10000;est.textContent='≈ '+fmtEst(n*450)+' · '+n.toLocaleString()+' URLs';}catch(e){}}
+  function sampleRange(){try{const sel=document.getElementById('sample-size');if(!sel)return{min:1000,max:10000};const opt=sel.selectedOptions&&sel.selectedOptions[0];const max=parseInt(sel.value||'10000',10)||10000;const min=opt&&opt.dataset&&opt.dataset.min!=null?parseInt(opt.dataset.min,10)||0:0;return{min,max};}catch(e){return{min:1000,max:10000};}}
+  function fmtRange(min,max){const f=n=>n.toLocaleString();return min===0?'0–'+f(max):f(min)+'–'+f(max);}
+  function updateSampleEst(){try{const est=document.getElementById('sample-size-est');if(!est)return;const{min,max}=sampleRange();est.textContent='≈ '+fmtEst(max*450)+' max · '+fmtRange(min,max)+' URLs';}catch(e){}}
   {const _sel=document.getElementById('sample-size');if(_sel){_sel.addEventListener('change',updateSampleEst);_sel.addEventListener('input',updateSampleEst);}updateSampleEst();}
   document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>{showTab(b.dataset.tab);lazyRender(b.dataset.tab);}));
   // Keyboard 1-0 tab shortcuts (a11y) + lazy-render tabs 2-10 after analyze
@@ -3134,9 +3136,13 @@ if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',fu
   document.getElementById('clear-btn').addEventListener('click',()=>{fi.value='';document.getElementById('info-bar').classList.add('hidden');document.getElementById('results').classList.add('hidden');document.getElementById('upload-panel').classList.remove('hidden');currentAnalysis=null});
   document.getElementById('download-sample-btn').addEventListener('click',e=>{
     e.stopPropagation();
-    // URL-count selector: total URLs drive generation; file size shown as estimate (~450 B/row)
-    let urlCount=parseInt(document.getElementById('sample-size')?.value||'10000',10)||10000;
-    urlCount=Math.max(100,Math.min(urlCount,1000000));
+    // URL-range selector: generate the range max (deterministic); file size is estimate (~450 B/row)
+    const _range=sampleRange();
+    let urlCount=Math.max(100,_range.max||10000);
+    if(urlCount>1000000){
+      if(!confirm('The '+fmtRange(_range.min,_range.max)+' URL range peaks at ≈ '+fmtEst(_range.max*450)+' — too large to build in a browser tab (it would crash). Generate the 1,000,000 URL browser max instead, or run the CLI for the full range: npm run gen-logs -- --lines '+_range.max+' --out file.jsonl. Continue with 1M in browser?'))return;
+      urlCount=1000000;
+    }
     let actualSizeMB=(urlCount*450)/1048576; // fractional MB => exact URL count via sampleTargetRecords
     const dispMB=actualSizeMB<1?actualSizeMB.toFixed(2):actualSizeMB<10?actualSizeMB.toFixed(1):Math.round(actualSizeMB).toString();
     const estLabel=urlCount.toLocaleString()+' URLs (≈ '+dispMB+' MB)';

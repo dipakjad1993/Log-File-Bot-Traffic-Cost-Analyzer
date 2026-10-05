@@ -13,7 +13,7 @@ Free, private, **$0** vs $139/yr Screaming Frog Log Analyser ($279 Spider) / €
 
 **[Try Live](https://log-file-bot-traffic-cost-analyzer.pages.dev) · [1-click 10k demo](https://log-file-bot-traffic-cost-analyzer.pages.dev/?sample=10k) · [1GB proof teardown](research/1gb-teardown.html)**
 
-Enterprise UI (v2.2.0): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Tool name + one-line description up front, sample downloads by **URL count with live file-size estimate** (100–1M URLs; estimator refreshes on every selection), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
+Enterprise UI (v2.2.0): **Material 3 (Material You)** theme — top app bar with **Analyzer · Knowledge Base ▾ · About · How To Use** (guides live on their own pages, not in a sidebar), M3 filled/tonal pill buttons, tonal chips, elevated cards, and linear progress. Tool name + one-line description up front, sample downloads by **URL range with live max-size estimate** (0–100 … 1M–10M URLs; in-browser generation caps at 1M, CLI covers the rest), and the 2026 Pixel typeface (**Google Sans Flex**) throughout.
 
 > Private by design: 100% client-side, no XHR/WebSocket/sendBeacon. Only network request is loading the demo file you click. See [METHOD.md](METHOD.md).
 
@@ -87,7 +87,7 @@ npm test             # 118 asserts
 npm run lint
 ```
 
-Inputs: JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush, .gz — mixed files + rotations OK. Streams in 8MB slices; 500MB+ exact → `node tools/cli.js --exact --in access.log --out summary.json`. Test data: pick **100 / 1K / 10K / 100K / 1M URLs** in the tool (each shows its estimated file size, ≈450 bytes/row) or `npm run gen-logs -- --lines N --out file.jsonl`.
+Inputs: JSON array, JSONL/NDJSON, Apache Combined, Nginx, W3C Extended (#Fields), AWS ALB, Cloudflare Logpush, .gz — mixed files + rotations OK. Streams in 8MB slices; 500MB+ exact → `node tools/cli.js --exact --in access.log --out summary.json`. Test data: pick a **URL range** in the tool (**0–100 / 100–1K / 1K–10K / 10K–100K / 100K–1M / 1M–10M**, each showing its max file size, ≈450 bytes/row; browser builds up to 1M) or `npm run gen-logs -- --lines N --out file.jsonl`.
 
 Deploy: Cloudflare Pages (primary, `main`, no build command, headers from `_headers`) or GitHub Pages backup. Live: https://log-file-bot-traffic-cost-analyzer.pages.dev
 

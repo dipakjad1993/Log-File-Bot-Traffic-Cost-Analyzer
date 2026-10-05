@@ -141,17 +141,18 @@
       <span class="divider-text">Need test data?</span>
       <div class="sample-controls">
         <label class="sample-size-label" for="sample-size">Sample volume:</label>
-        <select id="sample-size" aria-label="Sample volume in log lines">
-          <option value="100">100 URLs</option>
-          <option value="1000">1,000 URLs</option>
-          <option value="10000" selected>10,000 URLs</option>
-          <option value="100000">100,000 URLs</option>
-          <option value="1000000">1,000,000 URLs</option>
+        <select id="sample-size" aria-label="Sample volume as a URL range">
+          <option value="100" data-min="0">0 – 100 URLs</option>
+          <option value="1000" data-min="100">100 – 1,000 URLs</option>
+          <option value="10000" data-min="1000" selected>1,000 – 10,000 URLs</option>
+          <option value="100000" data-min="10000">10,000 – 100,000 URLs</option>
+          <option value="1000000" data-min="100000">100,000 – 1,000,000 URLs</option>
+          <option value="10000000" data-min="1000000">1,000,000 – 10,000,000 URLs</option>
         </select>
-        <span class="sample-est" id="sample-size-est" aria-live="polite">≈ 4.3 MB · 10,000 URLs</span>
+        <span class="sample-est" id="sample-size-est" aria-live="polite">≈ 4.3 MB max · 1,000–10,000 URLs</span>
         <button class="btn-outline" id="download-sample-btn">Download Sample Log</button>
       </div>
-      <p class="sample-note">Each option lists total URLs plus its estimated file size (≈450 bytes/row). For exact multi-GB totals use <code>node tools/cli.js --exact</code>.</p>
+      <p class="sample-note">Pick a URL range — the chip shows the max file size for that range (≈450 bytes/row). In-browser generation caps at 1M URLs; for 10M or exact multi-GB totals use <code>node tools/cli.js --exact</code>.</p>
     </div>
     <section class="kb-strip" aria-label="Knowledge base">
       <p>Looking for research? Open <strong>Knowledge Base ▾</strong> in the top bar — bot comparisons, Cloudflare playbooks, and the measured 1.02GB teardown live on their own pages.</p>
@@ -272,6 +273,6 @@
 <script src="./js/vendor/jspdf.umd.min.js?v=2.5.1"></script>
 <script src="./js/vendor/jspdf-autotable.min.js?v=3.8.2"></script>
 <script src="./js/cfo-pdf.js?v=1.2.0"></script>
-<script src="./js/analyzer.js?v=1.5.0"></script>
+<script src="./js/analyzer.js?v=1.6.0"></script>
 </body>
 </html>
