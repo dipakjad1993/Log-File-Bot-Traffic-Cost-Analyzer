@@ -1,7 +1,12 @@
 /* ============================================================
    Log File & Bot Traffic Analyzer — Material 3 (Material You)
    M3 color roles + shape scale + elevation, seed #0B57D0.
-   Typeface: Google Sans Flex (2026 Pixel) + Google Sans Code.
+   Typeface: Google Sans Flex (Pixel system font since Android 16,
+   open-sourced Nov 2025, variable 1–1000) + Google Sans Code
+   (Google's 2025 code face, variable 300–800, italics included).
+   Both served from Google Fonts; every page (tool + all 8
+   Knowledge Base pages) links them. Display grade = weight 800
+   + tight tracking + optical sizing, the Pixel/M3-Expressive look.
    Legacy --bg/--text/--accent aliases map onto M3 roles so all
    analyzer-generated markup keeps working unchanged.
    ============================================================ */
@@ -91,8 +96,9 @@
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:15px;-webkit-font-smoothing:antialiased}
-body{font-family:var(--sans);background:var(--md-surface);color:var(--md-on-surface);min-height:100vh;line-height:1.6}
+html{font-size:15px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-optical-sizing:auto}
+body{font-family:var(--sans);font-optical-sizing:auto;background:var(--md-surface);color:var(--md-on-surface);min-height:100vh;line-height:1.6}
+button,input,select,textarea{font-family:var(--sans);font-optical-sizing:auto}
 
 /* ---- Legacy sidebar (removed → top app bar) ---- */
 .sidebar{display:none !important}
@@ -117,13 +123,14 @@ body{font-family:var(--sans);background:var(--md-surface);color:var(--md-on-surf
   display:flex;align-items:center;justify-content:center;font-size:20px;
 }
 .brand-text{display:flex;flex-direction:column;line-height:1.25;min-width:0}
-.brand-text strong{font-size:15px;font-weight:700;letter-spacing:-0.1px;white-space:nowrap}
+.brand-text strong{font-size:15.5px;font-weight:800;letter-spacing:-0.02em;white-space:nowrap}
 .brand-text small{font-size:11px;color:var(--md-on-surface-variant);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .topnav{display:flex;align-items:center;gap:2px;margin-left:auto}
 .nav-btn{
   background:transparent;border:none;color:var(--md-on-surface-variant);
-  padding:9px 16px;border-radius:var(--m3-full);font-size:13px;font-weight:600;cursor:pointer;
+  padding:9px 16px;border-radius:var(--m3-full);font-size:13px;font-weight:700;cursor:pointer;
   font-family:var(--sans);white-space:nowrap;text-decoration:none;transition:background .15s,color .15s;
+  letter-spacing:0.01em;
 }
 .nav-btn:hover{background:var(--md-state-hover);color:var(--md-on-surface)}
 .nav-btn.active{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
@@ -158,7 +165,7 @@ a.nav-btn{display:inline-block}
 
 /* ---- Upload (M3 hero) ---- */
 .upload-panel{max-width:760px;margin:0 auto;padding:44px 0 30px;text-align:center}
-.upload-header h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;margin:6px 0 10px;color:var(--md-on-surface)}
+.upload-header h1{font-size:36px;font-weight:800;letter-spacing:-0.03em;line-height:1.12;margin:6px 0 10px;color:var(--md-on-surface);text-wrap:balance}
 .tool-sub{font-size:14.5px;color:var(--md-on-surface-variant);line-height:1.75;max-width:640px;margin:0 auto}
 .tool-sub strong{color:var(--md-on-surface)}
 .trust-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px auto 4px}
@@ -209,7 +216,7 @@ a.nav-btn{display:inline-block}
 .btn-primary{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   min-height:40px;padding:10px 24px;background:var(--md-primary);color:var(--md-on-primary);border:none;
-  border-radius:var(--m3-full);font-size:13px;font-weight:600;
+  border-radius:var(--m3-full);font-size:13px;font-weight:700;letter-spacing:0.01em;
   cursor:pointer;transition:box-shadow .15s,background .15s;font-family:var(--sans);text-decoration:none;
   box-shadow:var(--m3-e0);
 }
@@ -263,7 +270,7 @@ a.btn-primary,a.btn-outline{text-decoration:none}
 .kpi.c-purple::before{background:var(--md-purple)}.kpi.c-cyan::before{background:var(--md-tertiary)}
 .kpi.c-pink::before{background:var(--pink)}
 .kpi-label{font-size:10px;color:var(--md-on-surface-variant);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-weight:600}
-.kpi-val{font-size:24px;font-weight:700;font-family:var(--mono);letter-spacing:-.4px;line-height:1;color:var(--md-on-surface)}
+.kpi-val{font-size:26px;font-weight:700;font-family:var(--mono);letter-spacing:-0.01em;line-height:1.05;color:var(--md-on-surface);font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
 .kpi-sub{font-size:11px;color:var(--md-on-surface-variant);margin-top:5px}
 
 /* ---- M3 tabs ---- */
@@ -286,7 +293,11 @@ a.btn-primary,a.btn-outline{text-decoration:none}
   border:none;border-radius:var(--m3-lg);padding:22px;margin-bottom:16px;
   box-shadow:var(--m3-e1);
 }
-.card h3{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--md-on-surface);letter-spacing:-.1px}
+.card h3{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--md-on-surface);letter-spacing:-0.01em}
+/* Display-grade page titles (Knowledge Base + About + HowTo screens) */
+.main-wrap h1,.card>h1{font-size:29px;font-weight:800;letter-spacing:-0.025em;line-height:1.18;margin-bottom:10px;text-wrap:balance}
+.content-page h1{font-size:28px;font-weight:800;letter-spacing:-0.025em;line-height:1.2;margin-bottom:8px;text-wrap:balance}
+.content-page h2{font-size:18px;font-weight:750;margin:28px 0 8px;letter-spacing:-0.01em}
 .card h4{font-size:13px;font-weight:600;margin:18px 0 8px;color:var(--md-on-surface-variant)}
 .card p{font-size:13px;color:var(--md-on-surface-variant);line-height:1.75;margin-bottom:8px}
 
@@ -294,8 +305,8 @@ a.btn-primary,a.btn-outline{text-decoration:none}
 .tbl-wrap{overflow-x:auto;margin:10px 0;border:1px solid var(--md-outline-variant);border-radius:var(--m3-md);background:var(--md-surface-container-lowest)}
 table.dt{width:100%;border-collapse:collapse;font-size:12px}
 table.dt th{
-  background:var(--md-surface-container);padding:10px 14px;text-align:left;font-weight:600;
-  font-size:11px;letter-spacing:.3px;color:var(--md-on-surface-variant);
+  background:var(--md-surface-container);padding:10px 14px;text-align:left;font-weight:700;
+  font-size:11px;letter-spacing:.04em;color:var(--md-on-surface-variant);
   border-bottom:1px solid var(--md-outline-variant);white-space:nowrap;font-family:var(--sans);
 }
 table.dt td{
@@ -508,6 +519,8 @@ table.dt{min-width:640px}
   .topnav{order:3;width:100%;overflow-x:auto;padding-bottom:2px}
   .privacy-chip{display:none}
   .brand-text strong{white-space:normal}
+  .upload-header h1{font-size:28px}
+  .main-wrap h1,.card>h1,.content-page h1{font-size:24px}
   .main-wrap{margin-left:0;padding:14px}
   .cols2{grid-template-columns:1fr}
   .bar-l{width:100px;font-size:10px}
